@@ -143,7 +143,8 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         yaxis_title=y_title,
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=450  # Imposta un'altezza fissa per il grafico
     )
     return fig
 
@@ -153,7 +154,8 @@ def plot_histogram(data, anni_totali):
         title_text='Distribuzione del Patrimonio Finale Reale',
         xaxis_title_text='Patrimonio Finale (Potere d\'Acquisto Odierno)',
         yaxis_title_text='Numero di Simulazioni',
-        bargap=0.1
+        bargap=0.1,
+        height=400 # Altezza fissa
     )
     return fig
 
@@ -169,7 +171,8 @@ def plot_success_probability(data, anni_totali):
         xaxis_title='Anni di Simulazione',
         yaxis_title='Probabilità di Avere Patrimonio Residuo',
         yaxis_tickformat='.0%',
-        yaxis_range=[0, 1.01]
+        yaxis_range=[0, 1.01],
+        height=400 # Altezza fissa
     )
     return fig
 
@@ -199,7 +202,8 @@ def plot_income_composition(data, anni_totali):
         yaxis_title='Reddito Reale Annuo (€ Odierni)',
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=400 # Altezza fissa
     )
     return fig
 
@@ -238,7 +242,8 @@ def plot_asset_allocation(data, anni_totali):
         yaxis_title='Percentuale del Patrimonio Totale',
         yaxis_tickformat='.0%',
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=400 # Altezza fissa
     )
     return fig
 
@@ -307,7 +312,8 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
         yaxis_title="Reddito Annuo Reale (€ di oggi)",
         legend_title="Range Percentili",
         showlegend=True,
-        hovermode="x unified"
+        hovermode="x unified",
+        height=450  # Imposta un'altezza fissa per il grafico
     )
     fig.update_yaxes(tickprefix="€", tickformat=",.0f")
 
@@ -356,7 +362,7 @@ def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
 
 # --- Configurazione Pagina ---
 st.set_page_config(
-    page_title="Simulatore Finanziario Monte Carlo v2.0",
+    page_title="Simulatore Finanziario Monte Carlo",
     page_icon="📈",
     layout="wide"
 )
@@ -368,8 +374,8 @@ if 'simulazione_eseguita' not in st.session_state:
     st.session_state['parametri'] = {}
 
 # --- Titolo ---
-st.title("📈 Simulatore di Pianificazione Finanziaria Monte Carlo v2.0")
-st.markdown("Benvenuto nella versione 2.0 del simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria.")
+st.title("📈 Simulatore di Pianificazione Finanziaria Monte Carlo")
+st.markdown("Benvenuto! Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria.")
 
 # --- Barra Laterale: Input Utente ---
 st.sidebar.header("Configurazione Simulazione")
@@ -750,25 +756,33 @@ else:
 
     st.write("---")
     st.markdown("##### Capitale Reale & Rischio")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric(
-        "Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}",
-        help="Il potere d'acquisto mediano del tuo patrimonio a fine piano, espresso in Euro di oggi. La metrica più importante."
-    )
-    col2.metric(
-        "Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}",
-        delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse",
-        help="La probabilità di finire i soldi prima della fine della simulazione."
-    )
-    col3.metric(
-        "Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}",
-        delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse",
-        help="La perdita percentuale più grande dal picco, nello scenario peggiore. Misura il 'dolore' massimo che potresti sopportare."
-    )
-    col4.metric(
-        "Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}",
-        help="Il rendimento ottenuto per ogni unità di rischio. Un valore più alto è meglio (sopra 1 è ottimo)."
-    )
+    with st.container(border=True):
+        st.subheader("Capitale Reale & Rischio")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(
+            label="Patrimonio Reale Finale Mediano (50°)",
+            value=f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}",
+            help="Il potere d'acquisto mediano del tuo patrimonio a fine piano."
+        )
+        col2.metric(
+            label="Probabilità di Fallimento",
+            value=f"{stats['probabilita_fallimento']:.2%}",
+            delta=f"{stats['probabilita_fallimento'] - (1 if 'storico' in stats and stats['storico'] else 0):.2%}",
+            delta_color="inverse",
+            help="La percentuale di simulazioni in cui il patrimonio si esaurisce prima della fine dell'orizzonte temporale."
+        )
+        col3.metric(
+            label="Drawdown Massimo Mediano",
+            value=f"{stats['drawdown_massimo_mediano']:.2%}",
+            delta=f"{stats['drawdown_massimo_mediano']:.2%}",
+            delta_color="normal",
+            help="La perdita massima mediana dal picco al minimo subita durante le simulazioni. Misura il rischio di ribasso."
+        )
+        col4.metric(
+            label="Sharpe Ratio Medio",
+            value=f"{stats['sharpe_ratio_medio']:.2f}",
+            help="Il rendimento ottenuto per ogni unità di rischio. Un valore più alto è meglio (sopra 1 è ottimo)."
+        )
 
     # --- Riepilogo Entrate in Pensione ---
     st.write("---")

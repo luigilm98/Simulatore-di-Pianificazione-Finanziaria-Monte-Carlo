@@ -263,16 +263,12 @@ def run_full_simulation(params):
     tutti_i_risultati_mensili = []
     lista_df_dettaglio = []
     tutti_i_risultati_nominali = []
-    tutti_i_redditi_reali_annui = []  # Correzione: raccoglie tutti i redditi
 
     for i in range(params['n_simulazioni']):
         patrimonio_reale, patrimonio_nominale, df_dettaglio = _esegui_una_simulazione(params)
         tutti_i_risultati_mensili.append(patrimonio_reale)
         tutti_i_risultati_nominali.append(patrimonio_nominale)
-        tutti_i_redditi_reali_annui.append(df_dettaglio['totale_entrate_reali']) # Correzione
-        
-        if i == 0: # Salva solo il dettaglio della prima simulazione per ora
-            lista_df_dettaglio.append(df_dettaglio)
+        lista_df_dettaglio.append(df_dettaglio)
 
     df_risultati_reali = pd.DataFrame(tutti_i_risultati_mensili).transpose()
     df_risultati_reali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
@@ -280,8 +276,9 @@ def run_full_simulation(params):
     df_risultati_nominali = pd.DataFrame(tutti_i_risultati_nominali).transpose()
     df_risultati_nominali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
     
-    # Correzione: Crea un DataFrame con i redditi di tutte le simulazioni
-    df_redditi_reali_annui = pd.DataFrame(tutti_i_redditi_reali_annui).transpose()
+    # Crea un DataFrame con i redditi di tutte le simulazioni partendo dai dati di dettaglio raccolti
+    df_dettaglio_completo = pd.concat(lista_df_dettaglio, keys=range(params['n_simulazioni']), names=['Sim_Num', 'Anno_Index'])
+    df_redditi_reali_annui = df_dettaglio_completo.reset_index().pivot(index='Anno_Index', columns='Sim_Num', values='totale_entrate_reali')
     df_redditi_reali_annui.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
 
     # Calcolo statistiche principali
@@ -289,17 +286,23 @@ def run_full_simulation(params):
     patrimoni_reali_finali = df_risultati_reali.iloc[-1]
     patrimoni_nominali_finali = df_risultati_nominali.iloc[-1]
     
-    # Calcolo drawdown massimo per ogni simulazione
-    drawdowns = []
-    for col in df_risultati_reali.columns:
-        serie = df_risultati_reali[col]
-        peak = serie.expanding().max()
+    # Calcolo drawdown massimo (Maximum Drawdown, MDD) in modo più robusto.
+    # Calcoliamo il MDD per ogni singola simulazione, poi prendiamo la mediana di questi valori.
+    # Questo dà una rappresentazione più fedele del drawdown che l'investitore "mediano" sperimenta.
+    drawdowns_reali = []
+    # Usiamo i dati annuali per un calcolo più stabile
+    df_risultati_reali_annuali = df_risultati_reali.iloc[::12, :] 
+    for col in df_risultati_reali_annuali.columns:
+        serie = df_risultati_reali_annuali[col]
+        peak = serie.expanding(min_periods=1).max()
         drawdown = (serie - peak) / peak
-        drawdowns.append(drawdown.min())
-    drawdown_massimo_peggiore = min(drawdowns) if drawdowns else 0
+        drawdowns_reali.append(drawdown.min())
+    
+    # Usiamo la mediana dei drawdown per una metrica più stabile e rappresentativa
+    drawdown_mediano = np.median(drawdowns_reali) if drawdowns_reali else 0
     
     # Calcolo Sharpe ratio medio (semplificato)
-    rendimenti_annuali = []
+    rendimenti_annuali_sim = []
     for col in df_risultati_reali.columns:
         serie = df_risultati_reali[col]
         if len(serie) > 12:
@@ -309,9 +312,9 @@ def run_full_simulation(params):
                     rendimento = (serie.iloc[i] - serie.iloc[i-12]) / serie.iloc[i-12]
                     rendimenti.append(rendimento)
             if rendimenti:
-                rendimenti_annuali.extend(rendimenti)
+                rendimenti_annuali_sim.extend(rendimenti)
     
-    sharpe_ratio_medio = np.mean(rendimenti_annuali) / np.std(rendimenti_annuali) if rendimenti_annuali and np.std(rendimenti_annuali) > 0 else 0
+    sharpe_ratio_medio = np.mean(rendimenti_annuali_sim) / np.std(rendimenti_annuali_sim) if rendimenti_annuali_sim and np.std(rendimenti_annuali_sim) > 0 else 0
     
     stats = {
         'patrimonio_iniziale': patrimonio_iniziale,
@@ -320,7 +323,7 @@ def run_full_simulation(params):
         'patrimonio_finale_mediano_nominale': patrimoni_nominali_finali.median(),
         'patrimonio_finale_top_10_nominale': patrimoni_nominali_finali.quantile(0.90),
         'patrimonio_finale_peggior_10_nominale': patrimoni_nominali_finali.quantile(0.10),
-        'drawdown_massimo_peggiore': abs(drawdown_massimo_peggiore),
+        'drawdown_massimo_mediano': abs(drawdown_mediano),
         'sharpe_ratio_medio': sharpe_ratio_medio,
         'patrimoni_reali_finali': patrimoni_reali_finali,
         'df_risultati_reali': df_risultati_reali,
@@ -329,60 +332,68 @@ def run_full_simulation(params):
         'mediana': df_risultati_reali.quantile(0.50, axis=1),
         'percentile_75': df_risultati_reali.quantile(0.75, axis=1),
         'percentile_90': df_risultati_reali.quantile(0.90, axis=1),
+        'reddito_reale_annuo': df_redditi_reali_annui
     }
 
-    # Calcolo statistiche prelievi
-    df_prelievi = lista_df_dettaglio[0] if lista_df_dettaglio else pd.DataFrame()
-    
-    # Calcolo tenore di vita mediano da TUTTE le simulazioni
+    # Calcolo tenore di vita mediano e sue componenti da TUTTE le simulazioni per coerenza
     totale_reale_medio_annuo_mediano = 0
+    prelievi_reali_mediani = 0
+    pensioni_reali_mediane = 0
+    rendite_fp_reali_mediane = 0
+
     if not df_redditi_reali_annui.empty:
         anni_pensione_start_index = params['anni_inizio_prelievo']
         if anni_pensione_start_index < len(df_redditi_reali_annui.index):
+            # Isola i dati del reddito solo per gli anni di pensione
             redditi_in_pensione = df_redditi_reali_annui.iloc[anni_pensione_start_index:]
-            # Evita di calcolare la media su colonne vuote se la pensione dura 0 anni
-            if not redditi_in_pensione.empty:
-                medie_redditi_per_simulazione = redditi_in_pensione.mean(axis=0)
-                totale_reale_medio_annuo_mediano = medie_redditi_per_simulazione.median()
+            
+            # Isola i dati delle singole componenti del reddito per la pensione
+            df_dettaglio_pensione = df_dettaglio_completo[df_dettaglio_completo['eta'] >= params['eta_iniziale'] + params['anni_inizio_prelievo']]
 
-    if not df_prelievi.empty:
-        # Filtra solo gli anni di pensione per le statistiche della singola sim (mediana)
-        anni_pensione = df_prelievi[df_prelievi['eta'] >= (params['eta_iniziale'] + params['anni_inizio_prelievo'])]
-        
-        stats_prelievi = {
-            'totale_reale_medio_annuo': totale_reale_medio_annuo_mediano, # Metrica corretta, usando la mediana di tutte le simulazioni
-            'prelievo_reale_medio': anni_pensione['prelievo_reale_effettivo'].mean() if not anni_pensione.empty else 0, # Dalla prima sim
-            'pensione_pubblica_reale_annua': df_prelievi['pensione_pubblica_reale'].mean(), # Dalla prima sim
-            'rendita_fp_reale_media': df_prelievi['rendita_fp_reale'].mean() # Dalla prima sim
-        }
-    else:
-        stats_prelievi = {
-            'totale_reale_medio_annuo': 0,
-            'prelievo_reale_medio': 0,
-            'pensione_pubblica_reale_annua': 0,
-            'rendita_fp_reale_media': 0
-        }
+            if not redditi_in_pensione.empty:
+                # Calcola la media annua per ogni simulazione
+                medie_redditi_per_sim = redditi_in_pensione.mean(axis=0)
+                totale_reale_medio_annuo_mediano = medie_redditi_per_sim.median()
+
+            if not df_dettaglio_pensione.empty:
+                # Calcola la media per ogni componente per ogni simulazione, poi la mediana di queste medie
+                prelievi_reali_mediani = df_dettaglio_pensione.groupby('Sim_Num')['prelievo_reale_effettivo'].mean().median()
+                pensioni_reali_mediane = df_dettaglio_pensione.groupby('Sim_Num')['pensione_pubblica_reale'].mean().median()
+                rendite_fp_reali_mediane = df_dettaglio_pensione.groupby('Sim_Num')['rendita_fp_reale'].mean().median()
+
+    # Sostituzione delle statistiche basate su una sola simulazione con quelle aggregate
+    stats_prelievi = {
+        'totale_reale_medio_annuo': totale_reale_medio_annuo_mediano,
+        'prelievo_reale_medio': prelievi_reali_mediani,
+        'pensione_pubblica_reale_annua': pensioni_reali_mediane,
+        'rendita_fp_reale_media': rendite_fp_reali_mediane
+    }
     
     # Preparazione dati per i grafici
     dati_grafici_principali = {
         'reale': df_risultati_reali,
         'nominale': df_risultati_nominali,
-        'reddito_reale_annuo': df_redditi_reali_annui # Correzione: passa il DataFrame completo
+        'reddito_reale_annuo': df_redditi_reali_annui
     }
     
+    # Prepara i dati di dettaglio per i grafici basati sulla simulazione mediana
+    mediana_idx = patrimoni_reali_finali.sort_values().index[len(patrimoni_reali_finali) // 2]
+    sim_num_mediana = int(mediana_idx.split('_')[1]) - 1
+    df_prelievi = lista_df_dettaglio[sim_num_mediana] if sim_num_mediana < len(lista_df_dettaglio) else pd.DataFrame()
+
     dati_grafici_avanzati = {
         'dati_mediana': {
-            'prelievi_target_nominali': df_prelievi['prelievo_nominale_obiettivo'] if not df_prelievi.empty else [],
-            'prelievi_effettivi_nominali': df_prelievi['prelievo_nominale_effettivo'] if not df_prelievi.empty else [],
-            'prelievi_da_banca_nominali': df_prelievi['prelievo_da_liquidita'] if not df_prelievi.empty else [],
-            'prelievi_da_etf_nominali': df_prelievi['prelievo_da_vendita_etf'] if not df_prelievi.empty else [],
-            'vendite_rebalance_nominali': df_prelievi['vendita_per_rebalance'] if not df_prelievi.empty else [],
-            'fp_liquidato_nominale': df_prelievi['liquidazione_capitale_fp'] if not df_prelievi.empty else [],
-            'prelievi_effettivi_reali': df_prelievi['prelievo_reale_effettivo'] if not df_prelievi.empty else [],
-            'pensioni_pubbliche_reali': df_prelievi['pensione_pubblica_reale'] if not df_prelievi.empty else [],
-            'rendite_fp_reali': df_prelievi['rendita_fp_reale'] if not df_prelievi.empty else [],
-            'saldo_banca_reale': df_prelievi['saldo_conto_fine_anno_reale'] if not df_prelievi.empty else [],
-            'saldo_etf_reale': df_prelievi['valore_etf_fine_anno_reale'] if not df_prelievi.empty else [],
+            'prelievi_target_nominali': df_prelievi['prelievo_nominale_obiettivo'].tolist() if not df_prelievi.empty else [],
+            'prelievi_effettivi_nominali': df_prelievi['prelievo_nominale_effettivo'].tolist() if not df_prelievi.empty else [],
+            'prelievi_da_banca_nominali': df_prelievi['prelievo_da_liquidita'].tolist() if not df_prelievi.empty else [],
+            'prelievi_da_etf_nominali': df_prelievi['prelievo_da_vendita_etf'].tolist() if not df_prelievi.empty else [],
+            'vendite_rebalance_nominali': df_prelievi['vendita_per_rebalance'].tolist() if not df_prelievi.empty else [],
+            'fp_liquidato_nominale': df_prelievi['liquidazione_capitale_fp'].tolist() if not df_prelievi.empty else [],
+            'prelievi_effettivi_reali': df_prelievi['prelievo_reale_effettivo'].tolist() if not df_prelievi.empty else [],
+            'pensioni_pubbliche_reali': df_prelievi['pensione_pubblica_reale'].tolist() if not df_prelievi.empty else [],
+            'rendite_fp_reali': df_prelievi['rendita_fp_reale'].tolist() if not df_prelievi.empty else [],
+            'saldo_banca_reale': df_prelievi['saldo_conto_fine_anno_reale'].tolist() if not df_prelievi.empty else [],
+            'saldo_etf_reale': df_prelievi['valore_etf_fine_anno_reale'].tolist() if not df_prelievi.empty else [],
             'saldo_fp_reale': [0] * len(df_prelievi) if not df_prelievi.empty else []  # Semplificazione
         }
     }
