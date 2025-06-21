@@ -2,9 +2,6 @@
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://simulatore-di-pianificazione-finanziaria-monte-carlo-amaeuqvh8.streamlit.app/)
 
-Ciao a tutti,
-
-Non sono un programmatore né un esperto di finanza, ho solo un diploma professionale e lavoro nel mio laboratorio odontotecnio. Da tempo seguo con enorme interesse il mondo della pianificazione finanziaria e dell'indipendenza economica, questo piccolo software è il risultato di un mix di idee, concetti e strategie che ho assorbito seguendo due figure che stimo tantissimo: **Mr. RIP** e **Paolo Coletti**. Ho cercato di prendere spunto dai loro insegnamenti per creare uno strumento pratico, un simulatore Monte Carlo che potesse aiutarmi (e spero anche voi) a visualizzare concretamente il futuro finanziario.
 
 ## 🚀 Prova l'Applicazione Online
 
@@ -19,6 +16,8 @@ Non sono un programmatore né un esperto di finanza, ho solo un diploma professi
 Non avendo competenze specifiche di programmazione, ho costruito questo simulatore da zero con l'aiuto di un'assistente AI avanzato (Gemini 2.5 Pro, tramite l'editor Cursor). Ho messo le idee e la logica, e l'AI mi ha aiutato a tradurle in codice Python funzionante. È stata un'esperienza incredibile, che dimostra come oggi la tecnologia possa aiutarci a realizzare progetti che un tempo sarebbero stati impensabili per chi non è del settore.
 
 Non ho la presunzione di dire che sia perfetto, anzi, è un progetto in continua evoluzione. Tuttavia, l'ho costruito con impegno e ho grande fiducia che possa essere uno strumento utile per chiunque voglia prendere maggiore consapevolezza del proprio percorso finanziario.
+
+Non sono un programmatore né un esperto di finanza, ho solo un diploma professionale e lavoro nel mio laboratorio odontotecnico. Da tempo seguo con enorme interesse il mondo della pianificazione finanziaria e dell'indipendenza economica, questo piccolo software è il risultato di un mix di idee, concetti e strategie che ho assorbito seguendo due figure che stimo tantissimo: **Mr. RIP** e **Paolo Coletti**. Ho cercato di prendere spunto dai loro insegnamenti per creare uno strumento pratico, un simulatore Monte Carlo che potesse aiutarmi (e spero anche voi) a visualizzare concretamente il futuro finanziario.
 
 ---
 
