@@ -329,14 +329,7 @@ def run_full_simulation(params):
         'patrimonio_finale_peggior_10_nominale': patrimoni_nominali_finali.quantile(0.10),
         'drawdown_massimo_mediano': abs(drawdown_mediano),
         'sharpe_ratio_medio': sharpe_ratio_medio,
-        'patrimoni_reali_finali': patrimoni_reali_finali,
-        'df_risultati_reali': df_risultati_reali,
-        'percentile_10': df_risultati_reali.quantile(0.10, axis=1),
-        'percentile_25': df_risultati_reali.quantile(0.25, axis=1),
-        'mediana': df_risultati_reali.quantile(0.50, axis=1),
-        'percentile_75': df_risultati_reali.quantile(0.75, axis=1),
-        'percentile_90': df_risultati_reali.quantile(0.90, axis=1),
-        'reddito_reale_annuo': df_redditi_reali_annui
+        'patrimoni_reali_finali': patrimoni_reali_finali.to_dict(),
     }
 
     # Calcolo tenore di vita mediano e sue componenti da TUTTE le simulazioni per coerenza
@@ -375,9 +368,9 @@ def run_full_simulation(params):
     
     # Preparazione dati per i grafici
     dati_grafici_principali = {
-        'reale': df_risultati_reali,
-        'nominale': df_risultati_nominali,
-        'reddito_reale_annuo': df_redditi_reali_annui
+        'reale': df_risultati_reali.to_dict('split'),
+        'nominale': df_risultati_nominali.to_dict('split'),
+        'reddito_reale_annuo': df_redditi_reali_annui.to_dict('split')
     }
     
     # Prepara i dati di dettaglio per i grafici basati sulla simulazione mediana

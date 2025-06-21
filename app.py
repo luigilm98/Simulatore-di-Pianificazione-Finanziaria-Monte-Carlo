@@ -69,6 +69,32 @@ def delete_simulation(filename):
     os.remove(filepath)
     st.rerun()
 
+def reconstruct_data_from_json(results):
+    """
+    Ricostruisce gli oggetti pandas (DataFrame, Series) dal formato dizionario
+    utilizzato per il salvataggio JSON. Modifica l'oggetto 'results' in-place.
+    Questo è il punto di controllo centrale per garantire la coerenza dei dati.
+    """
+    # Ricostruisci i DataFrame principali per i grafici
+    for key in ['reale', 'nominale', 'reddito_reale_annuo']:
+        if key in results.get('dati_grafici_principali', {}):
+            df_dict = results['dati_grafici_principali'][key]
+            # Controlla se è un dizionario nel formato 'split'
+            if isinstance(df_dict, dict) and 'data' in df_dict and 'index' in df_dict:
+                results['dati_grafici_principali'][key] = pd.DataFrame(
+                    df_dict['data'],
+                    index=pd.to_numeric(df_dict['index']),
+                    columns=df_dict['columns']
+                )
+
+    # Ricostruisci la Series dei patrimoni finali
+    if 'patrimoni_reali_finali' in results.get('statistiche', {}):
+        series_dict = results['statistiche']['patrimoni_reali_finali']
+        if isinstance(series_dict, dict):
+            results['statistiche']['patrimoni_reali_finali'] = pd.Series(series_dict)
+
+    return results
+
 # --- Funzioni di Plotting ---
 def hex_to_rgb(hex_color):
     """Converte un colore esadecimale in una tupla RGB."""
@@ -84,12 +110,9 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
     """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
     
-    # L'engine produce dati con shape (mesi, simulazioni).
-    # L'asse X deve avere una lunghezza pari al numero di righe (i punti temporali).
+    # I dati arrivano già come DataFrame pulito
     anni_asse_x = np.linspace(0, anni_totali, data.shape[0])
 
-    # Calcolo percentili lungo l'asse delle simulazioni (axis=1) per ogni punto nel tempo.
-    # Questo è il modo corretto per ottenere l'intervallo di confidenza nel tempo.
     p10 = data.quantile(0.10, axis=1)
     p25 = data.quantile(0.25, axis=1)
     median_data = data.median(axis=1)
@@ -240,21 +263,17 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
     """
     fig = go.Figure()
 
-    # L'indice di partenza è in ANNI
+    # I dati arrivano già come DataFrame pulito
     start_year_index = anni_inizio_prelievo
 
-    # Se la fase di prelievo non inizia entro l'orizzonte, non mostrare nulla.
     if start_year_index >= len(data.index):
         fig.add_annotation(text="La fase di prelievo inizia oltre l'orizzonte temporale.", showarrow=False)
         return fig
 
-    # Seleziona i dati dalla pensione in poi
     data_pensione = data.iloc[start_year_index:]
     
-    # FIX: Crea un asse x numerico esplicito per evitare problemi con indici non numerici.
     anni_asse_x = np.arange(start_year_index, start_year_index + len(data_pensione))
 
-    # Calcolo percentili e uso di .values per passare a Plotly array numpy puliti.
     p10 = data_pensione.quantile(0.10, axis=1).values
     p25 = data_pensione.quantile(0.25, axis=1).values
     p50 = data_pensione.quantile(0.50, axis=1).values
@@ -374,7 +393,7 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                 if st.button("📂", key=f"load_{sim['filename']}", help="Carica questa simulazione"):
                     data = load_simulation_data(sim['filename'])
                     st.session_state.parametri = data['parameters']
-                    st.session_state.risultati = data['results']
+                    st.session_state.risultati = reconstruct_data_from_json(data['results'])
                     st.session_state.simulazione_eseguita = True
                     st.rerun()
             with col3:
@@ -675,9 +694,9 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             "Esecuzione della simulazione Monte Carlo... Questo potrebbe richiedere alcuni istanti."
         ):
             try:
-                st.session_state.risultati = engine.run_full_simulation(
-                    st.session_state.parametri
-                )
+                # Esegui e ricostruisci SEMPRE per garantire coerenza
+                raw_results = engine.run_full_simulation(st.session_state.parametri)
+                st.session_state.risultati = reconstruct_data_from_json(raw_results)
                 st.session_state.simulazione_eseguita = True
                 st.rerun()  # Ricarica l'app per mostrare i risultati
             except ValueError as e:
