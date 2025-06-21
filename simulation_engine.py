@@ -349,8 +349,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     drawdown = 0
     sharpe_ratio = 0
     with np.errstate(divide='ignore', invalid='ignore'):
-        patrimonio_np = np.array(patrimonio_storico)
-        picchi = np.maximum.accumulate(patrimonio_np)
+        patrimoni_np = np.array(patrimonio_storico)
+        picchi = np.maximum.accumulate(patrimoni_np)
         if np.any(picchi > 0):
             drawdown_values = (patrimonio_np - picchi) / picchi
             drawdown = np.min(drawdown_values)
@@ -462,23 +462,10 @@ def run_full_simulation(parametri):
             else:
                  prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
         
-        # Usiamo i dati della run mediana attuale per il foglio di calcolo, 
-        # stimando il prelievo su di essa.
-        dati_per_foglio_prelievi = dati_mediana_run
+        # Sovrascriviamo il prelievo calcolato solo per le statistiche, non per i dati di dettaglio
+        statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
 
-    else:
-        # Usiamo i dati della run mediana effettiva
-        dati_per_foglio_prelievi = dati_mediana_run
-    
-    # --- Calcolo Statistiche Prelievi ---
-    statistiche_prelievi = {
-        'prelievo_reale_medio': 0,
-        'pensione_pubblica_reale_annua': 0,
-        'rendita_fp_reale_media': 0,
-        'totale_reale_medio_annuo': 0,
-    }
-
-    if prelievi_reali_successo.shape[0] > 0:
+    elif prelievi_reali_successo.shape[0] > 0:
         anno_inizio_prelievo = parametri['anni_inizio_prelievo']
         anno_inizio_pensione = parametri['inizio_pensione_anni']
         anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
@@ -530,6 +517,6 @@ def run_full_simulation(parametri):
             "reddito_reale_annuo": tutti_i_dati_annuali['reddito_totale_reale']
         },
         "dati_grafici_avanzati": {
-            "dati_mediana": dati_per_foglio_prelievi
+            "dati_mediana": dati_mediana_run
         }
     } 
