@@ -13,6 +13,10 @@ def valida_parametri(parametri):
         raise ValueError("Contributo mensile banca non può essere negativo")
     if parametri['contributo_mensile_etf'] < 0:
         raise ValueError("Contributo mensile ETF non può essere negativo")
+    if not (0 <= parametri['rendimento_medio'] <= 1):
+        raise ValueError("Rendimento medio deve essere tra 0 e 1")
+    if not (0 <= parametri['volatilita'] <= 1):
+        raise ValueError("Volatilità deve essere tra 0 e 1")
     if not (0 <= parametri['inflazione'] <= 1):
         raise ValueError("Inflazione deve essere tra 0 e 1")
     if parametri['anni_inizio_prelievo'] < 0:
@@ -25,17 +29,15 @@ def valida_parametri(parametri):
         raise ValueError("Anni totali deve essere positivo")
     if not (0 <= parametri['tassazione_capital_gain'] <= 1):
         raise ValueError("La tassazione sul capital gain deve essere tra 0 e 1")
-    if parametri['costo_fisso_deposito_titoli'] < 0:
-        raise ValueError("Il costo fisso deposito titoli non può essere negativo")
-    if parametri['usa_fp']:
-        if not (0 <= parametri['fp_rendimento_netto'] <= 1):
-            raise ValueError("Rendimento netto FP deve essere tra 0 e 1")
-        if parametri['fp_capitale_iniziale'] < 0:
-            raise ValueError("Capitale iniziale FP non può essere negativo")
-        if parametri['fp_contributo_mensile'] < 0:
-            raise ValueError("Contributo mensile FP non può essere negativo")
-        if not (0 <= parametri['fp_aliquota_tassazione_finale'] <= 1):
-            raise ValueError("Aliquota tassazione finale FP deve essere tra 0 e 1")
+    if not (0 <= parametri['ter_etf'] <= 1):
+        raise ValueError("Il TER degli ETF deve essere tra 0 e 1")
+    if parametri['costo_fisso_etf_mensile'] < 0:
+        raise ValueError("Il costo fisso ETF mensile non può essere negativo")
+    if parametri['attiva_fondo_pensione']:
+        if not (0 <= parametri['rendimento_medio_fp'] <= 1):
+            raise ValueError("Rendimento medio FP deve essere tra 0 e 1")
+        if not (0 <= parametri['ter_fp'] <= 1):
+            raise ValueError("TER FP deve essere tra 0 e 1")
 
 def _esegui_una_simulazione(params):
     """
@@ -76,9 +78,7 @@ def _esegui_una_simulazione(params):
     dati_annuali_list = []
     
     patrimonio_mensile_reale = np.zeros(mesi_totali + 1)
-    patrimonio_mensile_nominale = np.zeros(mesi_totali + 1)
     patrimonio_mensile_reale[0] = (stato['conto_corrente'] + stato['patrimonio_etf']) / stato['indice_prezzi']
-    patrimonio_mensile_nominale[0] = stato['conto_corrente'] + stato['patrimonio_etf']
 
     for mese in range(1, mesi_totali + 1):
         anno = (mese - 1) // 12
@@ -170,7 +170,6 @@ def _esegui_una_simulazione(params):
         stato['indice_prezzi'] *= (1 + np.random.normal(params['inflazione'] / 12, 0.005))
         
         patrimonio_mensile_reale[mese] = (stato['conto_corrente'] + stato['patrimonio_etf']) / stato['indice_prezzi']
-        patrimonio_mensile_nominale[mese] = stato['conto_corrente'] + stato['patrimonio_etf']
 
         # --- OPERAZIONI DI FINE ANNO ---
         if is_fine_anno:
@@ -244,7 +243,7 @@ def _esegui_una_simulazione(params):
             }
             dati_annuali_list.append(dati_anno_corrente)
     
-    return patrimonio_mensile_reale, patrimonio_mensile_nominale, pd.DataFrame(dati_annuali_list, columns=colonne_annuali)
+    return patrimonio_mensile_reale, pd.DataFrame(dati_annuali_list, columns=colonne_annuali)
 
 
 def run_full_simulation(params):
@@ -253,129 +252,32 @@ def run_full_simulation(params):
     """
     tutti_i_risultati_mensili = []
     lista_df_dettaglio = []
-    tutti_i_risultati_nominali = []
-    tutti_i_redditi_reali_annui = []
 
     for i in range(params['n_simulazioni']):
-        patrimonio_reale, patrimonio_nominale, df_dettaglio = _esegui_una_simulazione(params)
+        patrimonio_reale, df_dettaglio = _esegui_una_simulazione(params)
         tutti_i_risultati_mensili.append(patrimonio_reale)
-        tutti_i_risultati_nominali.append(patrimonio_nominale)
-        
-        if i == 0: # Salva solo il dettaglio della prima simulazione per i dati della tabella
+        if i == 0: # Salva solo il dettaglio della prima simulazione per ora
             lista_df_dettaglio.append(df_dettaglio)
 
-        if not df_dettaglio.empty:
-            tutti_i_redditi_reali_annui.append(df_dettaglio['totale_entrate_reali'])
-
-    df_risultati_reali = pd.DataFrame(tutti_i_risultati_mensili).transpose()
-    df_risultati_reali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
+    df_risultati = pd.DataFrame(tutti_i_risultati_mensili).transpose()
+    df_risultati.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
     
-    df_risultati_nominali = pd.DataFrame(tutti_i_risultati_nominali).transpose()
-    df_risultati_nominali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
-    
-    df_reddito_reale_annuo = pd.concat(tutti_i_redditi_reali_annui, axis=1) if tutti_i_redditi_reali_annui else pd.DataFrame()
-    if not df_reddito_reale_annuo.empty:
-        df_reddito_reale_annuo.columns = [f'Sim_{i+1}' for i in range(len(tutti_i_redditi_reali_annui))]
-
     # Calcolo statistiche principali
-    patrimonio_iniziale = params['capitale_iniziale'] + params['etf_iniziale']
-    patrimoni_reali_finali = df_risultati_reali.iloc[-1]
-    patrimoni_nominali_finali = df_risultati_nominali.iloc[-1]
-    
-    # Calcolo drawdown massimo per ogni simulazione
-    drawdowns = []
-    for col in df_risultati_reali.columns:
-        serie = df_risultati_reali[col]
-        peak = serie.expanding().max()
-        drawdown = (serie - peak) / peak
-        drawdowns.append(drawdown.min())
-    drawdown_massimo_peggiore = min(drawdowns) if drawdowns else 0
-    
-    # Calcolo Sharpe ratio medio (semplificato)
-    rendimenti_annuali = []
-    for col in df_risultati_reali.columns:
-        serie = df_risultati_reali[col]
-        if len(serie) > 12:
-            rendimenti = []
-            for i in range(12, len(serie), 12):
-                if i < len(serie):
-                    rendimento = (serie.iloc[i] - serie.iloc[i-12]) / serie.iloc[i-12]
-                    rendimenti.append(rendimento)
-            if rendimenti:
-                rendimenti_annuali.extend(rendimenti)
-    
-    sharpe_ratio_medio = np.mean(rendimenti_annuali) / np.std(rendimenti_annuali) if rendimenti_annuali and np.std(rendimenti_annuali) > 0 else 0
-    
     stats = {
-        'patrimonio_iniziale': patrimonio_iniziale,
-        'probabilita_fallimento': (patrimoni_reali_finali <= 1).mean(),
-        'patrimonio_finale_mediano_reale': patrimoni_reali_finali.median(),
-        'patrimonio_finale_mediano_nominale': patrimoni_nominali_finali.median(),
-        'patrimonio_finale_top_10_nominale': patrimoni_nominali_finali.quantile(0.90),
-        'patrimonio_finale_peggior_10_nominale': patrimoni_nominali_finali.quantile(0.10),
-        'drawdown_massimo_peggiore': abs(drawdown_massimo_peggiore),
-        'sharpe_ratio_medio': sharpe_ratio_medio,
-        'patrimoni_reali_finali': patrimoni_reali_finali,
-        'df_risultati_reali': df_risultati_reali,
-        'percentile_10': df_risultati_reali.quantile(0.10, axis=1),
-        'percentile_25': df_risultati_reali.quantile(0.25, axis=1),
-        'mediana': df_risultati_reali.quantile(0.50, axis=1),
-        'percentile_75': df_risultati_reali.quantile(0.75, axis=1),
-        'percentile_90': df_risultati_reali.quantile(0.90, axis=1),
+        'df_risultati_reali': df_risultati,
+        'probabilita_fallimento': (df_risultati.iloc[-1] <= 1).mean(), # Fallimento se si scende sotto 1€
+        'patrimonio_finale_mediano_reale': df_risultati.iloc[-1].median(),
+        'percentile_10': df_risultati.quantile(0.10, axis=1),
+        'percentile_25': df_risultati.quantile(0.25, axis=1),
+        'mediana': df_risultati.quantile(0.50, axis=1),
+        'percentile_75': df_risultati.quantile(0.75, axis=1),
+        'percentile_90': df_risultati.quantile(0.90, axis=1),
     }
 
     # Calcolo statistiche prelievi (dalla prima simulazione)
     df_prelievi = lista_df_dettaglio[0] if lista_df_dettaglio else pd.DataFrame()
-    
-    if not df_prelievi.empty:
-        # Filtra solo gli anni di pensione per un calcolo corretto delle medie
-        anni_pensione = df_prelievi[df_prelievi['eta'] >= (params['eta_iniziale'] + params['anni_inizio_prelievo'])]
-        
-        if not anni_pensione.empty:
-            stats_prelievi = {
-                'totale_reale_medio_annuo': anni_pensione['totale_entrate_reali'].mean(),
-                'prelievo_reale_medio': anni_pensione['prelievo_reale_effettivo'].mean(),
-                'pensione_pubblica_reale_annua': anni_pensione[anni_pensione['pensione_pubblica_reale'] > 0]['pensione_pubblica_reale'].mean(),
-                'rendita_fp_reale_media': anni_pensione[anni_pensione['rendita_fp_reale'] > 0]['rendita_fp_reale'].mean()
-            }
-            # Se non ci sono entrate di un tipo, il .mean() restituisce NaN. Lo converto a 0.
-            stats_prelievi['pensione_pubblica_reale_annua'] = stats_prelievi.get('pensione_pubblica_reale_annua') or 0
-            stats_prelievi['rendita_fp_reale_media'] = stats_prelievi.get('rendita_fp_reale_media') or 0
-        else:
-             stats_prelievi = { 'totale_reale_medio_annuo': 0, 'prelievo_reale_medio': 0, 'pensione_pubblica_reale_annua': 0, 'rendita_fp_reale_media': 0 }
-    else:
-        stats_prelievi = { 'totale_reale_medio_annuo': 0, 'prelievo_reale_medio': 0, 'pensione_pubblica_reale_annua': 0, 'rendita_fp_reale_media': 0 }
-    
-    # Preparazione dati per i grafici
-    dati_grafici_principali = {
-        'reale': df_risultati_reali,
-        'nominale': df_risultati_nominali,
-        'reddito_reale_annuo': df_reddito_reale_annuo
+    stats_prelievi = {
+        'totale_reale_medio_annuo': df_prelievi['totale_entrate_reali'].mean() if not df_prelievi.empty else 0
     }
     
-    dati_grafici_avanzati = {
-        'dati_mediana': {
-            'prelievi_target_nominali': df_prelievi['prelievo_nominale_obiettivo'] if not df_prelievi.empty else [],
-            'prelievi_effettivi_nominali': df_prelievi['prelievo_nominale_effettivo'] if not df_prelievi.empty else [],
-            'prelievi_da_banca_nominali': df_prelievi['prelievo_da_liquidita'] if not df_prelievi.empty else [],
-            'prelievi_da_etf_nominali': df_prelievi['prelievo_da_vendita_etf'] if not df_prelievi.empty else [],
-            'vendite_rebalance_nominali': df_prelievi['vendita_per_rebalance'] if not df_prelievi.empty else [],
-            'fp_liquidato_nominale': df_prelievi['liquidazione_capitale_fp'] if not df_prelievi.empty else [],
-            'prelievi_effettivi_reali': df_prelievi['prelievo_reale_effettivo'] if not df_prelievi.empty else [],
-            'pensioni_pubbliche_reali': df_prelievi['pensione_pubblica_reale'] if not df_prelievi.empty else [],
-            'rendite_fp_reali': df_prelievi['rendita_fp_reale'] if not df_prelievi.empty else [],
-            'saldo_banca_reale': df_prelievi['saldo_conto_fine_anno_reale'] if not df_prelievi.empty else [],
-            'saldo_etf_reale': df_prelievi['valore_etf_fine_anno_reale'] if not df_prelievi.empty else [],
-            'saldo_fp_reale': [0] * len(df_prelievi) if not df_prelievi.empty else []  # Semplificazione
-        }
-    }
-    
-    # Struttura finale dei risultati
-    risultati = {
-        'statistiche': stats,
-        'statistiche_prelievi': stats_prelievi,
-        'dati_grafici_principali': dati_grafici_principali,
-        'dati_grafici_avanzati': dati_grafici_avanzati
-    }
-    
-    return risultati 
+    return stats, stats_prelievi, df_prelievi 
