@@ -1,6 +1,6 @@
 # 📈 Simulatore di Pianificazione Finanziaria Monte Carlo
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://simulatore-pianificazione-finanziaria.streamlit.app)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://simulatore-di-pianificazione-finanziaria-monte-carlo-amaeuqvh8.streamlit.app/)
 
 Ciao a tutti,
 
@@ -8,7 +8,7 @@ Non sono un programmatore né un esperto di finanza, ho solo un diploma professi
 
 ## 🚀 Prova l'Applicazione Online
 
-**[👉 CLICCA QUI PER PROVARE IL SIMULATORE ONLINE](https://simulatore-pianificazione-finanziaria.streamlit.app)**
+**[👉 CLICCA QUI PER PROVARE IL SIMULATORE ONLINE](https://simulatore-di-pianificazione-finanziaria-monte-carlo-amaeuqvh8.streamlit.app/)**
 
 *Non serve installare nulla! L'applicazione funziona direttamente nel browser.*
 
@@ -113,7 +113,7 @@ Il simulatore è specificamente progettato per il contesto italiano:
 
 **Non serve installare nulla!** L'applicazione è disponibile online:
 
-**[👉 PROVA SUBITO ONLINE](https://simulatore-pianificazione-finanziaria.streamlit.app)**
+**[👉 PROVA SUBITO ONLINE](https://simulatore-di-pianificazione-finanziaria-monte-carlo-amaeuqvh8.streamlit.app/)**
 
 ### 💻 Opzione 2: Installa Localmente
 
