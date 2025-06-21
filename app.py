@@ -876,34 +876,37 @@ else:
         df['Entrate Anno (Reali)'] = df['Prelievo Effettivo (Reale)'] + df['Pensione Pubblica (Reale)'] + df['Rendita FP (Reale)']
         
         # Riorganizzo le colonne per la visualizzazione
-        colonne_visualizzate = [
-            'Anno', 'Età', 'Obiettivo Prelievo (Nom.)', 'Prelievo Effettivo (Nom.)', 
-            'Fonte: Conto vs Fonte ETF': st.column_config.NumberColumn(format="€ %.0f"),
-            'Liquidazione Capitale FP': st.column_config.NumberColumn(format="€ %.0f"),
-            'Prelievo Effettivo (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
-            'Pensione Pubblica (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
-            'Rendita FP (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
-            'Entrate Anno (Reali)': st.column_config.NumberColumn(format="€ %.0f", help="La somma di tutte le entrate reali. Questa cifra misura il tuo vero tenore di vita annuale."),
-            'Saldo Conto Fine Anno (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
-            'Valore ETF Fine Anno (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
-        ]
+        df_dettaglio_view = df.rename(columns={
+            'anno': 'Anno',
+            'eta': 'Età',
+            'prelievo_nominale_obiettivo': 'Obiettivo Prelievo (Nom.)',
+            'prelievo_nominale_effettivo': 'Prelievo Effettivo (Nom.)',
+            'prelievo_da_liquidita': 'Fonte: Conto Corrente',
+            'prelievo_da_vendita_etf': 'Fonte: Vendita ETF',
+            'vendita_per_rebalance': 'Vendita ETF (Rebalance)',
+            'liquidazione_capitale_fp': 'Liquidazione Capitale FP',
+            'prelievo_reale_effettivo': 'Prelievo Effettivo (Reale)',
+            'pensione_pubblica_reale': 'Pensione Pubblica (Reale)',
+            'rendita_fp_reale': 'Rendita FP (Reale)',
+            'totale_entrate_reali': 'Entrate Anno (Reali)',
+            'saldo_conto_fine_anno_reale': 'Saldo Conto Fine Anno (Reale)',
+            'valore_etf_fine_anno_reale': 'Valore ETF Fine Anno (Reale)'
+        })
         
-        st.dataframe(
-            df[colonne_visualizzate],
-            height=500,
-            column_config={
-                "Obiettivo Prelievo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Prelievo Effettivo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Fonte Conto vs Fonte ETF": st.column_config.NumberColumn(format="€ %.0f"),
-                "Liquidazione Capitale FP": st.column_config.NumberColumn(format="€ %.0f"),
-                "Prelievo Effettivo (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Pensione Pubblica (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Rendita FP (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Entrate Anno (Reali)": st.column_config.NumberColumn(format="€ %.0f", help="La somma di tutte le entrate reali. Questa cifra misura il tuo vero tenore di vita annuale."),
-                "Saldo Conto Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Valore ETF Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-            }
-        )
+        st.dataframe(df_dettaglio_view, hide_index=True, column_config={
+            "Obiettivo Prelievo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Prelievo Effettivo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Fonte: Conto Corrente": st.column_config.NumberColumn(format="€ %.0f"),
+            "Fonte: Vendita ETF": st.column_config.NumberColumn(format="€ %.0f"),
+            "Vendita ETF (Rebalance)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Liquidazione Capitale FP": st.column_config.NumberColumn(format="€ %.0f"),
+            "Prelievo Effettivo (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Pensione Pubblica (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Rendita FP (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Entrate Anno (Reali)": st.column_config.NumberColumn(format="€ %.0f", help="La somma di tutte le entrate reali. Questa cifra misura il tuo vero tenore di vita annuale."),
+            "Saldo Conto Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
+            "Valore ETF Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
+        })
 
         with st.expander("Guida alla Lettura della Tabella"):
             st.markdown("""
