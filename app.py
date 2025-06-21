@@ -75,7 +75,7 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali, anni_inizio_prelievo=None):
+def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali):
     """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
     anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
@@ -110,12 +110,8 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         x=anni_asse_x, y=median_data, mode='lines',
         name='Scenario Mediano (50°)',
         line={'width': 3, 'color': color_median},
-        hovertemplate='Anno %{x:.1f}<br>Valore Mediano: €%{y:,.0f}<extra></extra>'
+        hovertemplate='Anno %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
-
-    if anni_inizio_prelievo is not None:
-        fig.add_vline(x=anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="white",
-                      annotation_text="Inizio Prelievi", annotation_position="top left")
     
     fig.update_layout(
         title=title,
@@ -123,8 +119,7 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         yaxis_title=y_title,
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        template="plotly_dark"
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     return fig
 
@@ -134,8 +129,7 @@ def plot_histogram(data, anni_totali):
         title_text='Distribuzione del Patrimonio Finale Reale',
         xaxis_title_text='Patrimonio Finale (Potere d\'Acquisto Odierno)',
         yaxis_title_text='Numero di Simulazioni',
-        bargap=0.1,
-        template="plotly_dark"
+        bargap=0.1
     )
     return fig
 
@@ -151,13 +145,12 @@ def plot_success_probability(data, anni_totali):
         xaxis_title='Anni di Simulazione',
         yaxis_title='Probabilità di Avere Patrimonio Residuo',
         yaxis_tickformat='.0%',
-        yaxis_range=[0, 1.01],
-        template="plotly_dark"
+        yaxis_range=[0, 1.01]
     )
     return fig
 
 def plot_income_composition(data, anni_totali):
-    anni_asse_x_annuale = np.arange(anni_totali + 1)
+    anni_asse_x_annuale = np.arange(anni_totali)
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
@@ -182,16 +175,15 @@ def plot_income_composition(data, anni_totali):
         yaxis_title='Reddito Reale Annuo (€ Odierni)',
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        template="plotly_dark"
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     return fig
 
 def plot_asset_allocation(data, anni_totali):
-    anni_asse_x_annuale = np.arange(anni_totali + 1)
+    anni_asse_x_annuale = np.arange(anni_totali)
     banca_reale = data['saldo_banca_reale']
     etf_reale = data['saldo_etf_reale']
-    fp_reale = data.get('saldo_fp_reale', np.zeros_like(banca_reale)) # Compatibilità
+    fp_reale = data['saldo_fp_reale']
     
     totale_reale = banca_reale + etf_reale + fp_reale
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -222,8 +214,7 @@ def plot_asset_allocation(data, anni_totali):
         yaxis_title='Percentuale del Patrimonio Totale',
         yaxis_tickformat='.0%',
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        template="plotly_dark"
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     return fig
 
@@ -232,14 +223,16 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
     fig = go.Figure()
     start_index = int(anni_inizio_prelievo)
     
-    # La simulazione ha N+1 punti dati annuali (da anno 0 a anno N)
-    end_index = int(anni_totali) + 1
+    # La simulazione dura N anni, quindi i dati sono calcolati per gli anni da 0 a N-1.
+    # Il grafico deve quindi mostrare i dati fino all'anno N-1.
+    end_index = int(anni_totali)
 
-    if start_index >= data.shape[1]:
-        return go.Figure().update_layout(title="Periodo di decumulo non sufficiente per il grafico.", template="plotly_dark")
+    if start_index >= end_index:
+        # Non c'è un periodo di decumulo da mostrare
+        return fig 
 
-    anni_asse_x = np.arange(start_index, end_index)
-    data_decumulo = data[:, start_index:end_index]
+    anni_asse_x = np.arange(start_index, end_index) # Es: da 35 a 79 se anni_totali=80
+    data_decumulo = data[:, start_index:end_index] # Seleziona le colonne corrispondenti
 
     p10 = np.percentile(data_decumulo, 10, axis=0)
     p25 = np.percentile(data_decumulo, 25, axis=0)
@@ -269,341 +262,491 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
         x=anni_asse_x, y=median_data, mode='lines',
         name='Reddito Mediano (50°)',
         line={'width': 3, 'color': '#00B0F0'},
-        hovertemplate='Età %{x:.0f}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
+        hovertemplate='Anno %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
     ))
-    
+
     fig.update_layout(
         title="Quale Sarà il Mio Tenore di Vita? (Reddito Annuo Reale)",
-        xaxis_title="Età",
+        xaxis_title="Anni",
         yaxis_title="Reddito Annuo Reale (€ di oggi)",
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        template="plotly_dark"
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    return fig
+
+def plot_wealth_composition_chart(initial, contributions, gains):
+    """Crea un grafico a barre per la composizione della ricchezza finale."""
+    labels = ['Patrimonio Iniziale', 'Contributi Versati', 'Guadagni da Investimento']
+    values = [initial, contributions, gains]
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+
+    fig = go.Figure(data=[go.Bar(
+        x=labels, 
+        y=values,
+        marker_color=colors,
+        text=[f"€{v:,.0f}" for v in values],
+        textposition='auto'
+    )])
+    
+    fig.update_layout(
+        title_text='Da Dove Viene la Tua Ricchezza? (Patrimonio Nominale Mediano)',
+        yaxis_title_text='Euro (€)',
+        xaxis_title_text='Fonte del Patrimonio',
+        bargap=0.4,
+        yaxis_tickformat="€,d"
     )
     return fig
 
 def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
-    """Mostra le traiettorie dei peggiori scenari."""
+    """Mostra un'analisi degli scenari peggiori (es. 10% dei casi)."""
     fig = go.Figure()
+    
+    soglia_peggiore = np.percentile(patrimoni_finali, 10)
+    indici_peggiori = np.where(patrimoni_finali <= soglia_peggiore)[0]
+    
     anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
     
-    for i, traiettoria in enumerate(data):
-        fig.add_trace(go.Scatter(
-            x=anni_asse_x, 
-            y=traiettoria, 
-            mode='lines',
-            line=dict(width=1.5, color='rgba(255, 127, 14, 0.7)'),
-            name=f"Scenario {i+1} (Finale: €{patrimoni_finali[i]:,.0f})",
-            hovertemplate='Anno %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
-        ))
+    if len(indici_peggiori) > 0:
+        indici_da_mostrare = np.random.choice(indici_peggiori, size=min(50, len(indici_peggiori)), replace=False)
+        
+        for i in indici_da_mostrare:
+            fig.add_trace(go.Scatter(
+                x=anni_asse_x, y=data[i, :], mode='lines',
+                line={'width': 1, 'color': 'rgba(255, 82, 82, 0.5)'},
+                hoverinfo='none', showlegend=False
+            ))
 
+    mediana_scenari_peggiori = np.median(data[indici_peggiori, :], axis=0) if len(indici_peggiori) > 0 else np.zeros(data.shape[1])
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=mediana_scenari_peggiori, mode='lines',
+        name='Mediana Scenari Peggiori',
+        line={'width': 2.5, 'color': '#FF5252'},
+        hovertemplate='Anno %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
+    ))
+            
     fig.update_layout(
-        title='Traiettorie dei Peggiori Scenari (5%)',
-        xaxis_title='Anni',
-        yaxis_title='Patrimonio Reale (€ di oggi)',
+        title="Come si Comporta il Piano negli Scenari Peggiori? (Analisi del Rischio)",
+        xaxis_title="Anni",
+        yaxis_title="Patrimonio Reale (€ di oggi)",
         yaxis_tickformat="€,d",
-        template="plotly_dark",
-        showlegend=False
+        hovermode="x unified",
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
     )
     return fig
 
+st.set_page_config(
+    page_title="Simulatore Finanziario Monte Carlo v2.0",
+    page_icon="📈",
+    layout="wide"
+)
+
+if 'simulazione_eseguita' not in st.session_state:
+    st.session_state['simulazione_eseguita'] = False
+    st.session_state['risultati'] = {}
+    st.session_state['parametri'] = {}
+
 def get_default_portfolio():
-    """Restituisce la configurazione di default del portafoglio."""
-    return {
-        "nome_simulazione": "La Mia Pensione",
-        "eta_iniziale": 27, "capitale_iniziale": 50000, "etf_iniziale": 100000,
-        "contributo_mensile_banca": 100, "contributo_mensile_etf": 1500,
-        "rendimento_medio": 0.075, "volatilita": 0.15, "inflazione": 0.02,
-        "anni_totali": 80,
-        "strategia_prelievo": "REGOLA_4_PERCENTO",
-        "prelievo_annuo": 12000, "percentuale_regola_4": 0.04,
-        "banda_guardrail": 0.10,
-        "anni_inizio_prelievo": 35,
-        "tassazione_capital_gain": 0.26, "ter_etf": 0.0020, "costo_fisso_etf_mensile": 0,
-        "attiva_glidepath": False, "inizio_glidepath_anni": 20, "fine_glidepath_anni": 40, "allocazione_etf_finale": 0.333,
-        "attiva_fondo_pensione": False, "contributo_annuo_fp": 5000, "rendimento_medio_fp": 0.045, "volatilita_fp": 0.08, "ter_fp": 0.01,
-        "eta_ritiro_fp": 67, "tipo_liquidazione_fp": "Capitale", "aliquota_finale_fp": 0.15,
-        "inizio_pensione_anni": 40, "pensione_pubblica_annua": 20000,
-        "n_simulazioni": 1000
-    }
+    return pd.DataFrame([
+        {"Fondo": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating", "Ticker": "VWCE", "Allocazione (%)": 90.0, "TER (%)": 0.22, "Rendimento Atteso (%)": 8.0, "Volatilità Attesa (%)": 15.0},
+        {"Fondo": "Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture", "Ticker": "CRB", "Allocazione (%)": 3.0, "TER (%)": 0.30, "Rendimento Atteso (%)": 5.0, "Volatilità Attesa (%)": 18.0},
+        {"Fondo": "iShares MSCI EM UCITS ETF (Acc)", "Ticker": "EIMI", "Allocazione (%)": 3.0, "TER (%)": 0.18, "Rendimento Atteso (%)": 9.0, "Volatilità Attesa (%)": 22.0},
+        {"Fondo": "Amundi MSCI Japan UCITS ETF Acc", "Ticker": "SJP", "Allocazione (%)": 3.0, "TER (%)": 0.12, "Rendimento Atteso (%)": 7.0, "Volatilità Attesa (%)": 16.0},
+        {"Fondo": "iShares Automation & Robotics UCITS ETF", "Ticker": "RBOT", "Allocazione (%)": 1.0, "TER (%)": 0.40, "Rendimento Atteso (%)": 12.0, "Volatilità Attesa (%)": 25.0},
+    ])
 
-def run_simulation(params):
-    """Esegue la simulazione e salva i risultati nello stato della sessione."""
-    try:
-        prelievo_annuo_da_usare = params['prelievo_annuo']
-        
-        with st.spinner("Calcolo in corso... Questo potrebbe richiedere alcuni secondi."):
-            results = engine.esegui_simulazioni(params, prelievo_annuo_da_usare)
-            st.session_state.simulation_results = results
-            st.session_state.simulation_params = params
-            st.session_state.show_details = False
-            st.session_state.show_advanced_charts = False
-    except ValueError as e:
-        st.error(f"Errore nei parametri: {e}")
-        st.session_state.simulation_results = None
+if 'portfolio' not in st.session_state:
+    st.session_state.portfolio = get_default_portfolio()
 
-# --- Inizio Interfaccia Streamlit ---
-st.set_page_config(layout="wide", page_title="Simulatore Finanziario Monte Carlo")
+st.title("📈 Simulatore di Pianificazione Finanziaria Monte Carlo v2.0")
+st.markdown("Benvenuto nella versione 2.0 del simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria.")
 
-# --- CSS Custom ---
-st.markdown("""
-<style>
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        font-size: 1.1rem;
-    }
-    .stMetric {
-        border: 1px solid #444;
-        border-radius: 8px;
-        padding: 10px;
-        background-color: #2a2a2e;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.sidebar.header("Configurazione Simulazione")
 
+with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
+    saved_simulations = load_simulations()
+    if not saved_simulations:
+        st.caption("Nessuna simulazione salvata.")
+    else:
+        for sim in saved_simulations:
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1:
+                st.markdown(f"**{sim['name']}**")
+                st.caption(f"Salvata il: {sim['timestamp']}")
+            with col2:
+                if st.button(f"🗑️ Elimina", key=f"del_{sim['filename']}"):
+                    delete_simulation(sim['filename'])
+                    st.rerun()
 
-# --- Barra Laterale (Sidebar) ---
-with st.sidebar:
-    st.image("https://www.copilot.com/logo.svg", width=150) # Placeholder
-    st.title("Configurazione Simulazione")
+            with col3:
+                if st.button(f"Carica", key=f"load_{sim['filename']}"):
+                    data = load_simulation_data(sim['filename'])
+                    st.session_state.parametri = data['parameters']
+                    st.session_state.risultati = data['results']
+                    st.session_state.simulazione_eseguita = True
+                    st.rerun()
 
-    simulations_list = load_simulations()
+with st.sidebar.expander("1. Parametri di Base", expanded=True):
+    p = st.session_state.get('parametri', {})
+    eta_iniziale = st.number_input("Età Iniziale", min_value=1, max_value=100, value=p.get('eta_iniziale', 27), help="La tua età attuale. È il punto di partenza per tutti i calcoli temporali.")
+    capitale_iniziale = st.number_input("Capitale Conto Corrente (€)", min_value=0, step=1000, value=p.get('capitale_iniziale', 17000), help="La liquidità che hai oggi sul conto corrente o in asset a bassissimo rischio/rendimento.")
+    etf_iniziale = st.number_input("Valore Portafoglio ETF (€)", min_value=0, step=1000, value=p.get('etf_iniziale', 600), help="Il valore di mercato attuale di tutti i tuoi investimenti in ETF/azioni.")
+    contributo_mensile_banca = st.number_input("Contributo Mensile Conto (€)", min_value=0, step=50, value=p.get('contributo_mensile_banca', 1300), help="La cifra che riesci a risparmiare e accantonare sul conto corrente ogni mese. Questi soldi verranno usati per il ribilanciamento o per le spese.")
+    contributo_mensile_etf = st.number_input("Contributo Mensile ETF (€)", min_value=0, step=50, value=p.get('contributo_mensile_etf', 300), help="La cifra che investi attivamente ogni mese nel tuo portafoglio ETF. Questo è il motore principale del tuo Piano di Accumulo (PAC).")
+    inflazione = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, p.get('inflazione', 0.03) * 100, 0.1, help="Il tasso a cui i prezzi aumentano e il denaro perde potere d'acquisto. Un'inflazione del 3% significa che tra un anno, 100€ compreranno beni per 97€.") / 100
+    anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
+    n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Più simulazioni esegui, più accurata sarà la stima delle probabilità. 250 è un buon compromesso tra velocità e precisione.")
+    anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p.get('anni_totali', 80), help="La durata totale della simulazione. Assicurati che sia abbastanza lunga da coprire tutta la tua aspettativa di vita.")
+
+with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
+    st.markdown("Modifica l'allocazione, il TER e le stime di rendimento/volatilità per ogni ETF.")
     
-    st.header("Gestione Scenari")
+    edited_portfolio = st.data_editor(
+        st.session_state.portfolio,
+        column_config={
+            "Allocazione (%)": st.column_config.NumberColumn(format="%.2f%%", min_value=0, max_value=100),
+            "TER (%)": st.column_config.NumberColumn(format="%.2f%%", min_value=0),
+            "Rendimento Atteso (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Volatilità Attesa (%)": st.column_config.NumberColumn(format="%.2f%%"),
+        },
+        num_rows="dynamic",
+        key="portfolio_editor"
+    )
+
+    total_allocation = edited_portfolio["Allocazione (%)"].sum()
+    if not np.isclose(total_allocation, 100):
+        st.warning(f"L'allocazione totale è {total_allocation:.2f}%. Assicurati che sia 100%.")
+    else:
+        st.success("Allocazione totale: 100%.")
     
-    if 'simulation_params' not in st.session_state:
-        st.session_state.simulation_params = get_default_portfolio()
-
-    selected_sim = st.selectbox("Carica Scenario Salvato", options=[f"{s['name']} ({s['timestamp']})" for s in simulations_list], index=None, placeholder="Seleziona uno scenario...")
+    st.session_state.portfolio = edited_portfolio
     
-    if selected_sim:
-        sim_data = next(s for s in simulations_list if f"{s['name']} ({s['timestamp']})" == selected_sim)
-        if st.button("Carica Scenario Selezionato"):
-            loaded_data = load_simulation_data(sim_data['filename'])
-            st.session_state.simulation_params = loaded_data['parameters']
-            st.session_state.simulation_results = loaded_data['results']
-            st.rerun()
+    weights = edited_portfolio["Allocazione (%)"] / 100
+    rendimento_medio_portfolio = np.sum(weights * edited_portfolio["Rendimento Atteso (%)"]) / 100
+    volatilita_portfolio = np.sum(weights * edited_portfolio["Volatilità Attesa (%)"]) / 100
+    ter_etf_portfolio = np.sum(weights * edited_portfolio["TER (%)"]) / 100
 
-    p = st.session_state.simulation_params
-    
-    p['nome_simulazione'] = st.text_input("Nome dello Scenario", value=p['nome_simulazione'])
+    st.markdown("---")
+    st.markdown("##### Parametri Calcolati dal Portafoglio:")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Rendimento Medio", f"{rendimento_medio_portfolio:.2%}")
+    col2.metric("Volatilità Attesa", f"{volatilita_portfolio:.2%}")
+    col3.metric("TER Ponderato", f"{ter_etf_portfolio:.4%}")
+    st.caption("La volatilità aggregata è una media ponderata semplificata.")
 
-    with st.expander("👤 Profilo Anagrafico e Capitale", expanded=True):
-        p['eta_iniziale'] = st.number_input("Età Iniziale", min_value=18, max_value=100, value=p['eta_iniziale'])
-        p['capitale_iniziale'] = st.number_input("Liquidità Iniziale (€)", min_value=0, value=p['capitale_iniziale'], step=1000)
-        p['etf_iniziale'] = st.number_input("Patrimonio ETF Iniziale (€)", min_value=0, value=p['etf_iniziale'], step=1000)
-        p['contributo_mensile_banca'] = st.number_input("Risparmio Mensile in Liquidità (€)", min_value=0, value=p['contributo_mensile_banca'], step=50)
-        p['contributo_mensile_etf'] = st.number_input("Investimento Mensile in ETF (€)", min_value=0, value=p['contributo_mensile_etf'], step=50)
-        p['anni_totali'] = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p['anni_totali'])
+with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
+    p = st.session_state.get('parametri', {})
+    strategia_prelievo = st.selectbox(
+        "Strategia di Prelievo",
+        options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'],
+        index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
+        help="Scegli come verranno calcolati i prelievi dal tuo patrimonio una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
+    )
+    prelievo_annuo = st.number_input(
+        "Importo Prelievo Fisso Annuo (€)",
+        min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
+        help="Usato SOLO con la strategia 'FISSO'. Imposta l'esatto importo lordo che vuoi prelevare ogni anno. Lascia a 0 per far calcolare al simulatore il prelievo massimo sostenibile."
+    )
+    percentuale_regola_4 = st.slider(
+        "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
+        help="Il tasso di prelievo iniziale per le strategie 'REGOLA_4_PERCENTO' e 'GUARDRAIL'. Il 4% è una regola standard, ma puoi adattarla alla tua situazione."
+    ) / 100
+    banda_guardrail = st.slider(
+        "Banda Guardrail (%)", 0.0, 50.0, p.get('banda_guardrail', 0.10) * 100, 1.0,
+        help="Solo per 'GUARDRAIL'. Se il mercato va molto bene o molto male, questa banda determina se aumentare o diminuire i prelievi per proteggere il capitale o realizzare profitti. Un valore del 10-20% è tipico."
+    ) / 100
 
-    with st.expander("📈 Ipotesi di Mercato", expanded=True):
-        p['rendimento_medio'] = st.slider("Rendimento Medio Annuo Lordo ETF (%)", 0.0, 20.0, p['rendimento_medio'] * 100, 0.5) / 100
-        p['volatilita'] = st.slider("Volatilità Annua ETF (%)", 0.0, 40.0, p['volatilita'] * 100, 1.0) / 100
-        p['inflazione'] = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, p['inflazione'] * 100, 0.25) / 100
+with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)"):
+    p = st.session_state.get('parametri', {})
+    attiva_glidepath = st.checkbox("Attiva Glidepath", value=p.get('attiva_glidepath', True), help="Se attivato, il simulatore ridurrà progressivamente l'esposizione azionaria (ETF) a favore della liquidità con l'avvicinarsi e durante la pensione, per ridurre il rischio.")
+    inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=p.get('inizio_glidepath_anni', 20), disabled=not attiva_glidepath, help="L'anno in cui inizi a rendere il tuo portafoglio più conservativo. Spesso si imposta 10-15 anni prima della pensione.")
+    fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=p.get('fine_glidepath_anni', 40), disabled=not attiva_glidepath, help="L'anno in cui raggiungi l'allocazione finale desiderata. Solitamente coincide con l'inizio della pensione o pochi anni dopo.")
+    allocazione_etf_finale = st.slider(
+        "Allocazione ETF Finale (%)", 0.0, 100.0, p.get('allocazione_etf_finale', 0.333) * 100, 1.0,
+        help="La percentuale di patrimonio che rimarrà investita in ETF alla fine del percorso di de-risking. Il resto sarà liquidità. Un valore comune è tra il 30% e il 50%.",
+        disabled=not attiva_glidepath
+    ) / 100
 
-    with st.expander("💰 Strategia di Prelievo", expanded=False):
-        p['anni_inizio_prelievo'] = st.number_input("Inizio Prelievo tra (Anni)", min_value=0, max_value=p['anni_totali'], value=p['anni_inizio_prelievo'])
-        p['strategia_prelievo'] = st.selectbox("Strategia di Prelievo", 
-            options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'], 
-            index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
-            help="""
-            - **FISSO**: Prelievo di un importo fisso, rivalutato per l'inflazione.
-            - **REGOLA_4%**: Prelievo del 4% del patrimonio a inizio anno.
-            - **GUARDRAIL**: Come FISSO, ma con aggiustamenti del 10% se il tasso di prelievo supera certe soglie.
-            """)
-        
-        if p['strategia_prelievo'] == 'FISSO':
-            p['prelievo_annuo'] = st.number_input("Importo Prelievo Fisso Annuo (€)", min_value=0, value=p['prelievo_annuo'], step=1000)
-        elif p['strategia_prelievo'] == 'REGOLA_4_PERCENTO':
-            p['percentuale_regola_4'] = st.slider("Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1) / 100
-        elif p['strategia_prelievo'] == 'GUARDRAIL':
-            st.number_input("Importo Prelievo Fisso Annuo (€)", min_value=0, value=p['prelievo_annuo'], step=1000, key='prelievo_guardrail') # Usa una chiave diversa
-            p['percentuale_regola_4'] = st.slider("Tasso di Prelievo di Riferimento (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1) / 100
-            p['banda_guardrail'] = st.slider("Banda Guardrail (%)", 0.0, 50.0, p.get('banda_guardrail', 0.20) * 100, 1.0) / 100
+with st.sidebar.expander("5. Tassazione e Costi (Italia)"):
+    p = st.session_state.get('parametri', {})
+    tassazione_capital_gain = st.slider("Tassazione Capital Gain (%)", 0.0, 50.0, p.get('tassazione_capital_gain', 0.26) * 100, 1.0, help="L'aliquota applicata ai profitti derivanti dalla vendita di ETF. In Italia è tipicamente il 26%.") / 100
+    imposta_bollo_titoli = st.slider("Imposta di Bollo Titoli (annua, %)", 0.0, 1.0, p.get('imposta_bollo_titoli', 0.002) * 100, 0.01, help="Tassa patrimoniale annuale sul valore totale del tuo portafoglio titoli. In Italia è lo 0,2%.") / 100
+    imposta_bollo_conto = st.number_input("Imposta di Bollo Conto (>5k€)", min_value=0, value=p.get('imposta_bollo_conto', 34), help="Imposta fissa annuale sui conti correnti con giacenza media superiore a 5.000€. In Italia è 34,20€.")
+    costo_fisso_etf_mensile = st.number_input("Costo Fisso Deposito Titoli (€/mese)", min_value=0.0, value=p.get('costo_fisso_etf_mensile', 0.0), step=0.5, help="Eventuali costi fissi mensili o annuali addebitati dal tuo broker per il mantenimento del conto titoli. Molti broker online non hanno costi fissi.")
 
-    with st.expander("📉 Asset Allocation Dinamica (Glidepath)", expanded=False):
-        p['attiva_glidepath'] = st.checkbox("Attiva Glidepath", value=p.get('attiva_glidepath', False))
-        if p['attiva_glidepath']:
-            p['inizio_glidepath_anni'] = st.number_input("Inizio Glidepath tra (Anni)", 0, p['anni_totali'], p.get('inizio_glidepath_anni', 20))
-            p['fine_glidepath_anni'] = st.number_input("Fine Glidepath tra (Anni)", p['inizio_glidepath_anni'], p['anni_totali'], p.get('fine_glidepath_anni', 40))
-            p['allocazione_etf_finale'] = st.slider("Allocazione ETF Finale (%)", 0.0, 100.0, p.get('allocazione_etf_finale', 0.333) * 100, 1.0) / 100
+with st.sidebar.expander("6. Fondo Pensione"):
+    p = st.session_state.get('parametri', {})
+    attiva_fondo_pensione = st.checkbox("Attiva Fondo Pensione", value=p.get('attiva_fondo_pensione', True))
+    contributo_annuo_fp = st.number_input("Contributo Annuo FP (€)", min_value=0, step=100, value=p.get('contributo_annuo_fp', 3000), disabled=not attiva_fondo_pensione)
+    rendimento_medio_fp = st.slider("Rendimento Medio Annuo FP (%)", 0.0, 15.0, p.get('rendimento_medio_fp', 0.04) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
+    volatilita_fp = st.slider("Volatilità Annuo FP (%)", 0.0, 30.0, p.get('volatilita_fp', 0.08) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
+    ter_fp = st.slider("Costo Annuo (TER) FP (%)", 0.0, 3.0, p.get('ter_fp', 0.01) * 100, 0.1, disabled=not attiva_fondo_pensione) / 100
+    tassazione_rendimenti_fp = st.slider("Tassazione Rendimenti FP (%)", 0.0, 30.0, p.get('tassazione_rendimenti_fp', 0.20) * 100, 1.0, disabled=not attiva_fondo_pensione) / 100
+    aliquota_finale_fp = st.slider("Aliquota Finale Ritiro FP (%)", 9.0, 23.0, p.get('aliquota_finale_fp', 0.15) * 100, 0.5, disabled=not attiva_fondo_pensione, help="La tassazione agevolata applicata al momento del ritiro del capitale o della rendita dal fondo pensione. Varia dal 15% al 9% in base agli anni di contribuzione.") / 100
+    eta_ritiro_fp = st.number_input("Età Ritiro Fondo Pensione", min_value=50, max_value=80, value=p.get('eta_ritiro_fp', 67), disabled=not attiva_fondo_pensione, help="L'età in cui maturi i requisiti per accedere al tuo fondo pensione.")
+    percentuale_capitale_fp = st.slider("% Ritiro in Capitale FP", 0.0, 100.0, p.get('percentuale_capitale_fp', 0.50) * 100, 1.0, help="La parte del montante finale che desideri ritirare subito come capitale tassato. Il resto verrà convertito in una rendita mensile.", disabled=not attiva_fondo_pensione) / 100
+    durata_rendita_fp_anni = st.number_input("Durata Rendita FP (Anni)", min_value=1, value=p.get('durata_rendita_fp_anni', 25), disabled=not attiva_fondo_pensione, help="Per quanti anni vuoi che venga erogata la rendita calcolata dal tuo fondo pensione.")
 
-    with st.expander("🇮🇹 Tassazione e Costi (Italia)", expanded=False):
-        p['tassazione_capital_gain'] = st.slider("Tassazione Capital Gain (%)", 0.0, 40.0, p['tassazione_capital_gain'] * 100, 0.5) / 100
-        p['ter_etf'] = st.slider("Costo Annuo ETF (TER) (%)", 0.0, 2.0, p['ter_etf'] * 100, 0.01) / 100
-        p['costo_fisso_etf_mensile'] = st.number_input("Costi Fissi Mensili Conto Titoli (€)", 0.0, 100.0, p.get('costo_fisso_etf_mensile', 0.0), 0.5)
+with st.sidebar.expander("7. Altre Entrate"):
+    p = st.session_state.get('parametri', {})
+    pensione_pubblica_annua = st.number_input("Pensione Pubblica Annua (€)", min_value=0, step=500, value=p.get('pensione_pubblica_annua', 8400), help="L'importo annuo lordo della pensione statale (es. INPS) che prevedi di ricevere.")
+    inizio_pensione_anni = st.number_input("Inizio Pensione (Anni da oggi)", min_value=0, value=p.get('inizio_pensione_anni', 40), help="Tra quanti anni inizierai a ricevere la pensione pubblica.")
 
-    with st.expander("🏦 Fondo Pensione", expanded=False):
-        p['attiva_fondo_pensione'] = st.checkbox("Attiva Fondo Pensione", value=p['attiva_fondo_pensione'])
-        if p['attiva_fondo_pensione']:
-            p['contributo_annuo_fp'] = st.number_input("Contributo Annuo Fondo Pensione (€)", 0, 10000, p['contributo_annuo_fp'], 100)
-            p['rendimento_medio_fp'] = st.slider("Rendimento Medio Annuo FP (%)", 0.0, 15.0, p['rendimento_medio_fp'] * 100, 0.25) / 100
-            p['volatilita_fp'] = st.slider("Volatilità Annua FP (%)", 0.0, 25.0, p.get('volatilita_fp', 0.08) * 100, 0.5) / 100
-            p['ter_fp'] = st.slider("Costo Annuo FP (TER) (%)", 0.0, 5.0, p['ter_fp'] * 100, 0.1) / 100
-            p['eta_ritiro_fp'] = st.number_input("Età Ritiro Fondo Pensione", 57, 75, p['eta_ritiro_fp'])
-            p['tipo_liquidazione_fp'] = st.selectbox("Tipo Liquidazione FP", ['Capitale', 'Rendita'], index=['Capitale', 'Rendita'].index(p['tipo_liquidazione_fp']))
-            p['aliquota_finale_fp'] = st.slider("Aliquota Fiscale Finale FP (%)", 9.0, 23.0, p['aliquota_finale_fp'] * 100, 0.5) / 100
-            
-    with st.expander("💶 Altre Entrate", expanded=False):
-        p['inizio_pensione_anni'] = st.number_input("Inizio Pensione Pubblica tra (Anni)", 0, p['anni_totali'], p['inizio_pensione_anni'])
-        p['pensione_pubblica_annua'] = st.number_input("Importo Annuo Pensione Pubblica (€)", 0, 100000, p['pensione_pubblica_annua'], 1000)
+if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
+    if not np.isclose(st.session_state.portfolio["Allocazione (%)"].sum(), 100):
+        st.sidebar.error("L'allocazione del portafoglio deve essere esattamente 100% per eseguire la simulazione.")
+    else:
+        st.session_state.parametri = {
+            'eta_iniziale': eta_iniziale, 'capitale_iniziale': capitale_iniziale, 'etf_iniziale': etf_iniziale,
+            'contributo_mensile_banca': contributo_mensile_banca, 'contributo_mensile_etf': contributo_mensile_etf, 
+            'rendimento_medio': rendimento_medio_portfolio,
+            'volatilita': volatilita_portfolio, 
+            'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
+            'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
+            'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
+            'attiva_glidepath': attiva_glidepath, 'inizio_glidepath_anni': inizio_glidepath_anni, 'fine_glidepath_anni': fine_glidepath_anni,
+            'allocazione_etf_finale': allocazione_etf_finale,
+            'tassazione_capital_gain': tassazione_capital_gain, 'imposta_bollo_titoli': imposta_bollo_titoli, 'imposta_bollo_conto': imposta_bollo_conto,
+            'ter_etf': ter_etf_portfolio, 
+            'costo_fisso_etf_mensile': costo_fisso_etf_mensile,
+            'attiva_fondo_pensione': attiva_fondo_pensione, 'contributo_annuo_fp': contributo_annuo_fp, 'rendimento_medio_fp': rendimento_medio_fp,
+            'volatilita_fp': volatilita_fp, 'ter_fp': ter_fp, 'tassazione_rendimenti_fp': tassazione_rendimenti_fp, 'aliquota_finale_fp': aliquota_finale_fp,
+            'eta_ritiro_fp': eta_ritiro_fp, 'percentuale_capitale_fp': percentuale_capitale_fp, 'durata_rendita_fp_anni': durata_rendita_fp_anni,
+            'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni
+        }
 
-    st.header("⚙️ Impostazioni Tecniche")
-    p['n_simulazioni'] = st.select_slider("Numero di Simulazioni", options=[100, 500, 1000, 2000, 5000], value=p['n_simulazioni'])
+        with st.spinner("Esecuzione della simulazione Monte Carlo... Questo potrebbe richiedere alcuni istanti."):
+            try:
+                st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
+                st.session_state.simulazione_eseguita = True
+                st.rerun()
+            except ValueError as e:
+                st.error(f"Errore nei parametri: {e}")
+            except Exception as e:
+                st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
 
-    if st.button("Esegui Simulazione", type="primary", use_container_width=True):
-        run_simulation(p)
+st.markdown("---")
 
-# --- Pagina Principale ---
-if 'simulation_results' not in st.session_state or st.session_state.simulation_results is None:
-    st.title("Simulatore di Pianificazione Finanziaria Monte Carlo")
-    st.markdown("### Benvenuto! Configura i parametri della tua simulazione nella barra laterale e clicca su 'Esegui Simulazione' per iniziare.")
-    st.info("Questo strumento ti aiuta a visualizzare migliaia di possibili futuri finanziari per prendere decisioni più consapevoli.")
-
+if not st.session_state.simulazione_eseguita:
+    st.header("Risultati della Simulazione")
+    st.info("I risultati appariranno qui dopo aver eseguito la simulazione.")
 else:
-    # Carica risultati e parametri dallo stato della sessione
-    results = st.session_state.simulation_results
-    params = st.session_state.simulation_params
-    stats = results['statistiche']
-    stat_patrimonio = stats['percentili_patrimonio_reale']
-    stat_prelievi = stats.get('statistiche_prelievi', {k: 0 for k in ['mediana', 'p10', 'p90']})
+    stats = st.session_state.risultati['statistiche']
+    params = st.session_state.parametri
 
-    st.title(f"Risultati per: *{params['nome_simulazione']}*")
-    st.markdown(f"*{params['n_simulazioni']} scenari calcolati in un orizzonte di {params['anni_totali']} anni.*")
+    with st.expander("💾 Salva Risultati Simulazione"):
+        simulation_name = st.text_input("Dai un nome a questa simulazione", f"Simulazione del {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        if st.button("Salva Simulazione"):
+            save_simulation(simulation_name, params, st.session_state.risultati)
 
-    # --- Sezione Metriche Chiave ---
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric(
-            label="📉 Probabilità di Fallimento",
-            value=f"{stats['tasso_fallimento']:.1%}",
-            help="La percentuale di simulazioni in cui il patrimonio si è esaurito prima della fine dell'orizzonte temporale."
-        )
-    with col2:
-        st.metric(
-            label="Median Wealth at End",
-            value=f"€{stat_patrimonio.get('mediana', 0):,.0f}",
-            help="Il patrimonio finale reale (potere d'acquisto odierno) nello scenario mediano (50° percentile)."
-        )
-    with col3:
-        reddito_mediano = stat_prelievi.get('mediana', 0)
-        st.metric(
-            label="Reddito Annuo Reale Mediano",
-            value=f"€{reddito_mediano:,.0f}",
-            help="Il reddito annuo reale mediano (prelievi + pensioni) che puoi sostenere durante il decumulo. Calcolato solo sugli scenari di successo."
-        )
-    with col4:
-        patrimonio_finale_in_anni_spesa = stat_patrimonio.get('mediana', 0) / reddito_mediano if reddito_mediano > 0 else 0
-        st.metric(
-            label="Patrimonio Finale in Anni di Spesa",
-            value=f"{patrimonio_finale_in_anni_spesa:.1f} Anni",
-            help="Quanti anni di spesa (basati sul reddito mediano) rappresenta il tuo patrimonio finale mediano. Utile per capire il 'margine di sicurezza'."
-        )
+    st.header("Riepilogo Statistico Chiave")
 
-    # --- Tabbed Interface per i Grafici ---
-    tab1, tab2, tab3 = st.tabs(["📊 Grafici Principali", "📈 Grafici Avanzati", "📄 Dettaglio Flussi di Cassa"])
+    patrimonio_iniziale_totale = params['capitale_iniziale'] + params['etf_iniziale']
+    contributi_versati = stats['contributi_totali_versati_mediano_nominale']
+    patrimonio_finale_nominale = stats['patrimonio_finale_mediano_nominale']
+    guadagni_da_investimento = patrimonio_finale_nominale - contributi_versati - patrimonio_iniziale_totale
     
-    with tab1:
-        st.header("Evoluzione del Patrimonio e del Tenore di Vita")
+    reddito_annuo_reale_pensione = st.session_state.risultati['statistiche_prelievi']['totale_reale_medio_annuo']
+    patrimonio_finale_reale = stats['patrimonio_finale_mediano_reale']
+    anni_di_spesa_coperti = 0.0
+    if reddito_annuo_reale_pensione > 0:
+        anni_di_spesa_coperti = patrimonio_finale_reale / reddito_annuo_reale_pensione
+    else:
+        # Se non c'è reddito annuo, il patrimonio non può coprire "anni di spesa"
+        anni_di_spesa_coperti = 0.0
+
+    st.markdown("##### Il Tuo Percorso Finanziario in Numeri")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric(
+        "Patrimonio Iniziale", f"€ {patrimonio_iniziale_totale:,.0f}",
+        help="La somma del capitale che hai all'inizio della simulazione."
+    )
+    col2.metric(
+        "Contributi Totali Versati", f"€ {contributi_versati:,.0f}",
+        help="La stima di tutto il denaro che verserai di tasca tua durante la fase di accumulo. Questo è il tuo sacrificio."
+    )
+    col3.metric(
+        "Guadagni da Investimento", f"€ {guadagni_da_investimento:,.0f}",
+        delta=f"{((guadagni_da_investimento / contributi_versati) * 100) if contributi_versati > 0 else 0:,.0f}% vs Contributi",
+        help="La ricchezza generata dal solo effetto dei rendimenti di mercato (interesse composto). Questa è la ricompensa per il rischio e la pazienza."
+    )
+    col4.metric(
+        "Patrimonio Finale in Anni di Spesa", f"{anni_di_spesa_coperti:,.1f} Anni",
+        help=f"Il tuo patrimonio finale reale mediano, tradotto in quanti anni del tuo tenore di vita pensionistico (€{reddito_annuo_reale_pensione:,.0f}/anno) può coprire."
+    )
+
+    st.markdown("##### Risultati Finali della Simulazione (Patrimonio Nominale)")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}")
+    col2.metric("Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}")
+    col3.metric("Patrimonio Finale (Peggior 10% - 10°)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}")
+    col4.metric("Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}")
+
+    st.markdown("##### Indicatori di Rischio del Piano")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}", delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse")
+    col2.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse")
+    col3.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}")
+
+    st.header("Riepilogo Entrate in Pensione (Valori Reali Medi)")
+    stats_prelievi = st.session_state.risultati['statistiche_prelievi']
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Prelievo Medio dal Patrimonio", f"€ {stats_prelievi['prelievo_reale_medio']:,.0f}")
+    col2.metric("Pensione Pubblica Annua", f"€ {stats_prelievi['pensione_pubblica_reale_annua']:,.0f}")
+    col3.metric("Rendita Media da Fondo Pensione", f"€ {stats_prelievi['rendita_fp_reale_media']:,.0f}")
+    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {stats_prelievi['totale_reale_medio_annuo']:,.0f}")
+
+    with st.expander("🔍 Guida alla Lettura: Perché il mio piano ha successo (o fallisce)?"):
+        st.markdown("""
+        **Perché la probabilità di fallimento è spesso 0%?**
+        Se vedi un fallimento dello 0%, non significa che il simulatore sia rotto. Significa che, date le ipotesi che hai inserito (contributi costanti, orizzonte lungo, rendimenti positivi), il tuo piano è matematicamente molto solido. Questo grafico ti aiuta a capire perché.
+        """)
         
-        # Grafico Evoluzione Patrimonio
-        patrimoni_reali = np.array(results['patrimoni_reali'])
-        fig_patrimonio = plot_percentile_chart(
-            patrimoni_reali,
-            "Evoluzione Patrimonio Reale (Tutti gli Scenari)",
-            "Patrimonio Reale (€)",
-            '#FFC000', '#FFC000',
+        st.plotly_chart(plot_wealth_composition_chart(patrimonio_iniziale_totale, contributi_versati, guadagni_da_investimento), use_container_width=True)
+
+        st.markdown("""
+        Come puoi vedere, nel lungo periodo, i **Guadagni da Investimento** (la ricompensa per il rischio e la pazienza) spesso superano persino il totale dei contributi che hai versato. Questo è l'effetto dell'**interesse composto**: i tuoi guadagni iniziano a generare altri guadagni, in un circolo virtuoso che accelera la crescita del tuo patrimonio.
+
+        **Limiti del Modello da Tenere a Mente:**
+        Questo simulatore è un potente strumento matematico, ma non può prevedere il futuro o la vita reale al 100%. Ricorda che:
+        - **Non considera shock improvvisi:** La perdita del lavoro, una spesa medica imprevista, o l'impossibilità di contribuire per alcuni anni non sono modellizzati.
+        - **Non considera l'emotività:** Non tiene conto del rischio di vendere in preda al panico durante un crollo di mercato.
+        - **I rendimenti sono un'ipotesi:** I rendimenti e la volatilità che hai inserito sono stime a lungo termine. Il futuro potrebbe essere diverso.
+        - **Le tasse sono semplificate:** Il modello usa un'aliquota fissa sul capital gain, senza considerare scaglioni, minusvalenze pregresse o altre ottimizzazioni fiscali complesse.
+
+        Usa questo strumento come una mappa per definire la direzione, non come un GPS che prevede la destinazione al centimetro.
+        """)
+
+    st.header("Analisi Dettagliata per Fasi")
+    tab_accumulo, tab_decumulo, tab_dettaglio = st.tabs(["📊 Fase di Accumulo", "🏖️ Fase di Decumulo (Pensione)", "🧾 Dettaglio Flussi di Cassa (Mediano)"])
+
+    with tab_accumulo:
+        eta_pensionamento = params['eta_iniziale'] + params['anni_inizio_prelievo']
+        st.subheader(f"Dall'età attuale ({params['eta_iniziale']} anni) fino alla pensione (a {eta_pensionamento} anni)")
+        st.markdown("In questa fase, i tuoi sforzi si concentrano sulla **costruzione del patrimonio**. I tuoi contributi mensili e annuali, uniti ai rendimenti composti degli investimenti, lavorano insieme per far crescere il capitale che ti sosterrà in futuro.")
+        st.markdown("---")
+        
+        dati_grafici = st.session_state.risultati['dati_grafici_principali']
+        
+        fig_reale = plot_percentile_chart(
+            dati_grafici['reale'], 'Evoluzione Patrimonio Reale (Tutti gli Scenari)', 'Patrimonio Reale (€)', 
+            color_median='#C00000', color_fill='#C00000',
+            anni_totali=params['anni_totali']
+        )
+        fig_reale.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        st.plotly_chart(fig_reale, use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo è il grafico della verità. Tiene conto dell'inflazione, mostrando il vero potere d'acquisto. La linea rossa è lo scenario mediano (50° percentile), le aree colorate mostrano i range di probabilità (dal 10° al 90° percentile).</div>", unsafe_allow_html=True)
+
+        fig_nominale = plot_percentile_chart(
+            dati_grafici['nominale'], 'Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 'Patrimonio (€)',
+            color_median='#4472C4', color_fill='#4472C4',
+            anni_totali=params['anni_totali']
+        )
+        fig_nominale.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        st.plotly_chart(fig_nominale, use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo grafico mostra il valore 'nominale', cioè quanti Euro vedrai scritti sul tuo estratto conto in futuro, senza considerare l'inflazione.</div>", unsafe_allow_html=True)
+
+    with tab_decumulo:
+        eta_pensionamento = params['eta_iniziale'] + params['anni_inizio_prelievo']
+        eta_pensione_pubblica = params['eta_iniziale'] + params['inizio_pensione_anni']
+        eta_ritiro_fp = params['eta_ritiro_fp']
+
+        st.subheader(f"Dalla pensione (a {eta_pensionamento} anni) in poi")
+        
+        testo_decumulo = f"""
+        A partire da **{eta_pensionamento} anni**, smetti di versare e inizi a **prelevare dal tuo patrimonio** per sostenere il tuo tenore di vita. 
+        A questo si aggiungeranno le altre fonti di reddito che hai configurato:
+        - La **pensione pubblica** a partire da **{eta_pensione_pubblica} anni**.
+        """
+        if params['attiva_fondo_pensione']:
+            testo_decumulo += f"\n- L'eventuale **rendita del fondo pensione** a partire da **{eta_ritiro_fp} anni**."
+        
+        testo_decumulo += "\n\nL'obiettivo è far sì che il patrimonio duri per tutto l'orizzonte temporale desiderato."
+        st.markdown(testo_decumulo)
+        st.markdown("---")
+
+        dati_principali = st.session_state.risultati['dati_grafici_principali']
+
+        # --- Grafico 1: Cono del Reddito ---
+        st.subheader("📊 Quale sarà il mio tenore di vita in pensione?")
+        st.markdown("""
+        Questo grafico è forse il più importante per la tua pianificazione. Non ti mostra solo un numero, ma **l'intera gamma dei possibili redditi annuali reali** (cioè, il potere d'acquisto di oggi) che potrai avere durante la pensione.
+
+        - **La linea blu centrale (Mediana):** È lo scenario più probabile, il tuo obiettivo realistico.
+        - **L'area azzurra (25°-75° percentile):** È l'intervallo di reddito 'plausibile'. C'è una buona probabilità che il tuo tenore di vita rientri in questa fascia.
+        - **L'area più chiara (10°-90° percentile):** Rappresenta gli estremi. La parte alta è lo scenario da sogno, la parte bassa è lo scenario più pessimistico ma comunque possibile. Usala per capire quale potrebbe essere il tuo reddito minimo in caso di andamenti di mercato molto sfortunati.
+        """)
+        fig_reddito = plot_income_cone_chart(
+            dati_principali['reddito_reale_annuo'], 
             params['anni_totali'],
             params['anni_inizio_prelievo']
         )
-        st.plotly_chart(fig_patrimonio, use_container_width=True)
-
-        # Grafico Tenore di Vita
-        reddito_reale = np.array(results['reddito_totale_reale'])
-        eta_x_axis = np.arange(params['anni_totali'] + 1) + params['eta_iniziale']
-        fig_reddito = plot_income_cone_chart(reddito_reale, params['anni_totali'], params['anni_inizio_prelievo'])
-        fig_reddito.update_xaxes(tickvals=eta_x_axis[::5], ticktext=[str(x) for x in eta_x_axis[::5]])
         st.plotly_chart(fig_reddito, use_container_width=True)
+        st.markdown("---")
 
-        st.info("""
-        **Come leggere questi grafici?**
-        - **Linea Azzurra/Gialla**: Rappresenta lo scenario mediano (50° percentile), il risultato più probabile.
-        - **Aree Colorate**: Mostrano l'incertezza. L'area più scura (25-75 percentile) contiene il 50% degli scenari più comuni. L'area più chiara (10-90 percentile) ne contiene l'80%. Più ampie sono le aree, maggiore è l'incertezza del futuro.
+        # --- Grafico 2: Analisi Scenari Peggiori ---
+        st.subheader("🔥 Il piano sopravviverà a una crisi di mercato iniziale?")
+        st.markdown("""
+        Questo grafico è il *crash test* del tuo piano pensionistico. Affronta la paura più grande di ogni pensionato: il **Rischio da Sequenza dei Rendimenti**. In parole semplici, una forte crisi di mercato **proprio all'inizio della pensione** è molto più dannosa di una che avviene 20 anni dopo, perché erode il capitale da cui stai iniziando a prelevare, dandogli meno tempo per recuperare.
+
+        Qui isoliamo il **10% degli scenari più sfortunati** della simulazione. Ogni linea rossa sottile rappresenta l'evoluzione del patrimonio in uno di questi futuri avversi.
+        
+        - **Cosa osservare:** Il tuo piano è robusto se, anche in questi scenari, il patrimonio non si azzera troppo in fretta. Se vedi che molte linee crollano a zero rapidamente, potrebbe essere un segnale che il tuo piano è troppo aggressivo o la tua percentuale di prelievo troppo alta per resistere a una "tempesta perfetta" iniziale.
         """)
+        fig_worst = plot_worst_scenarios_chart(
+            dati_principali['reale'],
+            st.session_state.risultati['statistiche']['patrimoni_reali_finali'],
+            params['anni_totali']
+        )
+        fig_worst.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        st.plotly_chart(fig_worst, use_container_width=True)
 
-    with tab2:
-        st.header("Analisi Avanzate dello Scenario")
-        dati_grafici_avanzati = results.get("dati_grafici_avanzati", {})
+    with tab_dettaglio:
+        st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")
+        st.markdown("Questa tabella è la 'radiografia' dello scenario mediano (il più probabile). Mostra, anno per anno, tutti i flussi finanziari.")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            if "dati_mediana" in dati_grafici_avanzati:
-                fig_composizione_reddito = plot_income_composition(dati_grafici_avanzati['dati_mediana'], params['anni_totali'])
-                st.plotly_chart(fig_composizione_reddito, use_container_width=True)
-
-            if "prob_successo_nel_tempo" in dati_grafici_avanzati:
-                fig_prob_successo = plot_success_probability(dati_grafici_avanzati['prob_successo_nel_tempo'], params['anni_totali'])
-                st.plotly_chart(fig_prob_successo, use_container_width=True)
-                
-        with col2:
-            if "dati_mediana" in dati_grafici_avanzati:
-                fig_allocazione = plot_asset_allocation(dati_grafici_avanzati['dati_mediana'], params['anni_totali'])
-                st.plotly_chart(fig_allocazione, use_container_width=True)
-
-            if "worst_scenarios" in dati_grafici_avanzati:
-                worst_data = dati_grafici_avanzati['worst_scenarios']
-                fig_worst = plot_worst_scenarios_chart(
-                    np.array(worst_data['traiettorie']),
-                    np.array(worst_data['patrimoni_finali']),
-                    params['anni_totali']
-                )
-                st.plotly_chart(fig_worst, use_container_width=True)
-
-
-    with tab3:
-        st.header("Dettaglio Flussi di Cassa (Scenario Mediano)")
-        st.write("Questa tabella mostra i flussi di cassa annuali per lo scenario mediano (50° percentile). Tutti i valori sono in termini reali (potere d'acquisto odierno).")
-
-        dati_mediana = dati_grafici_avanzati.get("dati_mediana", {})
+        dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
         
-        # Prepara i dati per la tabella, gestendo chiavi mancanti per vecchie simulazioni
-        anni = np.arange(params['anni_totali'] + 1)
-        eta = anni + params['eta_iniziale']
+        # Costruzione del DataFrame
+        num_anni = params['anni_totali']
+        df = pd.DataFrame({
+            'Anno': np.arange(1, num_anni + 1),
+            'Età': params['eta_iniziale'] + np.arange(num_anni),
+            'Obiettivo Prelievo (Nom.)': dati_tabella.get('prelievi_target_nominali', np.zeros(num_anni))[:num_anni],
+            'Prelievo Effettivo (Nom.)': dati_tabella.get('prelievi_effettivi_nominali', np.zeros(num_anni))[:num_anni],
+            'Fonte: Conto Corrente': dati_tabella.get('prelievi_da_banca_nominali', np.zeros(num_anni))[:num_anni],
+            'Fonte: Vendita ETF': dati_tabella.get('prelievi_da_etf_nominali', np.zeros(num_anni))[:num_anni],
+            'Vendita ETF (Rebalance)': dati_tabella.get('vendite_rebalance_nominali', np.zeros(num_anni))[:num_anni],
+            'Prelievo Effettivo (Reale)': dati_tabella.get('prelievi_effettivi_reali', np.zeros(num_anni))[:num_anni],
+            'Pensione Pubblica (Nom.)': dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(num_anni))[:num_anni],
+            'Rendita FP (Nom.)': dati_tabella.get('rendite_fp_nominali', np.zeros(num_anni))[:num_anni],
+            'Liquidazione FP (Nom.)': dati_tabella.get('fp_liquidato_nominale', np.zeros(num_anni))[:num_anni],
+            'Patrimonio Banca (Nom.)': dati_tabella.get('saldo_banca_nominale', np.zeros(num_anni))[:num_anni],
+            'Patrimonio ETF (Nom.)': dati_tabella.get('saldo_etf_nominale', np.zeros(num_anni))[:num_anni],
+            'Patrimonio FP (Nom.)': dati_tabella.get('saldo_fp_nominale', np.zeros(num_anni))[:num_anni],
+        })
         
-        df_data = {
-            "Età": eta,
-            "Patrimonio Iniziale Reale": np.median(patrimoni_reali[:, ::12], axis=0),
-            "Reddito Reale Annuo": np.median(results.get('reddito_totale_reale', np.zeros_like(patrimoni_reali)), axis=0),
-            "Prelievi Effettivi Reali": dati_mediana.get('prelievi_effettivi_reali', np.zeros(anni.size)),
-            "Pensione Pubblica Reale": dati_mediana.get('pensioni_pubbliche_reali', np.zeros(anni.size)),
-            "Rendita FP Reale": dati_mediana.get('rendite_fp_reali', np.zeros(anni.size)),
-            "Liquidazione FP Nominale": dati_mediana.get('fp_liquidato_nominale', np.zeros(anni.size)),
-            "Vendite per Rebalance": dati_mediana.get('vendite_rebalance_nominali', np.zeros(anni.size)),
-            "Tasse su Rebalance": np.median(results.get('tasse_rebalance_nominali', np.zeros_like(patrimoni_reali)), axis=0)
-        }
-        
-        df = pd.DataFrame(df_data)
-        
-        # Formattazione per la visualizzazione
-        styled_df = df.style.format({
-            "Patrimonio Iniziale Reale": "€{:,.0f}",
-            "Reddito Reale Annuo": "€{:,.0f}",
-            "Prelievi Effettivi Reali": "€{:,.0f}",
-            "Pensione Pubblica Reale": "€{:,.0f}",
-            "Rendita FP Reale": "€{:,.0f}",
-            "Liquidazione FP Nominale": "€{:,.0f}",
-            "Vendite per Rebalance": "€{:,.0f}",
-            "Tasse su Rebalance": "€{:,.0f}"
-        }).set_properties(**{'text-align': 'right'}).hide(axis="index")
-        
-        st.dataframe(styled_df, use_container_width=True, height=500)
+        st.dataframe(df.style.format({
+            'Obiettivo Prelievo (Nom.)': "€ {:,.0f}",
+            'Prelievo Effettivo (Nom.)': "€ {:,.0f}",
+            'Fonte: Conto Corrente': "€ {:,.0f}",
+            'Fonte: Vendita ETF': "€ {:,.0f}",
+            'Vendita ETF (Rebalance)': "€ {:,.0f}",
+            'Prelievo Effettivo (Reale)': "€ {:,.0f}",
+            'Pensione Pubblica (Nom.)': "€ {:,.0f}",
+            'Rendita FP (Nom.)': "€ {:,.0f}",
+            'Liquidazione FP (Nom.)': "€ {:,.0f}",
+            'Patrimonio Banca (Nom.)': "€ {:,.0f}",
+            'Patrimonio ETF (Nom.)': "€ {:,.0f}",
+            'Patrimonio FP (Nom.)': "€ {:,.0f}",
+        }))
 
-
-    st.header("Gestione Scenario Corrente")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Salva Scenario Corrente", use_container_width=True):
-            save_simulation(params['nome_simulazione'], params, results)
-    with col2:
-        # Aggiungi un bottone per eliminare lo scenario caricato se applicabile
-        pass # Logica di eliminazione gestita nella sidebar 
+        with st.expander("Guida alla Lettura della Tabella"):
+            st.markdown("""
+            - **Obiettivo Prelievo vs Prelievo Effettivo**: L''Obiettivo' è quanto vorresti prelevare. L''Effettivo' è quanto prelevi realmente. Se hai pochi soldi, l''Effettivo' sarà più basso.
+            - **Fonte Conto vs Fonte ETF**: Mostrano da dove provengono i soldi per il prelievo. Prima si usa la liquidità sul conto, poi si vendono gli ETF.
+            - **Vendita ETF (Rebalance)**: NON sono soldi spesi. Sono vendite fatte per ridurre il rischio (seguendo il Glidepath). I soldi vengono spostati da ETF a liquidità.
+            - **Liquidazione Capitale FP**: Somma che ricevi tutta in una volta dal fondo pensione all'età scelta. Aumenta di molto la tua liquidità in quell'anno.
+            - **Entrate Anno (Reali)**: La somma di tutte le tue entrate (prelievi, pensioni) in potere d'acquisto di oggi. Questa cifra misura il tuo vero tenore di vita annuale.
+            """) 

@@ -64,7 +64,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'prelievi_da_banca_nominali': np.zeros(num_anni),
         'prelievi_da_etf_nominali': np.zeros(num_anni),
         'vendite_rebalance_nominali': np.zeros(num_anni),
-        'tasse_rebalance_nominali': np.zeros(num_anni),
         'fp_liquidato_nominale': np.zeros(num_anni),
         'pensioni_pubbliche_nominali': np.zeros(num_anni),
         'pensioni_pubbliche_reali': np.zeros(num_anni),
@@ -149,6 +148,13 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             if is_primo_mese_prelievo or is_inizio_anno_fiscale:
                 patrimonio_attuale = patrimonio_banca + patrimonio_etf
                 
+                # FIX: Esclude la liquidazione del capitale FP dell'anno precedente dalla base di calcolo
+                # per le strategie di prelievo basate su percentuali, per evitare picchi anomali.
+                if anno_corrente > 0:
+                    lump_sum_anno_precedente = dati_annuali['fp_liquidato_nominale'][anno_corrente - 1]
+                    if lump_sum_anno_precedente > 0:
+                        patrimonio_attuale -= lump_sum_anno_precedente
+
                 if patrimonio_attuale <= 0:
                     prelievo_annuo_corrente = 0
                 else:
@@ -228,14 +234,11 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         patrimonio_etf *= (1 + rendimento_mensile)
         
         if patrimonio_etf > 0:
-            patrimonio_etf -= patrimonio_etf * (parametri['ter_etf'] / 12)
             patrimonio_etf -= parametri['costo_fisso_etf_mensile']
 
         if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
             rendimento_fp = np.random.normal(parametri['rendimento_medio_fp']/12, parametri['volatilita_fp']/np.sqrt(12))
             patrimonio_fp *= (1 + rendimento_fp)
-            if patrimonio_fp > 0:
-                patrimonio_fp -= patrimonio_fp * (parametri['ter_fp'] / 12)
 
         tasso_inflazione_mensile = np.random.normal(parametri['inflazione']/12, 0.005)
         indice_prezzi *= (1 + tasso_inflazione_mensile)
@@ -247,7 +250,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             
             if fp_convertito_in_rendita and eta_attuale >= parametri['eta_ritiro_fp']:
                  dati_annuali['rendite_fp_reali'][anno_corrente] = rendita_annua_reale_fp
-                 dati_annuali['rendite_fp_nominali'][anno_corrente] = rendita_annua_reale_fp * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
+                 dati_annuali['rendite_fp_nominali'][anno_corrente] = rendita_annua_reale_fp * indice_prezzi
 
             dati_annuali['reddito_totale_reale'][anno_corrente] = (
                 dati_annuali['prelievi_effettivi_reali'][anno_corrente] +
@@ -255,78 +258,97 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 dati_annuali['rendite_fp_reali'][anno_corrente]
             )
 
-            # --- Logica Glidepath (fine anno) ---
-            if parametri['attiva_glidepath'] and anno_corrente >= parametri['inizio_glidepath_anni']:
+            if patrimonio_banca > 5000: patrimonio_banca -= parametri['imposta_bollo_conto']
+            if patrimonio_etf > 0:
+                patrimonio_etf -= patrimonio_etf * parametri['imposta_bollo_titoli']
+                patrimonio_etf -= patrimonio_etf * parametri['ter_etf']
+            
+            if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
+                patrimonio_fp_post_costi = patrimonio_fp * (1 - parametri['ter_fp'])
+                
+                rendimento_maturato_anno = patrimonio_fp_post_costi - patrimonio_fp_inizio_anno - contributi_fp_anno_corrente
+                
+                if rendimento_maturato_anno > 0:
+                    tassa_su_rendimento = rendimento_maturato_anno * parametri['tassazione_rendimenti_fp']
+                    patrimonio_fp = patrimonio_fp_post_costi - tassa_su_rendimento
+                else:
+                    patrimonio_fp = patrimonio_fp_post_costi
+
+                patrimonio_fp_inizio_anno = patrimonio_fp
+                contributi_fp_anno_corrente = 0
+                
+                if eta_attuale >= parametri['eta_ritiro_fp'] and patrimonio_fp > 0:
+                    capitale_ritirato = patrimonio_fp * parametri['percentuale_capitale_fp']
+                    dati_annuali['fp_liquidato_nominale'][anno_corrente] = capitale_ritirato
+                    patrimonio_banca += capitale_ritirato * (1 - parametri['aliquota_finale_fp'])
+                    
+                    capitale_per_rendita = patrimonio_fp * (1 - parametri['percentuale_capitale_fp'])
+                    if parametri['durata_rendita_fp_anni'] > 0 and capitale_per_rendita > 0:
+                        tasso_interesse_annuo_fp = parametri['rendimento_medio_fp'] - parametri['ter_fp']
+                        n_anni_rendita = parametri['durata_rendita_fp_anni']
+                        
+                        rendita_annua_nominale_iniziale = 0
+                        if tasso_interesse_annuo_fp > 0:
+                            fattore_rendita = tasso_interesse_annuo_fp / (1 - (1 + tasso_interesse_annuo_fp) ** -n_anni_rendita)
+                            rendita_annua_nominale_iniziale = capitale_per_rendita * fattore_rendita
+                        else:
+                            rendita_annua_nominale_iniziale = capitale_per_rendita / n_anni_rendita
+
+                        rendita_annua_reale_fp = rendita_annua_nominale_iniziale / indice_prezzi
+                        rendita_mensile_nominale_tassata_fp = (rendita_annua_nominale_iniziale / 12) * (1 - parametri['aliquota_finale_fp'])
+                        indice_prezzi_inizio_rendita_fp = indice_prezzi
+                    
+                    patrimonio_fp = 0
+                    fp_convertito_in_rendita = True
+
+            if parametri['attiva_glidepath']:
                 patrimonio_investibile = patrimonio_banca + patrimonio_etf
                 if patrimonio_investibile > 0:
                     current_etf_alloc = patrimonio_etf / patrimonio_investibile
+                    target_alloc_etf = -1.0
                     
-                    if allocazione_etf_inizio_glidepath < 0:
-                         allocazione_etf_inizio_glidepath = current_etf_alloc
-
-                    durata = parametri['fine_glidepath_anni'] - parametri['inizio_glidepath_anni']
-                    progresso = (anno_corrente - parametri['inizio_glidepath_anni']) / durata if durata > 0 else 1.0
-                    progresso = min(progresso, 1.0)
-
-                    target_alloc_etf = allocazione_etf_inizio_glidepath * (1 - progresso) + parametri['allocazione_etf_finale'] * progresso
-                    
-                    rebalance_amount = (patrimonio_investibile * target_alloc_etf) - patrimonio_etf
-
-                    if rebalance_amount < -1: # Vendi ETF
-                        importo_da_vendere = abs(rebalance_amount)
-                        dati_annuali['vendite_rebalance_nominali'][anno_corrente] += importo_da_vendere
+                    if anno_corrente >= parametri['inizio_glidepath_anni'] and anno_corrente <= parametri['fine_glidepath_anni']:
+                        if allocazione_etf_inizio_glidepath < 0:
+                            allocazione_etf_inizio_glidepath = current_etf_alloc
                         
-                        costo_proporzionale = (importo_da_vendere / patrimonio_etf) * etf_cost_basis if patrimonio_etf > 0 else 0
-                        plusvalenza = importo_da_vendere - costo_proporzionale
-                        tasse_da_pagare = max(0, plusvalenza * parametri['tassazione_capital_gain'])
-                        
-                        dati_annuali['tasse_rebalance_nominali'][anno_corrente] += tasse_da_pagare
-
-                        patrimonio_etf -= (importo_da_vendere)
-                        etf_cost_basis -= costo_proporzionale
-                        patrimonio_banca += (importo_da_vendere - tasse_da_pagare)
-
-                    elif rebalance_amount > 1: # Compra ETF
-                        importo_da_comprare = min(rebalance_amount, patrimonio_banca)
-                        patrimonio_banca -= importo_da_comprare
-                        patrimonio_etf += importo_da_comprare
-                        etf_cost_basis += importo_da_comprare
-            
-            # Liquidazione / Conversione in Rendita Fondo Pensione (fine anno)
-            if parametri['attiva_fondo_pensione'] and eta_attuale == parametri['eta_ritiro_fp'] - 1 and not fp_convertito_in_rendita:
-                montante_fp = patrimonio_fp
-                tasse_fp = montante_fp * parametri['aliquota_finale_fp']
-                montante_netto_fp = montante_fp - tasse_fp
-                dati_annuali['fp_liquidato_nominale'][anno_corrente] = montante_netto_fp
-                
-                if parametri['tipo_liquidazione_fp'] == 'Rendita':
-                    fattore_conversione_grezzo = 0.045 # Esempio
-                    rendita_annua_lorda = montante_netto_fp * fattore_conversione_grezzo
-                    rendita_annua_reale_fp = rendita_annua_lorda / indice_prezzi
+                        durata = float(parametri['fine_glidepath_anni'] - parametri['inizio_glidepath_anni'])
+                        progresso = (anno_corrente - parametri['inizio_glidepath_anni']) / durata if durata > 0 else 1.0
+                        target_alloc_etf = allocazione_etf_inizio_glidepath * (1 - progresso) + parametri['allocazione_etf_finale'] * progresso
                     
-                    rendita_mensile_nominale_tassata_fp = rendita_annua_lorda / 12
-                    fp_convertito_in_rendita = True
-                    indice_prezzi_inizio_rendita_fp = indice_prezzi
-                    patrimonio_fp = 0 
-                else: # 'Capitale'
-                    patrimonio_banca += montante_netto_fp
-                    patrimonio_fp = 0
-            
-            # Salvataggio dati di fine anno
+                    elif anno_corrente > parametri['fine_glidepath_anni']:
+                        target_alloc_etf = parametri['allocazione_etf_finale']
+
+                    if target_alloc_etf >= 0:
+                        rebalance_amount = (patrimonio_investibile * target_alloc_etf) - patrimonio_etf
+                        if rebalance_amount < -1:
+                            importo_da_vendere = abs(rebalance_amount)
+                            dati_annuali['vendite_rebalance_nominali'][anno_corrente] += importo_da_vendere
+                            costo_proporzionale = (importo_da_vendere / patrimonio_etf) * etf_cost_basis if patrimonio_etf > 0 else 0
+                            plusvalenza = importo_da_vendere - costo_proporzionale
+                            tasse_da_pagare = max(0, plusvalenza * parametri['tassazione_capital_gain'])
+                            
+                            patrimonio_etf -= (importo_da_vendere)
+                            etf_cost_basis -= costo_proporzionale
+                            patrimonio_banca += (importo_da_vendere - tasse_da_pagare)
+
+                        elif rebalance_amount > 1:
+                            importo_da_comprare = min(rebalance_amount, patrimonio_banca)
+                            patrimonio_banca -= importo_da_comprare
+                            patrimonio_etf += importo_da_comprare
+                            etf_cost_basis += importo_da_comprare
+                            
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
             dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
             dati_annuali['saldo_banca_reale'][anno_corrente] = patrimonio_banca / indice_prezzi
             dati_annuali['saldo_etf_reale'][anno_corrente] = patrimonio_etf / indice_prezzi
-            
-            if parametri['attiva_fondo_pensione']:
-                dati_annuali['saldo_fp_nominale'][anno_corrente] = patrimonio_fp
-                dati_annuali['saldo_fp_reale'][anno_corrente] = patrimonio_fp / indice_prezzi
-            
-            contributi_fp_anno_corrente = 0
-            patrimonio_fp_inizio_anno = patrimonio_fp
+            dati_annuali['saldo_fp_nominale'][anno_corrente] = patrimonio_fp
+            dati_annuali['saldo_fp_reale'][anno_corrente] = patrimonio_fp / indice_prezzi
 
-        patrimoni_run[mese] = patrimonio_banca + patrimonio_etf + patrimonio_fp
-        patrimoni_reali_run[mese] = patrimoni_run[mese] / indice_prezzi
+            if parametri['attiva_fondo_pensione']:
+                patrimonio_fp_inizio_anno = patrimonio_fp
+
+        patrimoni_run[mese] = max(0, patrimonio_banca + patrimonio_etf + patrimonio_fp)
+        patrimoni_reali_run[mese] = max(0, patrimoni_run[mese] / indice_prezzi)
         patrimonio_storico.append(patrimoni_run[mese])
         
         if (patrimonio_banca + patrimonio_etf) <= 0 and mese >= inizio_prelievo_mesi:
@@ -335,51 +357,52 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     # Calcoli finali per la singola run
     drawdown = 0
     sharpe_ratio = 0
-    if len(patrimonio_storico) > 1:
-        rendimenti_mensili_np = np.diff(patrimonio_storico) / patrimonio_storico[:-1]
-        rendimento_medio_mensile = np.mean(rendimenti_mensili_np) if len(rendimenti_mensili_np) > 0 else 0
-        std_dev_mensile = np.std(rendimenti_mensili_np) if len(rendimenti_mensili_np) > 0 else 0
-        sharpe_ratio = (rendimento_medio_mensile / std_dev_mensile) * np.sqrt(12) if std_dev_mensile > 0 else 0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        patrimoni_np = np.array(patrimonio_storico)
+        picchi = np.maximum.accumulate(patrimoni_np)
+        if np.any(picchi > 0):
+            drawdown_values = (patrimoni_np - picchi) / picchi
+            drawdown = np.min(drawdown_values)
         
-        rolling_max = np.maximum.accumulate(patrimonio_storico)
-        drawdowns = (rolling_max - patrimonio_storico) / rolling_max
-        drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0
-
+        returns = patrimoni_run[1:] / patrimoni_run[:-1] - 1
+        finite_returns = returns[np.isfinite(returns)]
+        if finite_returns.size > 1 and np.std(finite_returns) > 0:
+            risk_free_month = (1 + 0.02) ** (1/12) - 1
+            sharpe_ratio = (np.mean(finite_returns) - risk_free_month) * np.sqrt(12) / np.std(finite_returns)
+            
     return {
-        'patrimoni_mensili': patrimoni_run,
-        'patrimoni_reali_mensili': patrimoni_reali_run,
-        'dati_annuali': dati_annuali,
-        'fallimento': patrimonio_negativo,
-        'patrimonio_finale_reale': patrimoni_reali_run[-1],
-        'contributi_totali_nominali': totale_contributi_versati_nominale,
-        'max_drawdown': drawdown,
-        'sharpe_ratio': sharpe_ratio
+        "patrimoni_mensili": patrimoni_run,
+        "patrimoni_reali_mensili": patrimoni_reali_run,
+        "dati_annuali": dati_annuali,
+        "drawdown": drawdown,
+        "sharpe_ratio": sharpe_ratio,
+        "fallimento": patrimonio_negativo,
+        "totale_contributi_versati_nominale": totale_contributi_versati_nominale
     }
 
-def esegui_simulazioni(parametri, prelievo_annuo_da_usare):
+def run_full_simulation(parametri):
+    """
+    Esegue la simulazione completa e restituisce tutti i dati aggregati e calcolati.
+    """
+    # 1. SETUP INIZIALE
     valida_parametri(parametri)
-    n_sim = parametri['n_simulazioni']
-    anni_totali = parametri['anni_totali']
-    mesi_totali = anni_totali * 12
-    num_anni = anni_totali + 1
 
+    n_sim = parametri['n_simulazioni']
+    mesi_totali = parametri['anni_totali'] * 12
+    num_anni = parametri['anni_totali'] + 1
+    
     patrimoni = np.zeros((n_sim, mesi_totali + 1))
     patrimoni_reali = np.zeros((n_sim, mesi_totali + 1))
-    prelievi_target_nominali_sim = np.zeros((n_sim, num_anni))
-    prelievi_effettivi_nominali_sim = np.zeros((n_sim, num_anni))
-    prelievi_effettivi_reali_sim = np.zeros((n_sim, num_anni))
-    reddito_totale_reale_sim = np.zeros((n_sim, num_anni))
-    tasse_rebalance_nominali_sim = np.zeros((n_sim, num_anni))
-
-    fallimenti = np.zeros(n_sim, dtype=bool)
-    patrimoni_finali_reali = np.zeros(n_sim)
-    prelievi_medi_reali = np.zeros(n_sim)
-    contributi_totali_nominali_agg = np.zeros(n_sim)
-    max_drawdowns_agg = np.zeros(n_sim)
-    sharpe_ratios_agg = np.zeros(n_sim)
-
-    # Dizionario per accumulare tutti i dati annuali da tutte le simulazioni
+    drawdowns = np.zeros(n_sim)
+    sharpe_ratios = np.zeros(n_sim)
+    fallimenti = 0
+    indici_fallimenti = []
+    
+    # Aggrega TUTTI i dati annuali per poter analizzare lo scenario mediano in dettaglio
     tutti_i_dati_annuali = {
+        'prelievi_target_nominali': np.zeros((n_sim, num_anni)),
+        'prelievi_effettivi_nominali': np.zeros((n_sim, num_anni)),
+        'prelievi_effettivi_reali': np.zeros((n_sim, num_anni)),
         'prelievi_da_banca_nominali': np.zeros((n_sim, num_anni)),
         'prelievi_da_etf_nominali': np.zeros((n_sim, num_anni)),
         'vendite_rebalance_nominali': np.zeros((n_sim, num_anni)),
@@ -394,109 +417,148 @@ def esegui_simulazioni(parametri, prelievo_annuo_da_usare):
         'saldo_etf_reale': np.zeros((n_sim, num_anni)),
         'saldo_fp_nominale': np.zeros((n_sim, num_anni)),
         'saldo_fp_reale': np.zeros((n_sim, num_anni)),
-        'prelievi_effettivi_reali': np.zeros((n_sim, num_anni))
+        'reddito_totale_reale': np.zeros((n_sim, num_anni))
     }
+    contributi_totali_agg = np.zeros(n_sim)
 
-    if parametri['strategia_prelievo'] == 'FISSO':
-        prelievo_annuo_da_usare = parametri['prelievo_annuo']
+    prelievo_annuo_da_usare = parametri['prelievo_annuo']
+    calcolo_sostenibile_attivo = parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0
 
+    if calcolo_sostenibile_attivo:
+        prelievo_annuo_da_usare = 0
+
+    # 2. ESECUZIONE SIMULAZIONI
     for sim in range(n_sim):
         risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
         
         patrimoni[sim, :] = risultati_run['patrimoni_mensili']
         patrimoni_reali[sim, :] = risultati_run['patrimoni_reali_mensili']
-        prelievi_target_nominali_sim[sim, :] = risultati_run['dati_annuali']['prelievi_target_nominali']
-        prelievi_effettivi_nominali_sim[sim, :] = risultati_run['dati_annuali']['prelievi_effettivi_nominali']
-        prelievi_effettivi_reali_sim[sim, :] = risultati_run['dati_annuali']['prelievi_effettivi_reali']
-        reddito_totale_reale_sim[sim, :] = risultati_run['dati_annuali']['reddito_totale_reale']
-        tasse_rebalance_nominali_sim[sim, :] = risultati_run['dati_annuali']['tasse_rebalance_nominali']
+        drawdowns[sim] = risultati_run['drawdown']
+        sharpe_ratios[sim] = risultati_run['sharpe_ratio']
+        if risultati_run['fallimento']:
+            fallimenti += 1
+            indici_fallimenti.append(sim)
         
-        fallimenti[sim] = risultati_run['fallimento']
-        patrimoni_finali_reali[sim] = risultati_run['patrimonio_finale_reale']
-        contributi_totali_nominali_agg[sim] = risultati_run['contributi_totali_nominali']
-        max_drawdowns_agg[sim] = risultati_run['max_drawdown']
-        sharpe_ratios_agg[sim] = risultati_run['sharpe_ratio']
-
-        for key in tutti_i_dati_annuali:
-             if key in risultati_run['dati_annuali']:
+        for key in tutti_i_dati_annuali.keys():
+            if key in risultati_run['dati_annuali']:
                 tutti_i_dati_annuali[key][sim, :] = risultati_run['dati_annuali'][key]
 
-    tasso_fallimento = np.mean(fallimenti)
-    scenari_successo_mask = ~fallimenti
+        contributi_totali_agg[sim] = risultati_run['totale_contributi_versati_nominale']
 
-    if np.any(scenari_successo_mask):
-        patrimoni_finali_reali_validi = patrimoni_finali_reali[scenari_successo_mask]
-        
-        # Usa reddito_totale_reale_sim per le statistiche sul reddito
-        reddito_totale_reale_validi = reddito_totale_reale_sim[scenari_successo_mask]
-
-        anni_prelievo = parametri['anni_totali'] - parametri['anni_inizio_prelievo']
-        if anni_prelievo > 0:
-            # Calcola il reddito medio annuo nel periodo di decumulo
-            reddito_periodo_decumulo = reddito_totale_reale_validi[:, parametri['anni_inizio_prelievo']:]
-            redditi_medi_reali_validi = np.mean(reddito_periodo_decumulo, axis=1)
-        else:
-            redditi_medi_reali_validi = np.array([0])
-
-        statistiche_prelievi = {
-            'min': np.min(redditi_medi_reali_validi),
-            'p10': np.percentile(redditi_medi_reali_validi, 10),
-            'p25': np.percentile(redditi_medi_reali_validi, 25),
-            'mediana': np.median(redditi_medi_reali_validi),
-            'p75': np.percentile(redditi_medi_reali_validi, 75),
-            'p90': np.percentile(redditi_medi_reali_validi, 90),
-            'max': np.max(redditi_medi_reali_validi),
-            'medio': np.mean(redditi_medi_reali_validi)
-        }
-        
-        stats_patrimonio_reale = {
-            'min': np.min(patrimoni_finali_reali_validi),
-            'p10': np.percentile(patrimoni_finali_reali_validi, 10),
-            'p25': np.percentile(patrimoni_finali_reali_validi, 25),
-            'mediana': np.median(patrimoni_finali_reali_validi),
-            'p75': np.percentile(patrimoni_finali_reali_validi, 75),
-            'p90': np.percentile(patrimoni_finali_reali_validi, 90),
-            'max': np.max(patrimoni_finali_reali_validi),
-            'medio': np.mean(patrimoni_finali_reali_validi)
-        }
-    else:
-        statistiche_prelievi = {k: 0 for k in ['min', 'p10', 'p25', 'mediana', 'p75', 'p90', 'max', 'medio']}
-        stats_patrimonio_reale = {k: 0 for k in ['min', 'p10', 'p25', 'mediana', 'p75', 'p90', 'max', 'medio']}
-
-    dati_mediana_run = {}
-    # Aggiungiamo anche i prelievi effettivi reali per la tabella
-    tutti_i_dati_annuali['prelievi_effettivi_reali'] = prelievi_effettivi_reali_sim
-    for key, data_array in tutti_i_dati_annuali.items():
-        dati_mediana_run[key] = np.median(data_array, axis=0)
-
-    prob_successo_nel_tempo = np.mean(patrimoni[:, 1:] > 0, axis=0)
+    # 3. CALCOLO STATISTICHE E SCENARIO MEDIANO
+    prob_fallimento = fallimenti / n_sim
+    patrimoni_finale_validi = patrimoni[:, -1]
+    patrimoni_reali_finale_validi = patrimoni_reali[:, -1]
     
-    num_worst_cases = max(1, n_sim // 20)
-    indici_peggiori = np.argsort(patrimoni_finali_reali)[:num_worst_cases]
-    worst_scenarios_data = patrimoni_reali[indici_peggiori, :]
-    patrimoni_finali_peggiori = patrimoni_finali_reali[indici_peggiori]
+    # --- Identifica le simulazioni di successo ---
+    sim_di_successo_mask = np.ones(n_sim, dtype=bool)
+    if indici_fallimenti:
+        sim_di_successo_mask[indici_fallimenti] = False
+    
+    # Ottieni i dati solo per le simulazioni di successo
+    prelievi_reali_successo = tutti_i_dati_annuali['prelievi_effettivi_reali'][sim_di_successo_mask, :]
+    rendite_fp_reali_successo = tutti_i_dati_annuali['rendite_fp_reali'][sim_di_successo_mask, :]
+    pensioni_reali_successo = tutti_i_dati_annuali['pensioni_pubbliche_reali'][sim_di_successo_mask, :]
+
+    # Lo scenario mediano viene sempre calcolato sulla base dei patrimoni reali finali
+    # della simulazione principale.
+    median_sim_index = 0
+    if len(patrimoni_reali_finale_validi) > 0:
+        median_sim_index = np.argmin(np.abs(patrimoni_reali[:, -1] - np.median(patrimoni_reali_finale_validi)))
+    
+    dati_mediana_run = {k: v[median_sim_index] for k, v in tutti_i_dati_annuali.items()}
+
+    # --- Calcolo Statistiche Prelievi ---
+    statistiche_prelievi = {
+        'prelievo_reale_medio': 0,
+        'pensione_pubblica_reale_annua': 0,
+        'rendita_fp_reale_media': 0,
+        'totale_reale_medio_annuo': 0,
+    }
+
+    # Se si calcola il prelievo sostenibile, si fa una stima, ma i dati
+    # per la tabella di dettaglio vengono comunque dallo scenario mediano della
+    # simulazione originale (con prelievo zero).
+    if calcolo_sostenibile_attivo:
+        anni_accumulo = parametri['anni_inizio_prelievo']
+        anni_prelievo = parametri['anni_totali'] - anni_accumulo
+        patrimonio_reale_a_inizio_prelievo_mediano = np.median(patrimoni_reali[:, anni_accumulo * 12])
+        
+        prelievo_annuo_calcolato = 0
+        if anni_prelievo > 0 and patrimonio_reale_a_inizio_prelievo_mediano > 0:
+            rend_reale_atteso = parametri['rendimento_medio'] - parametri['ter_etf'] - parametri['inflazione']
+
+            if rend_reale_atteso != 0:
+                try:
+                    fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
+                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
+                except (OverflowError, ZeroDivisionError):
+                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
+            else:
+                 prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
+        
+        # Sovrascriviamo il prelievo calcolato solo per le statistiche, non per i dati di dettaglio
+        statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
+        statistiche_prelievi['pensione_pubblica_reale_annua'] = parametri['pensione_pubblica_annua']
+        # In questo scenario semplificato non calcoliamo la rendita FP per la statistica
+        statistiche_prelievi['totale_reale_medio_annuo'] = prelievo_annuo_calcolato + parametri['pensione_pubblica_annua']
+
+
+    elif prelievi_reali_successo.shape[0] > 0:
+        anno_inizio_prelievo = parametri['anni_inizio_prelievo']
+        anno_inizio_pensione = parametri['inizio_pensione_anni']
+        anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
+
+        # Calcola le medie solo sugli anni in cui ogni flusso è attivo e > 0
+        prelievi_reali_attivi = prelievi_reali_successo[:, anno_inizio_prelievo:]
+        prelievi_reali_validi = prelievi_reali_attivi[prelievi_reali_attivi > 1e-6]
+
+        pensioni_reali_attive = pensioni_reali_successo[:, anno_inizio_pensione:]
+        pensioni_validi = pensioni_reali_attive[pensioni_reali_attive > 1e-6]
+        
+        rendite_fp_reali_attive = rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]
+        rendite_fp_validi = rendite_fp_reali_attive[rendite_fp_reali_attive > 1e-6]
+
+        # Calcola il totale solo per gli scenari di successo
+        totali_reali_agg_successo = prelievi_reali_successo + pensioni_reali_successo + rendite_fp_reali_successo
+        
+        # Determina da quale anno iniziare a calcolare il reddito totale medio
+        anno_inizio_reddito_pensione = min(anno_inizio_prelievo, anno_inizio_pensione)
+        if parametri['attiva_fondo_pensione'] and anno_inizio_rendita_fp < parametri['anni_totali']:
+            anno_inizio_reddito_pensione = min(anno_inizio_reddito_pensione, anno_inizio_rendita_fp)
+
+        totali_reali_attivi = totali_reali_agg_successo[:, anno_inizio_reddito_pensione:]
+        totali_reali_validi = totali_reali_attivi[totali_reali_attivi > 1e-6]
+
+        statistiche_prelievi['prelievo_reale_medio'] = np.mean(prelievi_reali_validi) if prelievi_reali_validi.size > 0 else 0
+        statistiche_prelievi['pensione_pubblica_reale_annua'] = np.mean(pensioni_validi) if pensioni_validi.size > 0 else 0
+        statistiche_prelievi['rendita_fp_reale_media'] = np.mean(rendite_fp_validi) if rendite_fp_validi.size > 0 else 0
+        statistiche_prelievi['totale_reale_medio_annuo'] = np.mean(totali_reali_validi) if totali_reali_validi.size > 0 else 0
+
+    # 4. PREPARAZIONE OUTPUT
+    statistiche_finali = {
+        'patrimonio_iniziale': parametri['capitale_iniziale'] + parametri['etf_iniziale'],
+        'patrimonio_finale_mediano_nominale': np.median(patrimoni_finale_validi),
+        'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finale_validi, 90),
+        'patrimonio_finale_peggior_10_nominale': np.percentile(patrimoni_finale_validi, 10),
+        'patrimonio_finale_mediano_reale': np.median(patrimoni_reali_finale_validi),
+        'drawdown_massimo_peggiore': np.min(drawdowns) if drawdowns.size > 0 else 0,
+        'sharpe_ratio_medio': np.mean(sharpe_ratios[np.isfinite(sharpe_ratios)]),
+        'probabilita_fallimento': prob_fallimento,
+        'patrimoni_reali_finali': patrimoni_reali_finale_validi,
+        'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
+        'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg)
+    }
 
     return {
-        'patrimoni_reali': patrimoni_reali,
-        'prelievi_target_nominali': prelievi_target_nominali_sim,
-        'prelievi_effettivi_nominali': prelievi_effettivi_nominali_sim,
-        'prelievi_effettivi_reali': prelievi_effettivi_reali_sim,
-        'reddito_totale_reale': reddito_totale_reale_sim,
-        'tasse_rebalance_nominali': tasse_rebalance_nominali_sim,
-        'statistiche': {
-            'tasso_fallimento': tasso_fallimento,
-            'percentili_patrimonio_reale': stats_patrimonio_reale,
-            'statistiche_prelievi': statistiche_prelievi,
-            'contributi_totali_mediani': np.median(contributi_totali_nominali_agg),
-            'max_drawdown_mediano': np.median(max_drawdowns_agg),
-            'sharpe_ratio_mediano': np.median(sharpe_ratios_agg),
+        "statistiche": statistiche_finali,
+        "statistiche_prelievi": statistiche_prelievi,
+        "dati_grafici_principali": {
+            "nominale": patrimoni,
+            "reale": patrimoni_reali,
+            "reddito_reale_annuo": tutti_i_dati_annuali['reddito_totale_reale']
         },
         "dati_grafici_avanzati": {
-            "dati_mediana": dati_mediana_run,
-            "prob_successo_nel_tempo": prob_successo_nel_tempo,
-            "worst_scenarios": {
-                "traiettorie": worst_scenarios_data,
-                "patrimoni_finali": patrimoni_finali_peggiori
-            }
+            "dati_mediana": dati_mediana_run
         }
-    }
+    } 
