@@ -150,21 +150,24 @@ def plot_success_probability(data, anni_totali):
     return fig
 
 def plot_income_composition(data, anni_totali):
-    anni_asse_x_annuale = np.arange(anni_totali)
+    """Crea un grafico ad area della composizione del reddito annuo reale."""
+    # L'asse X va da 1 ad anni_totali, perchè il reddito è un flusso annuale
+    anni_asse_x_annuale = np.arange(1, anni_totali + 1)
     fig = go.Figure()
     
+    # I dati partono dall'indice 1 per escludere l'anno 0 (iniziale)
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['prelievi_effettivi_reali'],
+        x=anni_asse_x_annuale, y=data['prelievi_effettivi_reali'][1:],
         name='Prelievi dal Patrimonio', stackgroup='one',
         line={'color': '#4472C4'}
     ))
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['pensioni_pubbliche_reali'],
+        x=anni_asse_x_annuale, y=data['pensioni_pubbliche_reali'][1:],
         name='Pensione Pubblica', stackgroup='one',
         line={'color': '#ED7D31'}
     ))
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['rendite_fp_reali'],
+        x=anni_asse_x_annuale, y=data['rendite_fp_reali'][1:],
         name='Rendita Fondo Pensione', stackgroup='one',
         line={'color': '#A5A5A5'}
     ))
@@ -173,6 +176,37 @@ def plot_income_composition(data, anni_totali):
         title='Composizione del Reddito Annuo Reale (Scenario Mediano)',
         xaxis_title='Anni',
         yaxis_title='Reddito Reale Annuo (€ Odierni)',
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    return fig
+
+def plot_wealth_composition_over_time_nominal(data, anni_totali):
+    """Crea un grafico stacked area per la composizione del patrimonio nominale nel tempo."""
+    anni_asse_x_annuale = np.arange(anni_totali + 1)
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x_annuale, y=data['saldo_banca_nominale'],
+        name='Liquidità (Conto Corrente)', stackgroup='one',
+        line={'color': '#5B9BD5'}
+    ))
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x_annuale, y=data['saldo_etf_nominale'],
+        name='Portafoglio ETF', stackgroup='one',
+        line={'color': '#ED7D31'}
+    ))
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x_annuale, y=data['saldo_fp_nominale'],
+        name='Fondo Pensione', stackgroup='one',
+        line={'color': '#70AD47'}
+    ))
+
+    fig.update_layout(
+        title='Composizione del Patrimonio Nominale nel Tempo (Scenario Mediano)',
+        xaxis_title='Anni',
+        yaxis_title='Patrimonio Nominale (€)',
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
@@ -704,27 +738,50 @@ else:
 
     with tab_dettaglio:
         st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")
-        st.markdown("Questa tabella è la 'radiografia' dello scenario mediano (il più probabile). Mostra, anno per anno, tutti i flussi finanziari.")
+        st.markdown("Questa sezione è la 'radiografia' dello scenario mediano (il più probabile). I grafici e la tabella mostrano, anno per anno, tutti i flussi finanziari e l'evoluzione del patrimonio.")
         
         dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
         
+        st.markdown("---")
+        st.subheader("Grafici di Dettaglio (Scenario Mediano)")
+
+        # Grafico 1: Composizione del Patrimonio Nominale
+        st.markdown("##### Da cosa è composto il mio patrimonio?")
+        st.markdown("Questo grafico mostra come evolvono nel tempo le tre componenti principali del tuo patrimonio: Liquidità, ETF e Fondo Pensione. I valori sono **nominali**, cioè non tengono conto dell'inflazione.")
+        fig_composizione_patrimonio = plot_wealth_composition_over_time_nominal(dati_tabella, params['anni_totali'])
+        st.plotly_chart(fig_composizione_patrimonio, use_container_width=True)
+
+        # Grafico 2: Composizione del Reddito Annuo Reale
+        st.markdown("##### Da dove arriveranno i miei soldi ogni anno in pensione?")
+        st.markdown("Questo grafico è fondamentale: mostra, anno per anno, da quali fonti proverrà il tuo reddito per vivere. I valori sono **reali** (potere d'acquisto di oggi) per darti un'idea concreta del tuo tenore di vita. Puoi vedere come i prelievi dal patrimonio vengono progressivamente sostituiti o integrati da pensione e rendite.")
+        fig_composizione_reddito = plot_income_composition(dati_tabella, params['anni_totali'])
+        st.plotly_chart(fig_composizione_reddito, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Tabella Dettagliata Anno per Anno")
+        
         # Costruzione del DataFrame
         num_anni = params['anni_totali']
+        # Usiamo arange(num_anni+1) per includere l'anno 0 per il patrimonio, ma partiamo da 1 per la visualizzazione
+        df_index = np.arange(1, num_anni + 1)
+        
         df = pd.DataFrame({
-            'Anno': np.arange(1, num_anni + 1),
-            'Età': params['eta_iniziale'] + np.arange(num_anni),
-            'Obiettivo Prelievo (Nom.)': dati_tabella.get('prelievi_target_nominali', np.zeros(num_anni))[:num_anni],
-            'Prelievo Effettivo (Nom.)': dati_tabella.get('prelievi_effettivi_nominali', np.zeros(num_anni))[:num_anni],
-            'Fonte: Conto Corrente': dati_tabella.get('prelievi_da_banca_nominali', np.zeros(num_anni))[:num_anni],
-            'Fonte: Vendita ETF': dati_tabella.get('prelievi_da_etf_nominali', np.zeros(num_anni))[:num_anni],
-            'Vendita ETF (Rebalance)': dati_tabella.get('vendite_rebalance_nominali', np.zeros(num_anni))[:num_anni],
-            'Prelievo Effettivo (Reale)': dati_tabella.get('prelievi_effettivi_reali', np.zeros(num_anni))[:num_anni],
-            'Pensione Pubblica (Nom.)': dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(num_anni))[:num_anni],
-            'Rendita FP (Nom.)': dati_tabella.get('rendite_fp_nominali', np.zeros(num_anni))[:num_anni],
-            'Liquidazione FP (Nom.)': dati_tabella.get('fp_liquidato_nominale', np.zeros(num_anni))[:num_anni],
-            'Patrimonio Banca (Nom.)': dati_tabella.get('saldo_banca_nominale', np.zeros(num_anni))[:num_anni],
-            'Patrimonio ETF (Nom.)': dati_tabella.get('saldo_etf_nominale', np.zeros(num_anni))[:num_anni],
-            'Patrimonio FP (Nom.)': dati_tabella.get('saldo_fp_nominale', np.zeros(num_anni))[:num_anni],
+            'Anno': df_index,
+            'Età': params['eta_iniziale'] + df_index,
+            # I flussi (come prelievi) hanno senso dall'anno 1 in poi
+            'Obiettivo Prelievo (Nom.)': dati_tabella.get('prelievi_target_nominali', np.zeros(num_anni + 1))[1:],
+            'Prelievo Effettivo (Nom.)': dati_tabella.get('prelievi_effettivi_nominali', np.zeros(num_anni + 1))[1:],
+            'Fonte: Conto Corrente': dati_tabella.get('prelievi_da_banca_nominali', np.zeros(num_anni + 1))[1:],
+            'Fonte: Vendita ETF': dati_tabella.get('prelievi_da_etf_nominali', np.zeros(num_anni + 1))[1:],
+            'Vendita ETF (Rebalance)': dati_tabella.get('vendite_rebalance_nominali', np.zeros(num_anni + 1))[1:],
+            'Prelievo Effettivo (Reale)': dati_tabella.get('prelievi_effettivi_reali', np.zeros(num_anni + 1))[1:],
+            'Pensione Pubblica (Nom.)': dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(num_anni + 1))[1:],
+            'Rendita FP (Nom.)': dati_tabella.get('rendite_fp_nominali', np.zeros(num_anni + 1))[1:],
+            'Liquidazione FP (Nom.)': dati_tabella.get('fp_liquidato_nominale', np.zeros(num_anni + 1))[1:],
+            # I saldi (patrimonio) hanno senso a fine anno, quindi usiamo i dati dall'anno 1
+            'Patrimonio Banca (Nom.)': dati_tabella.get('saldo_banca_nominale', np.zeros(num_anni + 1))[1:],
+            'Patrimonio ETF (Nom.)': dati_tabella.get('saldo_etf_nominale', np.zeros(num_anni + 1))[1:],
+            'Patrimonio FP (Nom.)': dati_tabella.get('saldo_fp_nominale', np.zeros(num_anni + 1))[1:],
         })
         
         st.dataframe(df.style.format({
