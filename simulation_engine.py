@@ -92,6 +92,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     indice_prezzi_inizio_rendita_fp = 1.0
     allocazione_etf_inizio_glidepath = -1.0
     
+    # FIX Definitivo: Usa il patrimonio di fine anno precedente come base per il calcolo del prelievo.
+    # Questo disaccoppia il calcolo da flussi di cassa una tantum (es. liquidazione FP) che avvengono durante l'anno.
+    patrimonio_per_calcolo_prelievo = parametri['capitale_iniziale'] + parametri['etf_iniziale']
+    
     prelievo_annuo_corrente = 0
     indice_prezzi_ultimo_prelievo = 1.0
     
@@ -146,15 +150,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             is_inizio_anno_fiscale = ((mese - inizio_prelievo_mesi) % 12 == 0)
 
             if is_primo_mese_prelievo or is_inizio_anno_fiscale:
-                patrimonio_attuale = patrimonio_banca + patrimonio_etf
+                # Usa il patrimonio salvato alla fine dell'anno precedente.
+                patrimonio_attuale = patrimonio_per_calcolo_prelievo
                 
-                # FIX: Esclude la liquidazione del capitale FP dell'anno precedente dalla base di calcolo
-                # per le strategie di prelievo basate su percentuali, per evitare picchi anomali.
-                if anno_corrente > 0:
-                    lump_sum_anno_precedente = dati_annuali['fp_liquidato_nominale'][anno_corrente - 1]
-                    if lump_sum_anno_precedente > 0:
-                        patrimonio_attuale -= lump_sum_anno_precedente
-
                 if patrimonio_attuale <= 0:
                     prelievo_annuo_corrente = 0
                 else:
@@ -337,6 +335,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                             patrimonio_etf += importo_da_comprare
                             etf_cost_basis += importo_da_comprare
                             
+            # Aggiorna il valore di riferimento per il calcolo del prelievo del prossimo anno.
+            patrimonio_per_calcolo_prelievo = patrimonio_banca + patrimonio_etf
+
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
             dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
             dati_annuali['saldo_banca_reale'][anno_corrente] = patrimonio_banca / indice_prezzi
