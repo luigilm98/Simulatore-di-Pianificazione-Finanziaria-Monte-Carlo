@@ -683,6 +683,7 @@ else:
         - **Non considera shock improvvisi:** La perdita del lavoro, una spesa medica imprevista, o l'impossibilità di contribuire per alcuni anni non sono modellizzati.
         - **Non considera l'emotività:** Non tiene conto del rischio di vendere in preda al panico durante un crollo di mercato.
         - **I rendimenti sono un'ipotesi:** I rendimenti e la volatilità che hai inserito sono stime a lungo termine. Il futuro potrebbe essere diverso.
+        - **Le tasse sono semplificate:** Il modello usa un'aliquota fissa del 26% sul capital gain, senza considerare scaglioni, minusvalenze pregresse o altre ottimizzazioni fiscali complesse.
 
         Usa questo strumento come una mappa per definire la direzione, non come un GPS che prevede la destinazione al centimetro.
         """)
@@ -812,7 +813,7 @@ else:
         colonne_visualizzate = [
             'Anno', 'Età', 'Obiettivo Prelievo (Nom.)', 'Prelievo Effettivo (Nom.)', 
             'Fonte: Conto Corrente', 'Fonte: Vendita ETF', 'Vendita ETF (Rebalance)', 
-            'Liquidazione Capitale FP', 'Prelievo Effettivo (Reale)', 'Pensione Pubblica (Reale)', 
+            'Liquidazione Capitale FP (Nom.)', 'Prelievo Effettivo (Reale)', 'Pensione Pubblica (Reale)', 
             'Rendita FP (Reale)', 'Entrate Anno (Reali)', 'Saldo Conto Fine Anno (Reale)', 
             'Valore ETF Fine Anno (Reale)'
         ]
@@ -826,13 +827,13 @@ else:
                 "Fonte: Conto Corrente": st.column_config.NumberColumn(format="€ %.0f"),
                 "Fonte: Vendita ETF": st.column_config.NumberColumn(format="€ %.0f"),
                 "Vendita ETF (Rebalance)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Liquidazione Capitale FP": st.column_config.NumberColumn(format="€ %.0f"),
+                "Liquidazione Capitale FP (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
                 "Prelievo Effettivo (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
                 "Pensione Pubblica (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
                 "Rendita FP (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Entrate Anno (Reali)": st.column_config.NumberColumn(format="€ %.0f", help="La somma di tutte le entrate reali. Questa cifra misura il tuo vero tenore di vita annuale."),
+                "Entrate Anno (Reali)": st.column_config.NumberColumn(format="€ %.0f"),
                 "Saldo Conto Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Valore ETF Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
+                "Valore ETF Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f")
             }
         )
 

@@ -122,6 +122,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             contributo_mensile_fp_indicizzato = (parametri['contributo_annuo_fp'] / 12) * indice_prezzi
             patrimonio_fp += contributo_mensile_fp_indicizzato
             contributi_fp_anno_corrente += contributo_mensile_fp_indicizzato
+            totale_contributi_versati_nominale += contributo_mensile_fp_indicizzato
 
         entrate_passive_mensili = 0
         if anno_corrente >= parametri['inizio_pensione_anni']:
