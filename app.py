@@ -542,7 +542,13 @@ else:
     guadagni_da_investimento = patrimonio_finale_nominale - contributi_versati - patrimonio_iniziale_totale
     
     reddito_annuo_reale_pensione = st.session_state.risultati['statistiche_prelievi']['totale_reale_medio_annuo']
-    anni_di_spesa_coperti = (stats['patrimonio_finale_mediano_reale'] / reddito_annuo_reale_pensione) if reddito_annuo_reale_pensione > 0 else float('inf')
+    patrimonio_finale_reale = stats['patrimonio_finale_mediano_reale']
+    anni_di_spesa_coperti = 0.0
+    if reddito_annuo_reale_pensione > 0:
+        anni_di_spesa_coperti = patrimonio_finale_reale / reddito_annuo_reale_pensione
+    else:
+        # Se non c'è reddito annuo, il patrimonio non può coprire "anni di spesa"
+        anni_di_spesa_coperti = 0.0
 
     st.markdown("##### Il Tuo Percorso Finanziario in Numeri")
     col1, col2, col3, col4 = st.columns(4)

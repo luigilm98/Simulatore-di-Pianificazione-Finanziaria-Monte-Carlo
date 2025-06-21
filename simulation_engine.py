@@ -484,9 +484,9 @@ def run_full_simulation(parametri):
                     fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
                     prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
                 except (OverflowError, ZeroDivisionError):
-                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
             else:
-                 prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+                 prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
         
         # Sovrascriviamo il prelievo calcolato solo per le statistiche, non per i dati di dettaglio
         statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
