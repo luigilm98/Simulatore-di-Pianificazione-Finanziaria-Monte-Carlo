@@ -69,31 +69,6 @@ def delete_simulation(filename):
     os.remove(filepath)
     st.rerun()
 
-def reconstruct_data_from_json(results):
-    """
-    Ricostruisce gli oggetti pandas (DataFrame, Series) dal formato dizionario 
-    utilizzato per il salvataggio JSON. Modifica l'oggetto 'results' in-place.
-    """
-    # Ricostruisci i DataFrame principali per i grafici
-    for key in ['reale', 'nominale', 'reddito_reale_annuo']:
-        if key in results['dati_grafici_principali']:
-            df_dict = results['dati_grafici_principali'][key]
-            if isinstance(df_dict, dict) and 'data' in df_dict:
-                results['dati_grafici_principali'][key] = pd.DataFrame(
-                    df_dict['data'], 
-                    index=pd.to_numeric(df_dict['index']), 
-                    columns=df_dict['columns']
-                )
-
-    # Ricostruisci la Series dei patrimoni finali
-    if 'patrimoni_reali_finali' in results['statistiche']:
-        series_dict = results['statistiche']['patrimoni_reali_finali']
-        if isinstance(series_dict, dict):
-             # Il formato to_dict() standard non ha 'data', quindi usiamo il dict stesso
-            results['statistiche']['patrimoni_reali_finali'] = pd.Series(series_dict)
-
-    return results
-
 # --- Funzioni di Plotting ---
 def hex_to_rgb(hex_color):
     """Converte un colore esadecimale in una tupla RGB."""
@@ -109,15 +84,6 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
     """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
     
-    # Robusteza: Assicura che i dati siano un DataFrame, gestendo anche il caricamento da JSON
-    if not isinstance(data, pd.DataFrame):
-        data = pd.DataFrame(data)
-
-    # Se i dati sono vuoti dopo la conversione, esci per evitare errori
-    if data.empty:
-        fig.add_annotation(text="Nessun dato patrimoniale disponibile.", showarrow=False)
-        return fig
-
     # L'engine produce dati con shape (mesi, simulazioni).
     # L'asse X deve avere una lunghezza pari al numero di righe (i punti temporali).
     anni_asse_x = np.linspace(0, anni_totali, data.shape[0])
@@ -274,30 +240,6 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
     """
     fig = go.Figure()
 
-    # Robusteza: Assicura che i dati siano un DataFrame, gestendo anche il caricamento da JSON
-    if not isinstance(data, pd.DataFrame):
-        data = pd.DataFrame(data)
-
-    # Correzione cruciale: dopo il caricamento da JSON, gli indici possono diventare stringhe.
-    # Dobbiamo forzarli a essere numerici per i calcoli e il plotting.
-    try:
-        data.index = pd.to_numeric(data.index)
-    except (ValueError, TypeError):
-        # Se la conversione fallisce, non possiamo plottare
-        fig.add_annotation(text="Formato dati reddito non valido dopo caricamento.", showarrow=False)
-        return fig
-
-    # Sanificazione completa dei dati: Forziamo la conversione numerica di tutte le colonne,
-    # coercendo gli errori in NaN, e poi riempiamo i NaN con 0.
-    # Questo risolve il problema alla radice, gestendo dati corrotti dal processo di save/load.
-    for col in data.columns:
-        data[col] = pd.to_numeric(data[col], errors='coerce')
-    data = data.fillna(0)
-
-    if data.empty:
-        fig.add_annotation(text="Nessun dato sul reddito disponibile.", showarrow=False)
-        return fig
-
     # L'indice di partenza è in ANNI
     start_year_index = anni_inizio_prelievo
 
@@ -432,7 +374,7 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                 if st.button("📂", key=f"load_{sim['filename']}", help="Carica questa simulazione"):
                     data = load_simulation_data(sim['filename'])
                     st.session_state.parametri = data['parameters']
-                    st.session_state.risultati = reconstruct_data_from_json(data['results'])
+                    st.session_state.risultati = data['results']
                     st.session_state.simulazione_eseguita = True
                     st.rerun()
             with col3:
@@ -733,10 +675,9 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             "Esecuzione della simulazione Monte Carlo... Questo potrebbe richiedere alcuni istanti."
         ):
             try:
-                # Esegui la simulazione per ottenere i risultati "grezzi" (dizionari)
-                raw_results = engine.run_full_simulation(st.session_state.parametri)
-                # Ricostruisci immediatamente i risultati in oggetti pandas corretti
-                st.session_state.risultati = reconstruct_data_from_json(raw_results)
+                st.session_state.risultati = engine.run_full_simulation(
+                    st.session_state.parametri
+                )
                 st.session_state.simulazione_eseguita = True
                 st.rerun()  # Ricarica l'app per mostrare i risultati
             except ValueError as e:
