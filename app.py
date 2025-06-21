@@ -262,6 +262,13 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
         fig.add_annotation(text="Formato dati reddito non valido dopo caricamento.", showarrow=False)
         return fig
 
+    # Sanificazione completa dei dati: Forziamo la conversione numerica di tutte le colonne,
+    # coercendo gli errori in NaN, e poi riempiamo i NaN con 0.
+    # Questo risolve il problema alla radice, gestendo dati corrotti dal processo di save/load.
+    for col in data.columns:
+        data[col] = pd.to_numeric(data[col], errors='coerce')
+    data = data.fillna(0)
+
     if data.empty:
         fig.add_annotation(text="Nessun dato sul reddito disponibile.", showarrow=False)
         return fig
