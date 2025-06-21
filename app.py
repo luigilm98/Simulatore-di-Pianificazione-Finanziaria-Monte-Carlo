@@ -3,6 +3,71 @@ import numpy as np
 import simulation_engine as engine
 import plotly.graph_objects as go
 import pandas as pd
+import json
+import os
+from datetime import datetime
+
+# --- Gestione File e Dati ---
+HISTORY_DIR = "simulation_history"
+os.makedirs(HISTORY_DIR, exist_ok=True)
+
+class NumpyEncoder(json.JSONEncoder):
+    """ Encoder JSON speciale per tipi di dati NumPy. """
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
+
+def save_simulation(name, params, results):
+    """Salva i parametri e i risultati di una simulazione in un file JSON."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{name.replace(' ', '_')}.json"
+    filepath = os.path.join(HISTORY_DIR, filename)
+    
+    data_to_save = {
+        "name": name,
+        "timestamp": timestamp,
+        "parameters": params,
+        "results": results
+    }
+    
+    with open(filepath, 'w') as f:
+        json.dump(data_to_save, f, cls=NumpyEncoder, indent=4)
+    st.success(f"Simulazione '{name}' salvata con successo!")
+
+def load_simulations():
+    """Carica i metadati di tutte le simulazioni salvate."""
+    simulations = []
+    for filename in sorted(os.listdir(HISTORY_DIR), reverse=True):
+        if filename.endswith(".json"):
+            try:
+                filepath = os.path.join(HISTORY_DIR, filename)
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                    simulations.append({
+                        "name": data.get("name", "Senza nome"),
+                        "timestamp": data.get("timestamp", "N/A"),
+                        "filename": filename
+                    })
+            except (json.JSONDecodeError, IOError) as e:
+                st.warning(f"Impossibile caricare {filename}: {e}")
+    return simulations
+
+def load_simulation_data(filename):
+    """Carica i dati completi di una specifica simulazione."""
+    filepath = os.path.join(HISTORY_DIR, filename)
+    with open(filepath, 'r') as f:
+        return json.load(f)
+
+def delete_simulation(filename):
+    """Elimina un file di simulazione salvato."""
+    filepath = os.path.join(HISTORY_DIR, filename)
+    os.remove(filepath)
+    st.rerun()
 
 # --- Funzioni di Plotting ---
 def hex_to_rgb(hex_color):
@@ -195,17 +260,40 @@ st.markdown("Benvenuto nella versione 2.0 del simulatore. Utilizza i controlli n
 # --- Barra Laterale: Input Utente ---
 st.sidebar.header("Configurazione Simulazione")
 
+# --- Sezione Storico ---
+with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
+    saved_simulations = load_simulations()
+    if not saved_simulations:
+        st.caption("Nessuna simulazione salvata.")
+    else:
+        for sim in saved_simulations:
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1:
+                st.markdown(f"**{sim['name']}**")
+                st.caption(f"Salvata il: {sim['timestamp']}")
+            with col2:
+                if st.button("📂", key=f"load_{sim['filename']}", help="Carica questa simulazione"):
+                    data = load_simulation_data(sim['filename'])
+                    st.session_state.parametri = data['parameters']
+                    st.session_state.risultati = data['results']
+                    st.session_state.simulazione_eseguita = True
+                    st.rerun()
+            with col3:
+                if st.button("🗑️", key=f"delete_{sim['filename']}", help="Elimina questa simulazione"):
+                    delete_simulation(sim['filename'])
+
 # --- Sezione Parametri di Base ---
 with st.sidebar.expander("1. Parametri di Base", expanded=True):
-    eta_iniziale = st.number_input("Età Iniziale", min_value=1, max_value=100, value=27, help="La tua età oggi.")
-    capitale_iniziale = st.number_input("Capitale Conto Corrente (€)", min_value=0, step=1000, value=17000, help="Liquidità iniziale sul conto.")
-    etf_iniziale = st.number_input("Valore Portafoglio ETF (€)", min_value=0, step=1000, value=600, help="Valore iniziale degli ETF.")
-    contributo_mensile_banca = st.number_input("Contributo Mensile Conto (€)", min_value=0, step=50, value=1300, help="Versamento mensile sul conto.")
-    contributo_mensile_etf = st.number_input("Contributo Mensile ETF (€)", min_value=0, step=50, value=300, help="Investimento mensile in ETF.")
-    inflazione = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, 3.0, 0.1, help="Tasso di inflazione medio atteso.") / 100
-    anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=35, help="Fra quanti anni inizierai a prelevare.")
-    n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, 250, 10, help="Numero di scenari futuri da calcolare.")
-    anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=80, help="Durata totale della simulazione.")
+    p = st.session_state.get('parametri', {})
+    eta_iniziale = st.number_input("Età Iniziale", min_value=1, max_value=100, value=p.get('eta_iniziale', 27), help="La tua età oggi.")
+    capitale_iniziale = st.number_input("Capitale Conto Corrente (€)", min_value=0, step=1000, value=p.get('capitale_iniziale', 17000), help="Liquidità iniziale sul conto.")
+    etf_iniziale = st.number_input("Valore Portafoglio ETF (€)", min_value=0, step=1000, value=p.get('etf_iniziale', 600), help="Valore iniziale degli ETF.")
+    contributo_mensile_banca = st.number_input("Contributo Mensile Conto (€)", min_value=0, step=50, value=p.get('contributo_mensile_banca', 1300), help="Versamento mensile sul conto.")
+    contributo_mensile_etf = st.number_input("Contributo Mensile ETF (€)", min_value=0, step=50, value=p.get('contributo_mensile_etf', 300), help="Investimento mensile in ETF.")
+    inflazione = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, p.get('inflazione', 0.03) * 100, 0.1, help="Tasso di inflazione medio atteso.") / 100
+    anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Fra quanti anni inizierai a prelevare.")
+    n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Numero di scenari futuri da calcolare.")
+    anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p.get('anni_totali', 80), help="Durata totale della simulazione.")
 
 # --- Sezione Portafoglio ETF ---
 with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
@@ -247,62 +335,67 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
 
 # --- Sezione Strategie di Prelievo ---
 with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
+    p = st.session_state.get('parametri', {})
     strategia_prelievo = st.selectbox(
         "Strategia di Prelievo",
         options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'],
-        index=1,
+        index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
         help="Scegli come calcolare l'importo da prelevare."
     )
     prelievo_annuo = st.number_input(
         "Importo Prelievo Fisso Annuo (€)",
-        min_value=0, step=500, value=12000,
+        min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
         help="Usato SOLO con la strategia 'FISSO'. Lascia a 0 per calcolare il prelievo massimo sostenibile."
     )
     percentuale_regola_4 = st.slider(
-        "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, 4.0, 0.1,
+        "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
         help="Usato da 'REGOLA_4_PERCENTO' e 'GUARDRAIL' per il primo prelievo."
     ) / 100
     banda_guardrail = st.slider(
-        "Banda Guardrail (%)", 0.0, 50.0, 10.0, 1.0,
+        "Banda Guardrail (%)", 0.0, 50.0, p.get('banda_guardrail', 0.10) * 100, 1.0,
         help="Usato solo da 'GUARDRAIL' per adeguare i prelievi futuri."
     ) / 100
 
 # --- Sezione Asset Allocation Dinamica (Glidepath) ---
 with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)"):
-    attiva_glidepath = st.checkbox("Attiva Glidepath", value=True, help="'S' per ridurre il rischio con l'età, spostando patrimonio da ETF a liquidità.")
-    inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=20, disabled=not attiva_glidepath)
-    fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=40, disabled=not attiva_glidepath)
+    p = st.session_state.get('parametri', {})
+    attiva_glidepath = st.checkbox("Attiva Glidepath", value=p.get('attiva_glidepath', True), help="'S' per ridurre il rischio con l'età, spostando patrimonio da ETF a liquidità.")
+    inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=p.get('inizio_glidepath_anni', 20), disabled=not attiva_glidepath)
+    fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=p.get('fine_glidepath_anni', 40), disabled=not attiva_glidepath)
     allocazione_etf_finale = st.slider(
-        "Allocazione ETF Finale (%)", 0.0, 100.0, 33.3, 1.0,
+        "Allocazione ETF Finale (%)", 0.0, 100.0, p.get('allocazione_etf_finale', 0.333) * 100, 1.0,
         help="La % di ETF che avrai alla fine del glidepath.",
         disabled=not attiva_glidepath
     ) / 100
 
 # --- Sezione Tassazione e Costi ---
 with st.sidebar.expander("5. Tassazione e Costi (Italia)"):
-    tassazione_capital_gain = st.slider("Tassazione Capital Gain (%)", 0.0, 50.0, 26.0, 1.0) / 100
-    imposta_bollo_titoli = st.slider("Imposta di Bollo Titoli (annua, %)", 0.0, 1.0, 0.2, 0.01) / 100
-    imposta_bollo_conto = st.number_input("Imposta di Bollo Conto (>5k€)", min_value=0, value=34)
+    p = st.session_state.get('parametri', {})
+    tassazione_capital_gain = st.slider("Tassazione Capital Gain (%)", 0.0, 50.0, p.get('tassazione_capital_gain', 0.26) * 100, 1.0) / 100
+    imposta_bollo_titoli = st.slider("Imposta di Bollo Titoli (annua, %)", 0.0, 1.0, p.get('imposta_bollo_titoli', 0.002) * 100, 0.01) / 100
+    imposta_bollo_conto = st.number_input("Imposta di Bollo Conto (>5k€)", min_value=0, value=p.get('imposta_bollo_conto', 34))
     # ter_etf è ora calcolato dal portafoglio
-    costo_fisso_etf_mensile = st.number_input("Costo Fisso Deposito Titoli (€/mese)", min_value=0.0, value=4.0, step=0.5)
+    costo_fisso_etf_mensile = st.number_input("Costo Fisso Deposito Titoli (€/mese)", min_value=0.0, value=p.get('costo_fisso_etf_mensile', 4.0), step=0.5)
 
 # --- Sezione Fondo Pensione ---
 with st.sidebar.expander("6. Fondo Pensione"):
-    attiva_fondo_pensione = st.checkbox("Attiva Fondo Pensione", value=True)
-    contributo_annuo_fp = st.number_input("Contributo Annuo FP (€)", min_value=0, step=100, value=3000, disabled=not attiva_fondo_pensione)
-    rendimento_medio_fp = st.slider("Rendimento Medio Annuo FP (%)", 0.0, 15.0, 4.0, 0.5, disabled=not attiva_fondo_pensione) / 100
-    volatilita_fp = st.slider("Volatilità Annuo FP (%)", 0.0, 30.0, 8.0, 0.5, disabled=not attiva_fondo_pensione) / 100
-    ter_fp = st.slider("Costo Annuo (TER) FP (%)", 0.0, 3.0, 1.0, 0.1, disabled=not attiva_fondo_pensione) / 100
-    tassazione_rendimenti_fp = st.slider("Tassazione Rendimenti FP (%)", 0.0, 30.0, 20.0, 1.0, disabled=not attiva_fondo_pensione) / 100
-    aliquota_finale_fp = st.slider("Aliquota Finale Ritiro FP (%)", 9.0, 23.0, 15.0, 0.5, disabled=not attiva_fondo_pensione) / 100
-    eta_ritiro_fp = st.number_input("Età Ritiro Fondo Pensione", min_value=50, max_value=80, value=67, disabled=not attiva_fondo_pensione)
-    percentuale_capitale_fp = st.slider("% Ritiro in Capitale FP", 0.0, 100.0, 33.0, 1.0, help="La % del montante ritirata subito. Il resto diventa rendita.", disabled=not attiva_fondo_pensione) / 100
-    durata_rendita_fp_anni = st.number_input("Durata Rendita FP (Anni)", min_value=1, value=40, disabled=not attiva_fondo_pensione)
+    p = st.session_state.get('parametri', {})
+    attiva_fondo_pensione = st.checkbox("Attiva Fondo Pensione", value=p.get('attiva_fondo_pensione', True))
+    contributo_annuo_fp = st.number_input("Contributo Annuo FP (€)", min_value=0, step=100, value=p.get('contributo_annuo_fp', 3000), disabled=not attiva_fondo_pensione)
+    rendimento_medio_fp = st.slider("Rendimento Medio Annuo FP (%)", 0.0, 15.0, p.get('rendimento_medio_fp', 0.04) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
+    volatilita_fp = st.slider("Volatilità Annuo FP (%)", 0.0, 30.0, p.get('volatilita_fp', 0.08) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
+    ter_fp = st.slider("Costo Annuo (TER) FP (%)", 0.0, 3.0, p.get('ter_fp', 0.01) * 100, 0.1, disabled=not attiva_fondo_pensione) / 100
+    tassazione_rendimenti_fp = st.slider("Tassazione Rendimenti FP (%)", 0.0, 30.0, p.get('tassazione_rendimenti_fp', 0.20) * 100, 1.0, disabled=not attiva_fondo_pensione) / 100
+    aliquota_finale_fp = st.slider("Aliquota Finale Ritiro FP (%)", 9.0, 23.0, p.get('aliquota_finale_fp', 0.15) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
+    eta_ritiro_fp = st.number_input("Età Ritiro Fondo Pensione", min_value=50, max_value=80, value=p.get('eta_ritiro_fp', 67), disabled=not attiva_fondo_pensione)
+    percentuale_capitale_fp = st.slider("% Ritiro in Capitale FP", 0.0, 100.0, p.get('percentuale_capitale_fp', 0.33) * 100, 1.0, help="La % del montante ritirata subito. Il resto diventa rendita.", disabled=not attiva_fondo_pensione) / 100
+    durata_rendita_fp_anni = st.number_input("Durata Rendita FP (Anni)", min_value=1, value=p.get('durata_rendita_fp_anni', 40), disabled=not attiva_fondo_pensione)
 
 # --- Sezione Altre Entrate ---
 with st.sidebar.expander("7. Altre Entrate"):
-    pensione_pubblica_annua = st.number_input("Pensione Pubblica Annua (€)", min_value=0, step=500, value=8400)
-    inizio_pensione_anni = st.number_input("Inizio Pensione (Anni da oggi)", min_value=0, value=40)
+    p = st.session_state.get('parametri', {})
+    pensione_pubblica_annua = st.number_input("Pensione Pubblica Annua (€)", min_value=0, step=500, value=p.get('pensione_pubblica_annua', 8400))
+    inizio_pensione_anni = st.number_input("Inizio Pensione (Anni da oggi)", min_value=0, value=p.get('inizio_pensione_anni', 40))
 
 # --- Pulsante Esecuzione ---
 if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
@@ -350,6 +443,12 @@ if not st.session_state.simulazione_eseguita:
 else:
     stats = st.session_state.risultati['statistiche']
     params = st.session_state.parametri
+
+    # --- Sezione Salvataggio ---
+    with st.expander("💾 Salva Risultati Simulazione"):
+        simulation_name = st.text_input("Dai un nome a questa simulazione", f"Simulazione del {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        if st.button("Salva Simulazione"):
+            save_simulation(simulation_name, params, st.session_state.risultati)
 
     # --- Riepilogo Statistico ---
     st.header("Riepilogo Statistico Chiave")

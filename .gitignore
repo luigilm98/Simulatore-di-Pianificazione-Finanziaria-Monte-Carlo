@@ -62,4 +62,7 @@ htmlcov/
 # Environment variables
 .env
 
-# Thumbs.db 
+# Thumbs.db
+
+# Simulation data
+simulation_history/ 
