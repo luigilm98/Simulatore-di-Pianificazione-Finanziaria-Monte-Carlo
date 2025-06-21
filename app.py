@@ -359,8 +359,13 @@ def get_default_portfolio():
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = get_default_portfolio()
 
-st.title("📈 Simulatore di Pianificazione Finanziaria Monte Carlo v2.0")
-st.markdown("Benvenuto nella versione 2.0 del simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria.")
+st.title("🔮 Il Tuo Futuro Finanziario: Un Simulatore Monte Carlo")
+st.markdown("""
+Come sarà il tuo futuro finanziario? Raggiungerai i tuoi obiettivi?
+Questo strumento non legge il futuro, ma ti aiuta a navigarlo. Attraverso migliaia di simulazioni di mercato, ti permette di esplorare le probabilità, testare le tue strategie e prendere decisioni più consapevoli per il tuo domani.
+
+**Inizia a costruire il tuo piano nella barra laterale.**
+""")
 
 st.sidebar.header("Configurazione Simulazione")
 

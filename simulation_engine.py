@@ -275,6 +275,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 patrimonio_fp_inizio_anno = patrimonio_fp
                 contributi_fp_anno_corrente = 0
                 
+                # Aggiorna il valore di riferimento per il calcolo del prelievo del prossimo anno
+                # PRIMA di aggiungere la liquidazione del capitale, per non "drogare" la base di calcolo.
+                patrimonio_per_calcolo_prelievo = patrimonio_banca + patrimonio_etf
+
                 if eta_attuale >= parametri['eta_ritiro_fp'] and patrimonio_fp > 0:
                     capitale_ritirato = patrimonio_fp * parametri['percentuale_capitale_fp']
                     dati_annuali['fp_liquidato_nominale'][anno_corrente] = capitale_ritirato
@@ -335,8 +339,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                             patrimonio_etf += importo_da_comprare
                             etf_cost_basis += importo_da_comprare
                             
-            # Aggiorna il valore di riferimento per il calcolo del prelievo del prossimo anno.
-            patrimonio_per_calcolo_prelievo = patrimonio_banca + patrimonio_etf
+            # Se il fondo pensione non è attivo, aggiorna qui il valore di riferimento
+            if not parametri['attiva_fondo_pensione']:
+                patrimonio_per_calcolo_prelievo = patrimonio_banca + patrimonio_etf
 
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
             dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
