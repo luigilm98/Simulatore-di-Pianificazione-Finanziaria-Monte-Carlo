@@ -69,6 +69,31 @@ def delete_simulation(filename):
     os.remove(filepath)
     st.rerun()
 
+def reconstruct_data_from_json(results):
+    """
+    Ricostruisce gli oggetti pandas (DataFrame, Series) dal formato dizionario 
+    utilizzato per il salvataggio JSON. Modifica l'oggetto 'results' in-place.
+    """
+    # Ricostruisci i DataFrame principali per i grafici
+    for key in ['reale', 'nominale', 'reddito_reale_annuo']:
+        if key in results['dati_grafici_principali']:
+            df_dict = results['dati_grafici_principali'][key]
+            if isinstance(df_dict, dict) and 'data' in df_dict:
+                results['dati_grafici_principali'][key] = pd.DataFrame(
+                    df_dict['data'], 
+                    index=pd.to_numeric(df_dict['index']), 
+                    columns=df_dict['columns']
+                )
+
+    # Ricostruisci la Series dei patrimoni finali
+    if 'patrimoni_reali_finali' in results['statistiche']:
+        series_dict = results['statistiche']['patrimoni_reali_finali']
+        if isinstance(series_dict, dict):
+             # Il formato to_dict() standard non ha 'data', quindi usiamo il dict stesso
+            results['statistiche']['patrimoni_reali_finali'] = pd.Series(series_dict)
+
+    return results
+
 # --- Funzioni di Plotting ---
 def hex_to_rgb(hex_color):
     """Converte un colore esadecimale in una tupla RGB."""
@@ -407,7 +432,7 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                 if st.button("📂", key=f"load_{sim['filename']}", help="Carica questa simulazione"):
                     data = load_simulation_data(sim['filename'])
                     st.session_state.parametri = data['parameters']
-                    st.session_state.risultati = data['results']
+                    st.session_state.risultati = reconstruct_data_from_json(data['results'])
                     st.session_state.simulazione_eseguita = True
                     st.rerun()
             with col3:
