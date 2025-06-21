@@ -390,6 +390,7 @@ def run_full_simulation(parametri):
     indici_fallimenti = []
     
     tutti_i_dati_annuali = {
+        'prelievi_target_nominali': np.zeros((n_sim, num_anni)),
         'prelievi_effettivi_reali': np.zeros((n_sim, num_anni)),
         'rendite_fp_reali': np.zeros((n_sim, num_anni)),
         'pensioni_pubbliche_reali': np.zeros((n_sim, num_anni)),
