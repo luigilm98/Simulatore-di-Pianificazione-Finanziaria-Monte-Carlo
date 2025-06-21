@@ -92,10 +92,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     indice_prezzi_inizio_rendita_fp = 1.0
     allocazione_etf_inizio_glidepath = -1.0
     
-    # FIX Definitivo: Usa il patrimonio di fine anno precedente come base per il calcolo del prelievo.
-    # Questo disaccoppia il calcolo da flussi di cassa una tantum (es. liquidazione FP) che avvengono durante l'anno.
-    patrimonio_per_calcolo_prelievo = parametri['capitale_iniziale'] + parametri['etf_iniziale']
-    
     prelievo_annuo_corrente = 0
     indice_prezzi_ultimo_prelievo = 1.0
     
@@ -112,6 +108,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     
     inizio_prelievo_mesi = parametri['anni_inizio_prelievo'] * 12 + 1
     
+    # --- Logger Diagnostico ---
+    is_debug_run = parametri.get('is_debug_run', False)
+    debug_start_mese = inizio_prelievo_mesi - 2
+    debug_end_mese = inizio_prelievo_mesi + 12
+    # --- Fine Logger ---
+
     for mese in range(1, mesi_totali + 1):
         anno_corrente = (mese - 1) // 12
         eta_attuale = eta_iniziale + anno_corrente
@@ -150,8 +152,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             is_inizio_anno_fiscale = ((mese - inizio_prelievo_mesi) % 12 == 0)
 
             if is_primo_mese_prelievo or is_inizio_anno_fiscale:
-                # Usa il patrimonio salvato alla fine dell'anno precedente.
-                patrimonio_attuale = patrimonio_per_calcolo_prelievo
+                patrimonio_attuale = patrimonio_banca + patrimonio_etf
                 
                 if patrimonio_attuale <= 0:
                     prelievo_annuo_corrente = 0
@@ -275,10 +276,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 patrimonio_fp_inizio_anno = patrimonio_fp
                 contributi_fp_anno_corrente = 0
                 
-                # Aggiorna il valore di riferimento per il calcolo del prelievo del prossimo anno
-                # PRIMA di aggiungere la liquidazione del capitale, per non "drogare" la base di calcolo.
-                patrimonio_per_calcolo_prelievo = patrimonio_banca + patrimonio_etf
-
                 if eta_attuale >= parametri['eta_ritiro_fp'] and patrimonio_fp > 0:
                     capitale_ritirato = patrimonio_fp * parametri['percentuale_capitale_fp']
                     dati_annuali['fp_liquidato_nominale'][anno_corrente] = capitale_ritirato
@@ -339,10 +336,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                             patrimonio_etf += importo_da_comprare
                             etf_cost_basis += importo_da_comprare
                             
-            # Se il fondo pensione non è attivo, aggiorna qui il valore di riferimento
-            if not parametri['attiva_fondo_pensione']:
-                patrimonio_per_calcolo_prelievo = patrimonio_banca + patrimonio_etf
-
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
             dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
             dati_annuali['saldo_banca_reale'][anno_corrente] = patrimonio_banca / indice_prezzi
@@ -359,6 +352,15 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         
         if (patrimonio_banca + patrimonio_etf) <= 0 and mese >= inizio_prelievo_mesi:
             patrimonio_negativo = True
+
+        if is_debug_run and debug_start_mese <= mese <= debug_end_mese:
+            print(f"--- Mese {mese} (Anno {anno_corrente}) ---")
+            print(f"Patrimonio Inizio Mese: Banca={patrimonio_banca:,.0f}, ETF={patrimonio_etf:,.0f}, Totale={patrimonio_banca+patrimonio_etf:,.0f}")
+            print(f"Prelievo Annuo Target: {prelievo_annuo_corrente:,.0f}, Prelievo Mensile: {prelievo_mensile:,.0f}")
+            print(f"Vendita Netta ETF: {ricavo_netto_etf_mese:,.0f}, Prelievo Effettivo: {prelievo_effettivo_mensile:,.0f}")
+            print(f"Patrimonio Fine Mese (Post-prelievo, Pre-rendimenti): Banca={patrimonio_banca:,.0f}, ETF={patrimonio_etf:,.0f}")
+            print(f"Rendimento ETF del mese: {rendimento_mensile:.4%}")
+            print(f"Patrimonio Finale: {patrimoni_run[mese]:,.0f}")
 
     # Calcoli finali per la singola run
     drawdown = 0
@@ -435,6 +437,8 @@ def run_full_simulation(parametri):
 
     # 2. ESECUZIONE SIMULAZIONI
     for sim in range(n_sim):
+        # Passa un flag per attivare il logger solo per la prima simulazione
+        parametri['is_debug_run'] = (sim == 0)
         risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
         
         patrimoni[sim, :] = risultati_run['patrimoni_mensili']
