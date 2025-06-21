@@ -37,6 +37,8 @@ def valida_parametri(parametri):
             raise ValueError("Rendimento medio FP deve essere tra 0 e 1")
         if not (0 <= parametri['ter_fp'] <= 1):
             raise ValueError("TER FP deve essere tra 0 e 1")
+        if not (0 <= parametri['aliquota_finale_fp'] <= 1):
+            raise ValueError("Aliquota finale FP deve essere tra 0 e 1 (es. 0.15 per 15%)")
 
 def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     """
@@ -500,6 +502,7 @@ def run_full_simulation(parametri):
         anno_inizio_pensione = parametri['inizio_pensione_anni']
         anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
 
+        # Calcola le medie solo sugli anni in cui ogni flusso è attivo e > 0
         prelievi_reali_attivi = prelievi_reali_successo[:, anno_inizio_prelievo:]
         prelievi_reali_validi = prelievi_reali_attivi[prelievi_reali_attivi > 1e-6]
 
@@ -509,8 +512,10 @@ def run_full_simulation(parametri):
         rendite_fp_reali_attive = rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]
         rendite_fp_validi = rendite_fp_reali_attive[rendite_fp_reali_attive > 1e-6]
 
+        # Calcola il totale solo per gli scenari di successo
         totali_reali_agg_successo = prelievi_reali_successo + pensioni_reali_successo + rendite_fp_reali_successo
         
+        # Determina da quale anno iniziare a calcolare il reddito totale medio
         anno_inizio_reddito_pensione = min(anno_inizio_prelievo, anno_inizio_pensione)
         if parametri['attiva_fondo_pensione'] and anno_inizio_rendita_fp < parametri['anni_totali']:
             anno_inizio_reddito_pensione = min(anno_inizio_reddito_pensione, anno_inizio_rendita_fp)
