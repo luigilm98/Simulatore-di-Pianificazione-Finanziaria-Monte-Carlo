@@ -629,149 +629,100 @@ else:
 
     # Calcoli per le nuove metriche
     patrimonio_iniziale_totale = params['capitale_iniziale'] + params['etf_iniziale']
-    contributi_versati = stats['totale_contributi_versati_nominale_medio']
-    guadagni_da_investimento = stats['patrimonio_nominale_medio_finale'] - patrimonio_iniziale_totale - contributi_versati
-    patrimonio_finale_in_anni_di_spesa = stats['patrimonio_reale_medio_finale'] / params['prelievo_target_reale_iniziale'] if params['prelievo_target_reale_iniziale'] > 0 else 0
-
-    st.markdown("---")
-    st.markdown("<h2 style='text-align: center; font-size: 28px;'>Il Tuo Percorso Finanziario in Numeri</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #a0a0a0;'>Una sintesi dei risultati chiave della tua simulazione. Tutti i valori monetari sono medie di tutti gli scenari possibili.</p>", unsafe_allow_html=True)
+    contributi_versati = stats['contributi_totali_versati_mediano_nominale']
+    patrimonio_finale_nominale = stats['patrimonio_finale_mediano_nominale']
+    guadagni_da_investimento = patrimonio_finale_nominale - contributi_versati - patrimonio_iniziale_totale
     
+    reddito_annuo_reale_pensione = st.session_state.risultati['statistiche_prelievi']['totale_reale_medio_annuo']
+    anni_di_spesa_coperti = (stats['patrimonio_finale_mediano_reale'] / reddito_annuo_reale_pensione) if reddito_annuo_reale_pensione > 0 else float('inf')
+
+
+    st.write("---")
+    st.markdown("##### Il Tuo Percorso Finanziario in Numeri")
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric(
-            label="Patrimonio Iniziale Totale",
-            value=f"€ {patrimonio_iniziale_totale:,.0f}",
-            help="La somma della tua liquidità iniziale e del valore del portafoglio ETF. È il tuo punto di partenza."
-        )
-    with col2:
-        st.metric(
-            label="Contributi Totali Versati",
-            value=f"€ {contributi_versati:,.0f}",
-            help="La somma totale di tutti i contributi mensili che hai versato nel portafoglio (e nel fondo pensione, se attivo) lungo tutta la fase di accumulo. Questo è il capitale che hai messo di tasca tua."
-        )
-    with col3:
-        st.metric(
-            label="Guadagni da Investimento (Capital Gain)",
-            value=f"€ {guadagni_da_investimento:,.0f}",
-            delta=f"{((guadagni_da_investimento / contributi_versati) * 100):.0f}% vs Contributi" if contributi_versati > 0 else "N/A",
-            help="Il profitto generato dai tuoi investimenti (interessi, dividendi, plusvalenze), al netto dei costi e delle tasse. È il rendimento del tuo capitale."
-        )
-    with col4:
-        st.metric(
-            label="Patrimonio Finale in Anni di Spesa",
-            value=f"{patrimonio_finale_in_anni_di_spesa:.1f} Anni",
-            help="Una misura intuitiva della tua ricchezza: per quanti anni potresti vivere prelevando un importo pari al tuo obiettivo di spesa iniziale, usando solo il patrimonio reale medio finale. Più alto è, meglio è."
-        )
+    col1.metric(
+        "Patrimonio Iniziale", f"€ {patrimonio_iniziale_totale:,.0f}",
+        help="La somma del capitale che hai all'inizio della simulazione."
+    )
+    col2.metric(
+        "Contributi Totali Versati", f"€ {contributi_versati:,.0f}",
+        help="La stima di tutto il denaro che verserai di tasca tua durante la fase di accumulo. Questo è il tuo sacrificio."
+    )
+    col3.metric(
+        "Guadagni da Investimento", f"€ {guadagni_da_investimento:,.0f}",
+        delta=f"{((guadagni_da_investimento / contributi_versati) * 100) if contributi_versati > 0 else 0:,.0f}% vs Contributi",
+        help="La ricchezza generata dal solo effetto dei rendimenti di mercato (interesse composto). Questa è la ricompensa per il rischio e la pazienza."
+    )
+    col4.metric(
+        "Patrimonio Finale in Anni di Spesa", f"{anni_di_spesa_coperti:,.1f} Anni",
+        help=f"Il tuo patrimonio finale reale mediano, tradotto in quanti anni del tuo tenore di vita pensionistico (€{reddito_annuo_reale_pensione:,.0f}/anno) può coprire."
+    )
 
-    st.markdown("---")
-    
-    st.markdown("<h3 style='text-align: left; font-size: 22px;'>Risultati Finali della Simulazione (Patrimonio Nominale)</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: left; color: #a0a0a0;'>Come potrebbe apparire il tuo patrimonio alla fine dell'orizzonte temporale, senza contare l'inflazione. Utile per confronti, ma il valore reale è più importante.</p>", unsafe_allow_html=True)
+    st.write("---")
+    st.markdown("##### Risultati Finali della Simulazione (Patrimonio Nominale)")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric(
+        "Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}",
+        help="Il risultato che si trova esattamente nel mezzo di tutti gli scenari. È la stima più realistica."
+    )
+    col2.metric(
+        "Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}",
+        help="Lo scenario 'da sogno'. C'è solo un 10% di probabilità che le cose vadano meglio di così."
+    )
+    col3.metric(
+        "Patrimonio Finale (Peggior 10% - 10°)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}",
+        help="Lo scenario 'notte insonne'. C'è un 10% di probabilità che le cose vadano peggio di così."
+    )
+    col4.metric(
+        "Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}",
+        help="Il potere d'acquisto mediano del tuo patrimonio a fine piano, espresso in Euro di oggi. La metrica più importante."
+    )
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(
-            label="Patrimonio Finale Medio (50° percentile)",
-            value=f"€ {stats['patrimonio_nominale_medio_finale']:,.0f}",
-            help="Il risultato mediano. C'è il 50% di probabilità che il tuo patrimonio finale sia superiore a questa cifra e il 50% che sia inferiore."
-        )
-    with col2:
-        st.metric(
-            label="Scenario Ottimistico (90° percentile)",
-            value=f"€ {stats['patrimonio_nominale_percentile_90']:,.0f}",
-            help="Uno scenario fortunato. C'è solo il 10% di probabilità che il tuo patrimonio superi questa cifra."
-        )
-    with col3:
-        st.metric(
-            label="Scenario Pessimistico (10° percentile)",
-            value=f"€ {stats['patrimonio_nominale_percentile_10']:,.0f}",
-            help="Uno scenario sfortunato. C'è il 10% di probabilità che il tuo patrimonio sia inferiore a questa cifra. È un buon valore per valutare il rischio del tuo piano."
-        )
 
-    st.markdown("<h3 style='text-align: left; font-size: 22px;'>Risultati Finali della Simulazione (Patrimonio Reale)</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: left; color: #a0a0a0;'>Questo è il valore che conta davvero: il potere d'acquisto del tuo patrimonio alla fine della simulazione, tenendo conto dell'erosione dell'inflazione.</p>", unsafe_allow_html=True)
+    st.write("---")
+    st.markdown("##### Indicatori di Rischio del Piano")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric(
+        "Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}",
+        delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse",
+        help="La probabilità di finire i soldi prima della fine della simulazione."
+    )
+    col2.metric(
+        "Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}",
+        delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse",
+        help="La perdita percentuale più grande dal picco, nello scenario peggiore. Misura il 'dolore' massimo che potresti sopportare."
+    )
+    col3.metric(
+        "Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}",
+        help="Il rendimento ottenuto per ogni unità di rischio. Un valore più alto è meglio (sopra 1 è ottimo)."
+    )
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(
-            label="Patrimonio Reale Finale Medio (50° percentile)",
-            value=f"€ {stats['patrimonio_reale_medio_finale']:,.0f}",
-            help="Il potere d'acquisto mediano del tuo patrimonio alla fine del piano. Questo è l'indicatore più importante del tuo successo finanziario."
-        )
-    with col2:
-        st.metric(
-            label="Patrimonio Reale Finale Ottimistico (90° percentile)",
-            value=f"€ {stats['patrimonio_reale_percentile_90']:,.0f}",
-            help="Il potere d'acquisto del tuo patrimonio in uno scenario fortunato (10% di probabilità di superarlo)."
-        )
-    with col3:
-        st.metric(
-            label="Patrimonio Reale Finale Pessimistico (10° percentile)",
-            value=f"€ {stats['patrimonio_reale_percentile_10']:,.0f}",
-            help="Il potere d'acquisto del tuo patrimonio in uno scenario sfortunato (10% di probabilità di essere inferiore). Se questo valore è sufficiente a coprire le tue necessità, il tuo piano è molto robusto."
-        )
 
-    st.markdown("---")
-    st.markdown("<h3 style='text-align: left; font-size: 22px;'>Indicatori di Rischio e Sostenibilità del Piano</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: left; color: #a0a0a0;'>Queste metriche ti aiutano a capire la robustezza del tuo piano e le probabilità di raggiungere i tuoi obiettivi.</p>", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(
-            label="Probabilità di Successo del Piano",
-            value=f"{stats['probabilita_successo'] * 100:.0f}%",
-            delta=f"{stats['probabilita_successo'] * 100 - 100:.0f}% vs Obiettivo",
-            help="La percentuale di simulazioni in cui il tuo patrimonio non si è esaurito prima della fine dell'orizzonte temporale. Un valore > 95% è considerato molto robusto."
-        )
-    with col2:
-        st.metric(
-            label="Drawdown Massimo Peggiore (Scenario Reale)",
-            value=f"{stats['max_drawdown_reale_peggiore'] * 100:.0f}%",
-            help="Il più grande calo percentuale del tuo portafoglio (dal picco al minimo) avvenuto in una singola simulazione, considerando i valori reali. Ti dà un'idea della massima perdita che avresti potuto sopportare psicologicamente."
-        )
-    with col3:
-        sharpe_ratio_medio_ann = stats.get('sharpe_ratio_medio_annualizzato', 0.0)
-        st.metric(
-            label="Sharpe Ratio Medio (Annualizzato)",
-            value=f"{sharpe_ratio_medio_ann:.2f}",
-            help="Misura il rendimento del tuo portafoglio in rapporto al rischio che ti sei assunto. Un valore più alto indica una migliore performance corretta per il rischio. (Valori > 1 sono considerati ottimi)."
-        )
-
-    st.markdown("---")
-    st.markdown(f"""
-    Basandosi sulla tua età iniziale ({params['eta_iniziale']} anni) e sull'inizio dei prelievi tra {params['anni_prelievo']} anni, la tua **fase di accumulo** durerà fino a quando avrai **{int(params['eta_iniziale'] + params['anni_prelievo'])} anni**.
-    Durante questo periodo, il tuo obiettivo sarà far crescere il patrimonio.
-
-    Successivamente, inizierà la **fase di decumulo (o pensione)**. Ecco un riepilogo delle tue entrate medie annuali durante questa fase, espresse nel potere d'acquisto di oggi (valori reali):
-    """)
+    # --- Riepilogo Entrate in Pensione ---
+    st.write("---")
+    st.header("Riepilogo Entrate in Pensione (Valori Reali Medi)")
+    st.markdown("Queste metriche mostrano il tenore di vita **medio annuo** che puoi aspettarti durante la fase di ritiro, espresso nel potere d'acquisto di oggi.")
+    stats_prelievi = st.session_state.risultati['statistiche_prelievi']
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric(
-            label="Prelievo Medio dal Patrimonio", 
-            value=f"€ {stats.get('prelievo_reale_medio_decumulo', 0):,.0f}",
-            help="L'importo medio annuo che preleverai dal tuo portafoglio di investimenti durante la pensione, espresso in potere d'acquisto di oggi."
-        )
-    with col2:
-        st.metric(
-            label="Pensione Pubblica Annua", 
-            value=f"€ {stats.get('pensione_pubblica_reale_media_decumulo', 0):,.0f}",
-            help="La tua pensione pubblica media annua, al netto dell'inflazione."
-        )
-    with col3:
-        st.metric(
-            label="Rendita Media da Fondo Pensione", 
-            value=f"€ {stats.get('rendita_fp_reale_media_decumulo', 0):,.0f}",
-            help="La rendita media annua che riceverai dal tuo fondo pensione complementare, al netto dell'inflazione."
-        )
-    with col4:
-        st.metric(
-            label="TOTALE ENTRATE MEDIE ANNUE", 
-            value=f"€ {stats.get('totale_entrate_reali_medie_decumulo', 0):,.0f}",
-            help="La somma di tutte le tue entrate medie annue in pensione. Questa cifra rappresenta il tuo tenore di vita medio annuo reale."
-        )
-    
+    col1.metric(
+        "Prelievo Medio dal Patrimonio", f"€ {stats_prelievi['prelievo_reale_medio']:,.0f}",
+        help="L'importo medio annuo prelevato dal tuo portafoglio (ETF+Liquidità) durante la pensione, in potere d'acquisto di oggi."
+    )
+    col2.metric(
+        "Pensione Pubblica Annua", f"€ {stats_prelievi['pensione_pubblica_reale_annua']:,.0f}",
+        help="L'importo della pensione pubblica che hai inserito, in potere d'acquisto di oggi."
+    )
+    col3.metric(
+        "Rendita Media da Fondo Pensione", f"€ {stats_prelievi['rendita_fp_reale_media']:,.0f}",
+        help="La rendita annua media generata dal capitale del tuo fondo pensione, in potere d'acquisto di oggi."
+    )
+    col4.metric(
+        "TOTALE ENTRATE MEDIE ANNUE", f"€ {stats_prelievi['totale_reale_medio_annuo']:,.0f}",
+        help="La somma di tutte le entrate medie in pensione. Misura il tuo tenore di vita medio annuo una volta in ritiro.",
+    )
+
+    # --- Sezione di Spiegazione e Grafico Composizione ---
     with st.expander("🔍 Guida alla Lettura: Perché il mio piano ha successo (o fallisce)?"):
         st.markdown("""
         **Perché la probabilità di fallimento è spesso 0%?**
