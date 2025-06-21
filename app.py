@@ -336,13 +336,11 @@ if 'simulazione_eseguita' not in st.session_state:
 
 # --- Dati di Default Portafoglio ---
 def get_default_portfolio():
+    """Restituisce un DataFrame con il portafoglio ETF di default."""
     return pd.DataFrame([
-        {"Fondo": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating", "Ticker": "VWCE", "Allocazione (%)": 90.0, "TER (%)": 0.22, "Rendimento Atteso (%)": 8.0, "Volatilità Attesa (%)": 15.0},
-        {"Fondo": "Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture", "Ticker": "CRB", "Allocazione (%)": 3.0, "TER (%)": 0.30, "Rendimento Atteso (%)": 5.0, "Volatilità Attesa (%)": 18.0},
-        {"Fondo": "iShares MSCI EM UCITS ETF (Acc)", "Ticker": "EIMI", "Allocazione (%)": 3.0, "TER (%)": 0.18, "Rendimento Atteso (%)": 9.0, "Volatilità Attesa (%)": 22.0},
-        {"Fondo": "Amundi MSCI Japan UCITS ETF Acc", "Ticker": "SJP", "Allocazione (%)": 3.0, "TER (%)": 0.12, "Rendimento Atteso (%)": 7.0, "Volatilità Attesa (%)": 16.0},
-        {"Fondo": "iShares Automation & Robotics UCITS ETF", "Ticker": "RBOT", "Allocazione (%)": 1.0, "TER (%)": 0.40, "Rendimento Atteso (%)": 12.0, "Volatilità Attesa (%)": 25.0},
-    ])
+        {"ETF": "VWCE", "Allocazione (%)": 80.0, "TER (%)": 0.22, "Rendimento Atteso (%)": 7.5, "Volatilità Attesa (%)": 15.0},
+        {"ETF": "AGGH", "Allocazione (%)": 20.0, "TER (%)": 0.10, "Rendimento Atteso (%)": 2.5, "Volatilità Attesa (%)": 4.0},
+    ]).set_index("ETF")
 
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = get_default_portfolio()
@@ -457,19 +455,51 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
             {'ETF': 'Obbligazionario Globale', 'Allocazione (%)': 20, 'TER (%)': 0.18, 'Rendimento Atteso (%)': 2.5, 'Volatilità Attesa (%)': 5.0},
         ]))
 
-    edited_df = st.data_editor(st.session_state.etf_portfolio, num_rows="dynamic", key="etf_editor")
+    st.session_state.etf_portfolio = st.data_editor(
+        st.session_state.etf_portfolio,
+        num_rows="dynamic",
+        column_config={
+            "Allocazione (%)": st.column_config.NumberColumn(
+                "Allocazione (%)",
+                help="La percentuale del portafoglio allocata a questo ETF.",
+                min_value=0,
+                max_value=100,
+                step=1.0,
+                format="%.2f%%"
+            ),
+            "TER (%)": st.column_config.NumberColumn(
+                "TER (%)",
+                help="Il costo annuale dell'ETF (Total Expense Ratio).",
+                min_value=0.00,
+                step=0.01,
+                format="%.2f%%"
+            ),
+            "Rendimento Atteso (%)": st.column_config.NumberColumn(
+                "Rendimento Atteso (%)",
+                help="Il rendimento annuo medio che ti aspetti da questo ETF.",
+                step=0.5,
+                format="%.2f%%"
+            ),
+            "Volatilità Attesa (%)": st.column_config.NumberColumn(
+                "Volatilità Attesa (%)",
+                help="La deviazione standard annua dei rendimenti (misura del rischio).",
+                step=0.5,
+                format="%.2f%%"
+            ),
+        }
+    )
     
-    total_allocation = edited_df["Allocazione (%)"].sum()
+    total_allocation = st.session_state.etf_portfolio["Allocazione (%)"].sum()
     if not np.isclose(total_allocation, 100):
         st.warning(f"L'allocazione totale è {total_allocation:.2f}%. Assicurati che sia 100%.")
     else:
         st.success("Allocazione totale: 100%.")
     
     # Calcolo parametri aggregati del portafoglio per l'utente
-    weights = edited_df["Allocazione (%)"] / 100
-    rendimento_medio_portfolio = np.sum(weights * edited_df["Rendimento Atteso (%)"])
-    volatilita_portfolio = np.sum(weights * edited_df["Volatilità Attesa (%)"])  # Semplificazione
-    ter_etf_portfolio = np.sum(weights * edited_df["TER (%)"])
+    weights = st.session_state.etf_portfolio["Allocazione (%)"] / 100
+    rendimento_medio_portfolio = np.sum(weights * st.session_state.etf_portfolio["Rendimento Atteso (%)"])
+    volatilita_portfolio = np.sum(weights * st.session_state.etf_portfolio["Volatilità Attesa (%)"])  # Semplificazione
+    ter_etf_portfolio = np.sum(weights * st.session_state.etf_portfolio["TER (%)"])
 
     st.markdown("---")
     st.markdown("##### Parametri Calcolati del Portafoglio:")

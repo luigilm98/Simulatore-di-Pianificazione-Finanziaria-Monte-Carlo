@@ -254,14 +254,18 @@ def run_full_simulation(params):
     tutti_i_risultati_mensili = []
     lista_df_dettaglio = []
     tutti_i_risultati_nominali = []
+    tutti_i_redditi_reali_annui = []
 
     for i in range(params['n_simulazioni']):
         patrimonio_reale, patrimonio_nominale, df_dettaglio = _esegui_una_simulazione(params)
         tutti_i_risultati_mensili.append(patrimonio_reale)
         tutti_i_risultati_nominali.append(patrimonio_nominale)
         
-        if i == 0: # Salva solo il dettaglio della prima simulazione per ora
+        if i == 0: # Salva solo il dettaglio della prima simulazione per i dati della tabella
             lista_df_dettaglio.append(df_dettaglio)
+
+        if not df_dettaglio.empty:
+            tutti_i_redditi_reali_annui.append(df_dettaglio['totale_entrate_reali'])
 
     df_risultati_reali = pd.DataFrame(tutti_i_risultati_mensili).transpose()
     df_risultati_reali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
@@ -269,6 +273,10 @@ def run_full_simulation(params):
     df_risultati_nominali = pd.DataFrame(tutti_i_risultati_nominali).transpose()
     df_risultati_nominali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
     
+    df_reddito_reale_annuo = pd.concat(tutti_i_redditi_reali_annui, axis=1) if tutti_i_redditi_reali_annui else pd.DataFrame()
+    if not df_reddito_reale_annuo.empty:
+        df_reddito_reale_annuo.columns = [f'Sim_{i+1}' for i in range(len(tutti_i_redditi_reali_annui))]
+
     # Calcolo statistiche principali
     patrimonio_iniziale = params['capitale_iniziale'] + params['etf_iniziale']
     patrimoni_reali_finali = df_risultati_reali.iloc[-1]
@@ -320,28 +328,29 @@ def run_full_simulation(params):
     df_prelievi = lista_df_dettaglio[0] if lista_df_dettaglio else pd.DataFrame()
     
     if not df_prelievi.empty:
-        # Filtra solo gli anni di pensione
+        # Filtra solo gli anni di pensione per un calcolo corretto delle medie
         anni_pensione = df_prelievi[df_prelievi['eta'] >= (params['eta_iniziale'] + params['anni_inizio_prelievo'])]
         
-        stats_prelievi = {
-            'totale_reale_medio_annuo': df_prelievi['totale_entrate_reali'].mean(),
-            'prelievo_reale_medio': anni_pensione['prelievo_reale_effettivo'].mean() if not anni_pensione.empty else 0,
-            'pensione_pubblica_reale_annua': df_prelievi['pensione_pubblica_reale'].mean(),
-            'rendita_fp_reale_media': df_prelievi['rendita_fp_reale'].mean()
-        }
+        if not anni_pensione.empty:
+            stats_prelievi = {
+                'totale_reale_medio_annuo': anni_pensione['totale_entrate_reali'].mean(),
+                'prelievo_reale_medio': anni_pensione['prelievo_reale_effettivo'].mean(),
+                'pensione_pubblica_reale_annua': anni_pensione[anni_pensione['pensione_pubblica_reale'] > 0]['pensione_pubblica_reale'].mean(),
+                'rendita_fp_reale_media': anni_pensione[anni_pensione['rendita_fp_reale'] > 0]['rendita_fp_reale'].mean()
+            }
+            # Se non ci sono entrate di un tipo, il .mean() restituisce NaN. Lo converto a 0.
+            stats_prelievi['pensione_pubblica_reale_annua'] = stats_prelievi.get('pensione_pubblica_reale_annua') or 0
+            stats_prelievi['rendita_fp_reale_media'] = stats_prelievi.get('rendita_fp_reale_media') or 0
+        else:
+             stats_prelievi = { 'totale_reale_medio_annuo': 0, 'prelievo_reale_medio': 0, 'pensione_pubblica_reale_annua': 0, 'rendita_fp_reale_media': 0 }
     else:
-        stats_prelievi = {
-            'totale_reale_medio_annuo': 0,
-            'prelievo_reale_medio': 0,
-            'pensione_pubblica_reale_annua': 0,
-            'rendita_fp_reale_media': 0
-        }
+        stats_prelievi = { 'totale_reale_medio_annuo': 0, 'prelievo_reale_medio': 0, 'pensione_pubblica_reale_annua': 0, 'rendita_fp_reale_media': 0 }
     
     # Preparazione dati per i grafici
     dati_grafici_principali = {
         'reale': df_risultati_reali,
         'nominale': df_risultati_nominali,
-        'reddito_reale_annuo': df_prelievi['totale_entrate_reali'] if not df_prelievi.empty else pd.Series()
+        'reddito_reale_annuo': df_reddito_reale_annuo
     }
     
     dati_grafici_avanzati = {
