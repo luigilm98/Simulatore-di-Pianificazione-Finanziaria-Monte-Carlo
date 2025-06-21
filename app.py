@@ -686,36 +686,65 @@ with st.sidebar.expander("7. Altre Entrate", expanded=False):
 # --- Pulsante Esecuzione ---
 if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
     # Validazione allocazione
-    if not np.isclose(st.session_state.etf_portfolio["Allocazione (%)"].sum(), 100):
-        st.sidebar.error("L'allocazione del portafoglio deve essere esattamente 100% per eseguire la simulazione.")
+    if not np.isclose(
+        st.session_state.etf_portfolio["Allocazione (%)"].sum(), 100
+    ):
+        st.sidebar.error(
+            "L'allocazione del portafoglio deve essere esattamente 100% per eseguire la simulazione."
+        )
     else:
         st.session_state.parametri = {
-            'eta_iniziale': eta_iniziale, 'capitale_iniziale': capitale_iniziale, 'etf_iniziale': etf_iniziale,
-            'contributo_mensile_banca': contributo_mensile_banca, 'contributo_mensile_etf': contributo_mensile_etf, 
-            'etf_portfolio': st.session_state.etf_portfolio,
-            'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
-            'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
-            'strategia_prelievo': strategia_prelievo, 'percentuale_prelievo': percentuale_prelievo,
-            'guardrail_superiore': guardrail_superiore, 'guardrail_inferiore': guardrail_inferiore,
-            'use_glidepath': use_glidepath, 'start_glidepath_eta': start_glidepath_eta, 'end_glidepath_eta': end_glidepath_eta,
-            'final_equity_percentage': final_equity_percentage,
-            'tassazione_capital_gain': tassazione_capital_gain, 'imposta_bollo_titoli': imposta_bollo_titoli,
-            'imposta_bollo_liquidita': imposta_bollo_liquidita, 'costo_fisso_deposito_titoli': costo_fisso_deposito_titoli,
-            'usa_fp': usa_fp, 'fp_capitale_iniziale': fp_capitale_iniziale, 'fp_contributo_mensile': fp_contributo_mensile,
-            'fp_eta_liquidazione': fp_eta_liquidazione, 'fp_rendimento_netto': fp_rendimento_netto,
-            'fp_perc_liquidazione_capitale': fp_perc_liquidazione_capitale, 'fp_aliquota_tassazione_finale': fp_aliquota_tassazione_finale,
-            'usa_pensione_pubblica': usa_pensione_pubblica, 'pensione_pubblica_importo_annuo': pensione_pubblica_importo_annuo, 'eta_inizio_pensione_pubblica': eta_inizio_pensione_pubblica
+            "eta_iniziale": eta_iniziale,
+            "capitale_iniziale": capitale_iniziale,
+            "etf_iniziale": etf_iniziale,
+            "contributo_mensile_banca": contributo_mensile_banca,
+            "contributo_mensile_etf": contributo_mensile_etf,
+            "etf_portfolio": st.session_state.etf_portfolio,
+            "inflazione": inflazione,
+            "anni_inizio_prelievo": anni_inizio_prelievo,
+            "prelievo_annuo": prelievo_annuo,
+            "n_simulazioni": n_simulazioni,
+            "anni_totali": anni_totali_input,
+            "strategia_prelievo": strategia_prelievo,
+            "percentuale_prelievo": percentuale_prelievo,
+            "guardrail_superiore": guardrail_superiore,
+            "guardrail_inferiore": guardrail_inferiore,
+            "use_glidepath": use_glidepath,
+            "start_glidepath_eta": start_glidepath_eta,
+            "end_glidepath_eta": end_glidepath_eta,
+            "final_equity_percentage": final_equity_percentage,
+            "tassazione_capital_gain": tassazione_capital_gain,
+            "imposta_bollo_titoli": imposta_bollo_titoli,
+            "imposta_bollo_liquidita": imposta_bollo_liquidita,
+            "costo_fisso_deposito_titoli": costo_fisso_deposito_titoli,
+            "usa_fp": usa_fp,
+            "fp_capitale_iniziale": fp_capitale_iniziale,
+            "fp_contributo_mensile": fp_contributo_mensile,
+            "fp_eta_liquidazione": fp_eta_liquidazione,
+            "fp_rendimento_netto": fp_rendimento_netto,
+            "fp_perc_liquidazione_capitale": fp_perc_liquidazione_capitale,
+            "fp_aliquota_tassazione_finale": fp_aliquota_tassazione_finale,
+            "usa_pensione_pubblica": usa_pensione_pubblica,
+            "pensione_pubblica_importo_annuo": pensione_pubblica_importo_annuo,
+            "eta_inizio_pensione_pubblica": eta_inizio_pensione_pubblica,
         }
 
-        with st.spinner("Esecuzione della simulazione Monte Carlo... Questo potrebbe richiedere alcuni istanti."):
+        with st.spinner(
+            "Esecuzione della simulazione Monte Carlo... Questo potrebbe richiedere alcuni istanti."
+        ):
             try:
-                st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
+                # Esegui la simulazione per ottenere i risultati "grezzi" (dizionari)
+                raw_results = engine.run_full_simulation(st.session_state.parametri)
+                # Ricostruisci immediatamente i risultati in oggetti pandas corretti
+                st.session_state.risultati = reconstruct_data_from_json(raw_results)
                 st.session_state.simulazione_eseguita = True
-                st.rerun() # Ricarica l'app per mostrare i risultati
+                st.rerun()  # Ricarica l'app per mostrare i risultati
             except ValueError as e:
                 st.error(f"Errore nei parametri: {e}")
             except Exception as e:
-                st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
+                st.error(
+                    f"Si è verificato un errore inaspettato durante la simulazione: {e}"
+                )
 
 
 # --- Area Principale ---
