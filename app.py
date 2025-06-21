@@ -78,14 +78,21 @@ def hex_to_rgb(hex_color):
 def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali):
     """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
-    anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
     
-    # Calcolo percentili
-    p10 = np.percentile(data, 10, axis=0)
-    p25 = np.percentile(data, 25, axis=0)
-    median_data = np.median(data, axis=0)
-    p75 = np.percentile(data, 75, axis=0)
-    p90 = np.percentile(data, 90, axis=0)
+    if data.empty or data.shape[1] == 0:
+        fig.update_layout(title=f"{title} (Nessun dato disponibile)")
+        return fig
+
+    # CORREZIONE: L'asse X deve basarsi sul numero di righe (dati temporali), non di colonne.
+    num_steps = data.shape[0]
+    anni_asse_x = np.linspace(0, anni_totali, num_steps)
+
+    # CORREZIONE: I percentili devono essere calcolati lungo l'asse 1 (attraverso le simulazioni), non l'asse 0.
+    p10 = np.percentile(data, 10, axis=1)
+    p25 = np.percentile(data, 25, axis=1)
+    median_data = np.median(data, axis=1)
+    p75 = np.percentile(data, 75, axis=1)
+    p90 = np.percentile(data, 90, axis=1)
 
     rgb_fill = hex_to_rgb(color_fill)
 
@@ -118,7 +125,7 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         line={'width': 3, 'color': color_median},
         hovertemplate='Anno %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
-
+    
     fig.update_layout(
         title=title,
         xaxis_title="Anni",
@@ -225,59 +232,29 @@ def plot_asset_allocation(data, anni_totali):
     return fig
 
 def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
-    """Crea un grafico a 'cono' per il reddito reale annuo."""
-    fig = go.Figure()
-    # Mostra i dati solo a partire dall'anno di inizio prelievo
-    start_index = int(anni_inizio_prelievo)
-    if start_index >= data.shape[1]:
-        return fig # Non c'è nulla da plottare se l'inizio è oltre l'orizzonte
+    """
+    Crea un grafico a 'cono' per il reddito annuo reale in pensione.
+    """
+    if data.empty:
+        fig = go.Figure()
+        fig.update_layout(title="Reddito in pensione (Nessun dato disponibile)")
+        return fig
+    
+    # Filtra i dati per includere solo gli anni di decumulo.
+    # L'indice del DataFrame 'data' corrisponde agli anni della simulazione.
+    data_decumulo = data.loc[anni_inizio_prelievo:]
 
-    anni_asse_x = np.arange(start_index, anni_totali + 1)
-    data_decumulo = data[:, start_index:]
-
-    p10 = np.percentile(data_decumulo, 10, axis=0)
-    p25 = np.percentile(data_decumulo, 25, axis=0)
-    median_data = np.median(data_decumulo, axis=0)
-    p75 = np.percentile(data_decumulo, 75, axis=0)
-    p90 = np.percentile(data_decumulo, 90, axis=0)
-
-    # Area 10-90
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p90, p10[::-1]]),
-        fill='toself',
-        fillcolor='rgba(0, 176, 246, 0.2)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='10-90 Percentile',
-        hoverinfo='none'
-    ))
-    # Area 25-75
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p75, p25[::-1]]),
-        fill='toself',
-        fillcolor='rgba(0, 176, 246, 0.4)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='25-75 Percentile',
-        hoverinfo='none'
-    ))
-    # Mediana
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_data, mode='lines',
-        name='Reddito Mediano (50°)',
-        line={'width': 3, 'color': '#00B0F0'},
-        hovertemplate='Anno %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
-    ))
-
-    fig.update_layout(
-        title="Quale Sarà il Mio Tenore di Vita? (Reddito Annuo Reale)",
-        xaxis_title="Anni",
-        yaxis_title="Reddito Annuo Reale (€ di oggi)",
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    # Calcola il numero di anni rimanenti per l'asse del grafico
+    anni_grafico = anni_totali - anni_inizio_prelievo
+    
+    # Chiama la funzione di plotting principale, che ora è robusta
+    return plot_percentile_chart(
+        data_decumulo, 
+        "Tenore di Vita Annuo Reale in Pensione", 
+        "Reddito Annuo Reale (€)", 
+        '#1f77b4', '#1f77b4', 
+        anni_grafico
     )
-    return fig
 
 def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
     """Mostra un'analisi degli scenari peggiori (es. 10% dei casi)."""
