@@ -143,8 +143,7 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         yaxis_title=y_title,
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=450  # Imposta un'altezza fissa per il grafico
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     return fig
 
@@ -154,8 +153,7 @@ def plot_histogram(data, anni_totali):
         title_text='Distribuzione del Patrimonio Finale Reale',
         xaxis_title_text='Patrimonio Finale (Potere d\'Acquisto Odierno)',
         yaxis_title_text='Numero di Simulazioni',
-        bargap=0.1,
-        height=400 # Altezza fissa
+        bargap=0.1
     )
     return fig
 
@@ -171,8 +169,7 @@ def plot_success_probability(data, anni_totali):
         xaxis_title='Anni di Simulazione',
         yaxis_title='Probabilità di Avere Patrimonio Residuo',
         yaxis_tickformat='.0%',
-        yaxis_range=[0, 1.01],
-        height=400 # Altezza fissa
+        yaxis_range=[0, 1.01]
     )
     return fig
 
@@ -202,8 +199,7 @@ def plot_income_composition(data, anni_totali):
         yaxis_title='Reddito Reale Annuo (€ Odierni)',
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=400 # Altezza fissa
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     return fig
 
@@ -242,8 +238,7 @@ def plot_asset_allocation(data, anni_totali):
         yaxis_title='Percentuale del Patrimonio Totale',
         yaxis_tickformat='.0%',
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=400 # Altezza fissa
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     return fig
 
@@ -257,6 +252,15 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
     # Robusteza: Assicura che i dati siano un DataFrame, gestendo anche il caricamento da JSON
     if not isinstance(data, pd.DataFrame):
         data = pd.DataFrame(data)
+
+    # Correzione cruciale: dopo il caricamento da JSON, gli indici possono diventare stringhe.
+    # Dobbiamo forzarli a essere numerici per i calcoli e il plotting.
+    try:
+        data.index = pd.to_numeric(data.index)
+    except (ValueError, TypeError):
+        # Se la conversione fallisce, non possiamo plottare
+        fig.add_annotation(text="Formato dati reddito non valido dopo caricamento.", showarrow=False)
+        return fig
 
     if data.empty:
         fig.add_annotation(text="Nessun dato sul reddito disponibile.", showarrow=False)
@@ -272,14 +276,16 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
 
     # Seleziona i dati dalla pensione in poi
     data_pensione = data.iloc[start_year_index:]
-    anni_asse_x = data_pensione.index
+    
+    # FIX: Crea un asse x numerico esplicito per evitare problemi con indici non numerici.
+    anni_asse_x = np.arange(start_year_index, start_year_index + len(data_pensione))
 
-    # Calcolo percentili
-    p10 = data_pensione.quantile(0.10, axis=1)
-    p25 = data_pensione.quantile(0.25, axis=1)
-    p50 = data_pensione.quantile(0.50, axis=1)
-    p75 = data_pensione.quantile(0.75, axis=1)
-    p90 = data_pensione.quantile(0.90, axis=1)
+    # Calcolo percentili e uso di .values per passare a Plotly array numpy puliti.
+    p10 = data_pensione.quantile(0.10, axis=1).values
+    p25 = data_pensione.quantile(0.25, axis=1).values
+    p50 = data_pensione.quantile(0.50, axis=1).values
+    p75 = data_pensione.quantile(0.75, axis=1).values
+    p90 = data_pensione.quantile(0.90, axis=1).values
     
     color_fill_outer = f"rgba({hex_to_rgb('#e6550d')}, 0.2)" # Arancione per il range più ampio
     color_fill_inner = f"rgba({hex_to_rgb('#3182bd')}, 0.3)" # Blu per il range interquartile
@@ -312,8 +318,7 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
         yaxis_title="Reddito Annuo Reale (€ di oggi)",
         legend_title="Range Percentili",
         showlegend=True,
-        hovermode="x unified",
-        height=450  # Imposta un'altezza fissa per il grafico
+        hovermode="x unified"
     )
     fig.update_yaxes(tickprefix="€", tickformat=",.0f")
 
