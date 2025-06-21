@@ -431,7 +431,8 @@ def run_full_simulation(parametri):
             indici_fallimenti.append(sim)
         
         for key in tutti_i_dati_annuali.keys():
-            tutti_i_dati_annuali[key][sim, :] = risultati_run['dati_annuali'][key]
+            if key in risultati_run['dati_annuali']:
+                tutti_i_dati_annuali[key][sim, :] = risultati_run['dati_annuali'][key]
 
         contributi_totali_agg[sim] = risultati_run['totale_contributi_versati_nominale']
 
@@ -450,13 +451,25 @@ def run_full_simulation(parametri):
     rendite_fp_reali_successo = tutti_i_dati_annuali['rendite_fp_reali'][sim_di_successo_mask, :]
     pensioni_reali_successo = tutti_i_dati_annuali['pensioni_pubbliche_reali'][sim_di_successo_mask, :]
 
-    dati_per_foglio_prelievi = {}
+    # Lo scenario mediano viene sempre calcolato sulla base dei patrimoni reali finali
+    # della simulazione principale.
     median_sim_index = 0
     if len(patrimoni_reali_finale_validi) > 0:
         median_sim_index = np.argmin(np.abs(patrimoni_reali[:, -1] - np.median(patrimoni_reali_finale_validi)))
     
     dati_mediana_run = {k: v[median_sim_index] for k, v in tutti_i_dati_annuali.items()}
 
+    # --- Calcolo Statistiche Prelievi ---
+    statistiche_prelievi = {
+        'prelievo_reale_medio': 0,
+        'pensione_pubblica_reale_annua': 0,
+        'rendita_fp_reale_media': 0,
+        'totale_reale_medio_annuo': 0,
+    }
+
+    # Se si calcola il prelievo sostenibile, si fa una stima, ma i dati
+    # per la tabella di dettaglio vengono comunque dallo scenario mediano della
+    # simulazione originale (con prelievo zero).
     if calcolo_sostenibile_attivo:
         anni_accumulo = parametri['anni_inizio_prelievo']
         anni_prelievo = parametri['anni_totali'] - anni_accumulo
@@ -477,6 +490,10 @@ def run_full_simulation(parametri):
         
         # Sovrascriviamo il prelievo calcolato solo per le statistiche, non per i dati di dettaglio
         statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
+        statistiche_prelievi['pensione_pubblica_reale_annua'] = parametri['pensione_pubblica_annua']
+        # In questo scenario semplificato non calcoliamo la rendita FP per la statistica
+        statistiche_prelievi['totale_reale_medio_annuo'] = prelievo_annuo_calcolato + parametri['pensione_pubblica_annua']
+
 
     elif prelievi_reali_successo.shape[0] > 0:
         anno_inizio_prelievo = parametri['anni_inizio_prelievo']
