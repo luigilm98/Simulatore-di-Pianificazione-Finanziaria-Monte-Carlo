@@ -275,6 +275,44 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
             if patrimonio_banca > 5000: patrimonio_banca -= parametri['imposta_bollo_conto']
             
+            # Eseguiamo il Glidepath PRIMA della liquidazione del FP,
+            # per evitare che la liquidazione venga immediatamente reinvestita.
+            if parametri['attiva_glidepath']:
+                patrimonio_investibile = patrimonio_banca + patrimonio_etf
+                if patrimonio_investibile > 0:
+                    current_etf_alloc = patrimonio_etf / patrimonio_investibile
+                    target_alloc_etf = -1.0
+                    
+                    if anno_corrente >= parametri['inizio_glidepath_anni'] and anno_corrente <= parametri['fine_glidepath_anni']:
+                        if allocazione_etf_inizio_glidepath < 0:
+                            allocazione_etf_inizio_glidepath = current_etf_alloc
+                        
+                        durata = float(parametri['fine_glidepath_anni'] - parametri['inizio_glidepath_anni'])
+                        progresso = (anno_corrente - parametri['inizio_glidepath_anni']) / durata if durata > 0 else 1.0
+                        target_alloc_etf = allocazione_etf_inizio_glidepath * (1 - progresso) + parametri['allocazione_etf_finale'] * progresso
+                    
+                    elif anno_corrente > parametri['fine_glidepath_anni']:
+                        target_alloc_etf = parametri['allocazione_etf_finale']
+
+                    if target_alloc_etf >= 0:
+                        rebalance_amount = (patrimonio_investibile * target_alloc_etf) - patrimonio_etf
+                        if rebalance_amount < -1:
+                            importo_da_vendere = abs(rebalance_amount)
+                            dati_annuali['vendite_rebalance_nominali'][anno_corrente] += importo_da_vendere
+                            costo_proporzionale = (importo_da_vendere / patrimonio_etf) * etf_cost_basis if patrimonio_etf > 0 else 0
+                            plusvalenza = importo_da_vendere - costo_proporzionale
+                            tasse_da_pagare = max(0, plusvalenza * parametri['tassazione_capital_gain'])
+                            
+                            patrimonio_etf -= (importo_da_vendere)
+                            etf_cost_basis -= costo_proporzionale
+                            patrimonio_banca += (importo_da_vendere - tasse_da_pagare)
+
+                        elif rebalance_amount > 1:
+                            importo_da_comprare = min(rebalance_amount, patrimonio_banca)
+                            patrimonio_banca -= importo_da_comprare
+                            patrimonio_etf += importo_da_comprare
+                            etf_cost_basis += importo_da_comprare
+
             if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
                 # La gestione del rendimento tassato sul FP è complessa e richiede il confronto con l'anno precedente
                 # quindi la lasciamo nel blocco annuale.
@@ -315,42 +353,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     patrimonio_fp = 0
                     fp_convertito_in_rendita = True
 
-            if parametri['attiva_glidepath']:
-                patrimonio_investibile = patrimonio_banca + patrimonio_etf
-                if patrimonio_investibile > 0:
-                    current_etf_alloc = patrimonio_etf / patrimonio_investibile
-                    target_alloc_etf = -1.0
-                    
-                    if anno_corrente >= parametri['inizio_glidepath_anni'] and anno_corrente <= parametri['fine_glidepath_anni']:
-                        if allocazione_etf_inizio_glidepath < 0:
-                            allocazione_etf_inizio_glidepath = current_etf_alloc
-                        
-                        durata = float(parametri['fine_glidepath_anni'] - parametri['inizio_glidepath_anni'])
-                        progresso = (anno_corrente - parametri['inizio_glidepath_anni']) / durata if durata > 0 else 1.0
-                        target_alloc_etf = allocazione_etf_inizio_glidepath * (1 - progresso) + parametri['allocazione_etf_finale'] * progresso
-                    
-                    elif anno_corrente > parametri['fine_glidepath_anni']:
-                        target_alloc_etf = parametri['allocazione_etf_finale']
-
-                    if target_alloc_etf >= 0:
-                        rebalance_amount = (patrimonio_investibile * target_alloc_etf) - patrimonio_etf
-                        if rebalance_amount < -1:
-                            importo_da_vendere = abs(rebalance_amount)
-                            dati_annuali['vendite_rebalance_nominali'][anno_corrente] += importo_da_vendere
-                            costo_proporzionale = (importo_da_vendere / patrimonio_etf) * etf_cost_basis if patrimonio_etf > 0 else 0
-                            plusvalenza = importo_da_vendere - costo_proporzionale
-                            tasse_da_pagare = max(0, plusvalenza * parametri['tassazione_capital_gain'])
-                            
-                            patrimonio_etf -= (importo_da_vendere)
-                            etf_cost_basis -= costo_proporzionale
-                            patrimonio_banca += (importo_da_vendere - tasse_da_pagare)
-
-                        elif rebalance_amount > 1:
-                            importo_da_comprare = min(rebalance_amount, patrimonio_banca)
-                            patrimonio_banca -= importo_da_comprare
-                            patrimonio_etf += importo_da_comprare
-                            etf_cost_basis += importo_da_comprare
-                            
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
             dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
             dati_annuali['saldo_banca_reale'][anno_corrente] = patrimonio_banca / indice_prezzi
