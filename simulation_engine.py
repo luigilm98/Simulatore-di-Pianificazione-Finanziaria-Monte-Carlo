@@ -389,11 +389,24 @@ def run_full_simulation(parametri):
     fallimenti = 0
     indici_fallimenti = []
     
+    # Aggrega TUTTI i dati annuali per poter analizzare lo scenario mediano in dettaglio
     tutti_i_dati_annuali = {
         'prelievi_target_nominali': np.zeros((n_sim, num_anni)),
+        'prelievi_effettivi_nominali': np.zeros((n_sim, num_anni)),
         'prelievi_effettivi_reali': np.zeros((n_sim, num_anni)),
-        'rendite_fp_reali': np.zeros((n_sim, num_anni)),
+        'prelievi_da_banca_nominali': np.zeros((n_sim, num_anni)),
+        'prelievi_da_etf_nominali': np.zeros((n_sim, num_anni)),
+        'vendite_rebalance_nominali': np.zeros((n_sim, num_anni)),
+        'fp_liquidato_nominale': np.zeros((n_sim, num_anni)),
+        'pensioni_pubbliche_nominali': np.zeros((n_sim, num_anni)),
         'pensioni_pubbliche_reali': np.zeros((n_sim, num_anni)),
+        'rendite_fp_nominali': np.zeros((n_sim, num_anni)),
+        'rendite_fp_reali': np.zeros((n_sim, num_anni)),
+        'saldo_banca_nominale': np.zeros((n_sim, num_anni)),
+        'saldo_etf_nominale': np.zeros((n_sim, num_anni)),
+        'saldo_banca_reale': np.zeros((n_sim, num_anni)),
+        'saldo_etf_reale': np.zeros((n_sim, num_anni)),
+        'saldo_fp_nominale': np.zeros((n_sim, num_anni)),
         'saldo_fp_reale': np.zeros((n_sim, num_anni)),
         'reddito_totale_reale': np.zeros((n_sim, num_anni))
     }
