@@ -222,11 +222,17 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
     """Crea un grafico a 'cono' per il reddito reale annuo."""
     fig = go.Figure()
     start_index = int(anni_inizio_prelievo)
-    if start_index >= data.shape[1]:
+    
+    # La simulazione dura N anni, quindi i dati sono calcolati per gli anni da 0 a N-1.
+    # Il grafico deve quindi mostrare i dati fino all'anno N-1.
+    end_index = int(anni_totali)
+
+    if start_index >= end_index:
+        # Non c'è un periodo di decumulo da mostrare
         return fig 
 
-    anni_asse_x = np.arange(start_index, anni_totali + 1)
-    data_decumulo = data[:, start_index:]
+    anni_asse_x = np.arange(start_index, end_index) # Es: da 35 a 79 se anni_totali=80
+    data_decumulo = data[:, start_index:end_index] # Seleziona le colonne corrispondenti
 
     p10 = np.percentile(data_decumulo, 10, axis=0)
     p25 = np.percentile(data_decumulo, 25, axis=0)
