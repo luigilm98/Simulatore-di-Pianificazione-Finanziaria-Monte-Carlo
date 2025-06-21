@@ -72,7 +72,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'saldo_banca_reale': np.zeros(num_anni),
         'saldo_etf_reale': np.zeros(num_anni),
         'saldo_fp_nominale': np.zeros(num_anni),
-        'saldo_fp_reale': np.zeros(num_anni)
+        'saldo_fp_reale': np.zeros(num_anni),
+        'reddito_totale_reale': np.zeros(num_anni)
     }
 
     # Stato della simulazione
@@ -238,6 +239,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                  dati_annuali['rendite_fp_reali'][anno_corrente] = rendita_annua_reale_fp
                  dati_annuali['rendite_fp_nominali'][anno_corrente] = rendita_annua_reale_fp * indice_prezzi
 
+            dati_annuali['reddito_totale_reale'][anno_corrente] = (
+                dati_annuali['prelievi_effettivi_reali'][anno_corrente] +
+                dati_annuali['pensioni_pubbliche_reali'][anno_corrente] +
+                dati_annuali['rendite_fp_reali'][anno_corrente]
+            )
+
             if patrimonio_banca > 5000: patrimonio_banca -= parametri['imposta_bollo_conto']
             if patrimonio_etf > 0:
                 patrimonio_etf -= patrimonio_etf * parametri['imposta_bollo_titoli']
@@ -380,6 +387,7 @@ def run_full_simulation(parametri):
     rendite_fp_annuali_reali_agg = np.zeros((n_sim, num_anni))
     pensioni_annuali_reali_agg = np.zeros((n_sim, num_anni))
     saldi_fp_reali_agg = np.zeros((n_sim, num_anni))
+    redditi_totali_reali_agg = np.zeros((n_sim, num_anni))
 
     prelievo_annuo_da_usare = parametri['prelievo_annuo']
     calcolo_sostenibile_attivo = parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0
@@ -402,6 +410,7 @@ def run_full_simulation(parametri):
         rendite_fp_annuali_reali_agg[sim, :] = risultati_run['dati_annuali']['rendite_fp_reali']
         pensioni_annuali_reali_agg[sim, :] = risultati_run['dati_annuali']['pensioni_pubbliche_reali']
         saldi_fp_reali_agg[sim, :] = risultati_run['dati_annuali']['saldo_fp_reale']
+        redditi_totali_reali_agg[sim, :] = risultati_run['dati_annuali']['reddito_totale_reale']
 
     # 3. CALCOLO STATISTICHE E SCENARIO MEDIANO
     prob_fallimento = fallimenti / n_sim
@@ -488,6 +497,7 @@ def run_full_simulation(parametri):
         "dati_grafici_principali": {
             "nominale": patrimoni,
             "reale": patrimoni_reali,
+            "reddito_reale_annuo": redditi_totali_reali_agg
         },
         "dati_grafici_avanzati": {
             "dati_mediana": dati_per_foglio_prelievi

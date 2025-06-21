@@ -224,6 +224,101 @@ def plot_asset_allocation(data, anni_totali):
     )
     return fig
 
+def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
+    """Crea un grafico a 'cono' per il reddito reale annuo."""
+    fig = go.Figure()
+    # Mostra i dati solo a partire dall'anno di inizio prelievo
+    start_index = int(anni_inizio_prelievo)
+    if start_index >= data.shape[1]:
+        return fig # Non c'è nulla da plottare se l'inizio è oltre l'orizzonte
+
+    anni_asse_x = np.arange(start_index, anni_totali + 1)
+    data_decumulo = data[:, start_index:]
+
+    p10 = np.percentile(data_decumulo, 10, axis=0)
+    p25 = np.percentile(data_decumulo, 25, axis=0)
+    median_data = np.median(data_decumulo, axis=0)
+    p75 = np.percentile(data_decumulo, 75, axis=0)
+    p90 = np.percentile(data_decumulo, 90, axis=0)
+
+    # Area 10-90
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
+        y=np.concatenate([p90, p10[::-1]]),
+        fill='toself',
+        fillcolor='rgba(0, 176, 246, 0.2)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='10-90 Percentile',
+        hoverinfo='none'
+    ))
+    # Area 25-75
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
+        y=np.concatenate([p75, p25[::-1]]),
+        fill='toself',
+        fillcolor='rgba(0, 176, 246, 0.4)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='25-75 Percentile',
+        hoverinfo='none'
+    ))
+    # Mediana
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=median_data, mode='lines',
+        name='Reddito Mediano (50°)',
+        line={'width': 3, 'color': '#00B0F0'},
+        hovertemplate='Anno %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
+    ))
+
+    fig.update_layout(
+        title="Quale Sarà il Mio Tenore di Vita? (Reddito Annuo Reale)",
+        xaxis_title="Anni",
+        yaxis_title="Reddito Annuo Reale (€ di oggi)",
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    return fig
+
+def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
+    """Mostra un'analisi degli scenari peggiori (es. 10% dei casi)."""
+    fig = go.Figure()
+    
+    # Identifica l'indice del 10° percentile dei patrimoni finali
+    soglia_peggiore = np.percentile(patrimoni_finali, 10)
+    indici_peggiori = np.where(patrimoni_finali <= soglia_peggiore)[0]
+    
+    anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
+    
+    if len(indici_peggiori) > 0:
+        # Mostra fino a un massimo di 50 linee per non affollare
+        indici_da_mostrare = np.random.choice(indici_peggiori, size=min(50, len(indici_peggiori)), replace=False)
+        
+        for i in indici_da_mostrare:
+            fig.add_trace(go.Scatter(
+                x=anni_asse_x, y=data[i, :], mode='lines',
+                line={'width': 1, 'color': 'rgba(255, 82, 82, 0.5)'},
+                hoverinfo='none', showlegend=False
+            ))
+
+    # Aggiungi una linea mediana degli scenari peggiori per dare un riferimento
+    mediana_scenari_peggiori = np.median(data[indici_peggiori, :], axis=0)
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=mediana_scenari_peggiori, mode='lines',
+        name='Mediana Scenari Peggiori',
+        line={'width': 2.5, 'color': '#FF5252'},
+        hovertemplate='Anno %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
+    ))
+            
+    fig.update_layout(
+        title="Come si Comporta il Piano negli Scenari Peggiori? (Analisi del Rischio)",
+        xaxis_title="Anni",
+        yaxis_title="Patrimonio Reale (€ di oggi)",
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
+    )
+    return fig
 
 # --- Configurazione Pagina ---
 st.set_page_config(
@@ -577,23 +672,42 @@ else:
         st.markdown(testo_decumulo)
         st.markdown("---")
 
-        dati_avanzati = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+        dati_principali = st.session_state.risultati['dati_grafici_principali']
 
-        st.plotly_chart(plot_histogram(stats['patrimoni_reali_finali'], params['anni_totali']), use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Le barre più alte indicano le fasce di ricchezza finale più probabili, dandoti un'idea della variabilità dei risultati.</div>", unsafe_allow_html=True)
+        # --- Grafico 1: Cono del Reddito ---
+        st.subheader("📊 Quale sarà il mio tenore di vita in pensione?")
+        st.markdown("""
+        Questo grafico è forse il più importante per la tua pianificazione. Non ti mostra solo un numero, ma **l'intera gamma dei possibili redditi annuali reali** (cioè, il potere d'acquisto di oggi) che potrai avere durante la pensione.
+
+        - **La linea blu centrale (Mediana):** È lo scenario più probabile, il tuo obiettivo realistico.
+        - **L'area azzurra (25°-75° percentile):** È l'intervallo di reddito 'plausibile'. C'è una buona probabilità che il tuo tenore di vita rientri in questa fascia.
+        - **L'area più chiara (10°-90° percentile):** Rappresenta gli estremi. La parte alta è lo scenario da sogno, la parte bassa è lo scenario più pessimistico ma comunque possibile. Usala per capire quale potrebbe essere il tuo reddito minimo in caso di andamenti di mercato molto sfortunati.
+        """)
+        fig_reddito = plot_income_cone_chart(
+            dati_principali['reddito_reale_annuo'], 
+            params['anni_totali'],
+            params['anni_inizio_prelievo']
+        )
+        st.plotly_chart(fig_reddito, use_container_width=True)
         st.markdown("---")
 
-        st.plotly_chart(plot_success_probability(stats['successo_per_anno'], params['anni_totali']), use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questa linea è il tuo 'indicatore di tranquillità'. Mostra la percentuale di scenari in cui non hai ancora finito i soldi.</div>", unsafe_allow_html=True)
-        st.markdown("---")
+        # --- Grafico 2: Analisi Scenari Peggiori ---
+        st.subheader("🔥 Il piano sopravviverà a una crisi di mercato iniziale?")
+        st.markdown("""
+        Questo grafico è il *crash test* del tuo piano pensionistico. Affronta la paura più grande di ogni pensionato: il **Rischio da Sequenza dei Rendimenti**. In parole semplici, una forte crisi di mercato **proprio all'inizio della pensione** è molto più dannosa di una che avviene 20 anni dopo, perché erode il capitale da cui stai iniziando a prelevare, dandogli meno tempo per recuperare.
+
+        Qui isoliamo il **10% degli scenari più sfortunati** della simulazione. Ogni linea rossa sottile rappresenta l'evoluzione del patrimonio in uno di questi futuri avversi.
         
-        st.plotly_chart(plot_income_composition(dati_avanzati, params['anni_totali']), use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Mostra da dove arriveranno i tuoi soldi per vivere (prelievi, pensione pubblica, rendita FP) nello scenario mediano.</div>", unsafe_allow_html=True)
-        st.markdown("---")
-        
-        st.plotly_chart(plot_asset_allocation(dati_avanzati, params['anni_totali']), use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Rende visibile la strategia 'Glidepath', mostrando come la % di rischio (ETF) diminuisce con l'avanzare dell'età.</div>", unsafe_allow_html=True)
-    
+        - **Cosa osservare:** Il tuo piano è robusto se, anche in questi scenari, il patrimonio non si azzera troppo in fretta. Se vedi che molte linee crollano a zero rapidamente, potrebbe essere un segnale che il tuo piano è troppo aggressivo o la tua percentuale di prelievo troppo alta per resistere a una "tempesta perfetta" iniziale.
+        """)
+        fig_worst = plot_worst_scenarios_chart(
+            dati_principali['reale'],
+            st.session_state.risultati['statistiche']['patrimoni_reali_finali'],
+            params['anni_totali']
+        )
+        fig_worst.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        st.plotly_chart(fig_worst, use_container_width=True)
+
     with tab_dettaglio:
         st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")
         st.markdown("Questa tabella è la 'radiografia' dello scenario mediano (il più probabile). Mostra, anno per anno, tutti i flussi finanziari.")
