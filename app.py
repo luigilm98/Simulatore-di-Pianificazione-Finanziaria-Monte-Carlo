@@ -225,58 +225,70 @@ def plot_asset_allocation(data, anni_totali):
     return fig
 
 def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
-    """Crea un grafico a 'cono' per il reddito reale annuo."""
+    """
+    Crea un grafico a cono per il reddito reale annuo durante la fase di pensione.
+    'data' è un DataFrame con anni come indice e simulazioni come colonne.
+    """
     fig = go.Figure()
-    # Mostra i dati solo a partire dall'anno di inizio prelievo
-    start_index = int(anni_inizio_prelievo)
-    if start_index >= data.shape[1]:
-        return fig # Non c'è nulla da plottare se l'inizio è oltre l'orizzonte
 
-    anni_asse_x = np.arange(start_index, anni_totali + 1)
-    data_decumulo = data[:, start_index:]
+    if data.empty:
+        fig.add_annotation(text="Nessun dato sul reddito disponibile.", showarrow=False)
+        return fig
 
-    p10 = np.percentile(data_decumulo, 10, axis=0)
-    p25 = np.percentile(data_decumulo, 25, axis=0)
-    median_data = np.median(data_decumulo, axis=0)
-    p75 = np.percentile(data_decumulo, 75, axis=0)
-    p90 = np.percentile(data_decumulo, 90, axis=0)
+    # L'indice di partenza è in ANNI
+    start_year_index = anni_inizio_prelievo
 
-    # Area 10-90
+    # Se la fase di prelievo non inizia entro l'orizzonte, non mostrare nulla.
+    if start_year_index >= len(data.index):
+        fig.add_annotation(text="La fase di prelievo inizia oltre l'orizzonte temporale.", showarrow=False)
+        return fig
+
+    # Seleziona i dati dalla pensione in poi
+    data_pensione = data.iloc[start_year_index:]
+    anni_asse_x = data_pensione.index
+
+    # Calcolo percentili
+    p10 = data_pensione.quantile(0.10, axis=1)
+    p25 = data_pensione.quantile(0.25, axis=1)
+    p50 = data_pensione.quantile(0.50, axis=1)
+    p75 = data_pensione.quantile(0.75, axis=1)
+    p90 = data_pensione.quantile(0.90, axis=1)
+    
+    color_fill_outer = f"rgba({hex_to_rgb('#e6550d')}, 0.2)" # Arancione per il range più ampio
+    color_fill_inner = f"rgba({hex_to_rgb('#3182bd')}, 0.3)" # Blu per il range interquartile
+    color_median = '#3182bd' # Blu scuro per la mediana
+
+    # Grafico
     fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p90, p10[::-1]]),
-        fill='toself',
-        fillcolor='rgba(0, 176, 246, 0.2)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='10-90 Percentile',
-        hoverinfo='none'
+        x=anni_asse_x, y=p90, fill=None, mode='lines', line_color=color_fill_outer, name='90° percentile', showlegend=False
     ))
-    # Area 25-75
     fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p75, p25[::-1]]),
-        fill='toself',
-        fillcolor='rgba(0, 176, 246, 0.4)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='25-75 Percentile',
-        hoverinfo='none'
+        x=anni_asse_x, y=p10, fill='tonexty', mode='lines', line_color=color_fill_outer, name='10°-90° percentile',
+        hovertemplate='Anno %{x}: €%{y:,.0f}<extra></extra>'
     ))
-    # Mediana
     fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_data, mode='lines',
-        name='Reddito Mediano (50°)',
-        line={'width': 3, 'color': '#00B0F0'},
-        hovertemplate='Anno %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
+        x=anni_asse_x, y=p75, fill=None, mode='lines', line_color=color_fill_inner, name='75° percentile', showlegend=False
+    ))
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=p25, fill='tonexty', mode='lines', line_color=color_fill_inner, name='25°-75° percentile (IQR)',
+        hovertemplate='Anno %{x}: €%{y:,.0f}<extra></extra>'
+    ))
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=p50, mode='lines', line=dict(color=color_median, width=3), name='Mediana (50°)',
+        hovertemplate='Anno %{x}: €%{y:,.0f}<extra></extra>'
     ))
 
+    # Layout
     fig.update_layout(
-        title="Quale Sarà il Mio Tenore di Vita? (Reddito Annuo Reale)",
-        xaxis_title="Anni",
+        title="Distribuzione del Reddito Annuo Reale in Pensione",
+        xaxis_title="Anni di simulazione",
         yaxis_title="Reddito Annuo Reale (€ di oggi)",
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend_title="Range Percentili",
+        showlegend=True,
+        hovermode="x unified"
     )
+    fig.update_yaxes(tickprefix="€", tickformat=",.0f")
+
     return fig
 
 def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
@@ -438,8 +450,11 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
     # Carica i dati del portafoglio dallo stato della sessione o usa i default
     if 'etf_portfolio' not in st.session_state:
         st.session_state.etf_portfolio = p.get('etf_portfolio', pd.DataFrame([
-            {'ETF': 'Azionario Globale', 'Allocazione (%)': 80, 'TER (%)': 0.22, 'Rendimento Atteso (%)': 8.0, 'Volatilità Attesa (%)': 15.0},
-            {'ETF': 'Obbligazionario Globale', 'Allocazione (%)': 20, 'TER (%)': 0.18, 'Rendimento Atteso (%)': 2.5, 'Volatilità Attesa (%)': 5.0},
+            {'ETF': 'Vanguard FTSE All-World UCITS ETF (USD) Accumulating', 'Ticker': 'VWCE', 'Allocazione (%)': 90.0, 'TER (%)': 0.22, 'Rendimento Atteso (%)': 8.0, 'Volatilità Attesa (%)': 15.0},
+            {'ETF': 'Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture', 'Ticker': 'CRB', 'Allocazione (%)': 3.0, 'TER (%)': 0.30, 'Rendimento Atteso (%)': 5.0, 'Volatilità Attesa (%)': 18.0},
+            {'ETF': 'iShares MSCI EM UCITS ETF (Acc)', 'Ticker': 'EIMI', 'Allocazione (%)': 3.0, 'TER (%)': 0.18, 'Rendimento Atteso (%)': 9.0, 'Volatilità Attesa (%)': 22.0},
+            {'ETF': 'Amundi MSCI Japan UCITS ETF Acc', 'Ticker': 'SJP', 'Allocazione (%)': 3.0, 'TER (%)': 0.12, 'Rendimento Atteso (%)': 7.0, 'Volatilità Attesa (%)': 16.0},
+            {'ETF': 'iShares Automation & Robotics UCITS ETF', 'Ticker': 'RBOT', 'Allocazione (%)': 1.0, 'TER (%)': 0.40, 'Rendimento Atteso (%)': 12.0, 'Volatilità Attesa (%)': 25.0},
         ]))
 
     edited_df = st.data_editor(st.session_state.etf_portfolio, num_rows="dynamic", key="etf_editor")
@@ -658,81 +673,41 @@ else:
     # --- Cruscotto Strategico ---
     st.header("Cruscotto Strategico Riepilogativo")
     
-    # Definisco stats_prelievi prima di usarlo
     stats_prelievi = st.session_state.risultati['statistiche_prelievi']
     
-    prob_successo = 1 - stats['probabilita_fallimento']
-    tenore_vita_mediano = stats_prelievi['totale_reale_medio_annuo']
-    patrimonio_reale_finale = stats['patrimonio_finale_mediano_reale']
-
-    def get_color_for_probability(p):
-        if p >= 0.85: return "green"
-        if p >= 0.70: return "orange"
-        return "red"
-
     col1, col2, col3 = st.columns(3)
     with col1:
-        fig = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = prob_successo * 100,
-            title = {'text': "Probabilità di Successo"},
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            gauge = {
-                'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-                'bar': {'color': get_color_for_probability(prob_successo)},
-                'steps' : [
-                    {'range': [0, 70], 'color': 'rgba(255, 0, 0, 0.1)'},
-                    {'range': [70, 85], 'color': 'rgba(255, 165, 0, 0.1)'},
-                    {'range': [85, 100], 'color': 'rgba(0, 128, 0, 0.1)'}],
-                'threshold' : {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 85}
-            }
-        ))
-        fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig, use_container_width=True)
-
+        prob_successo = 1 - stats['probabilita_fallimento']
+        st.metric(
+            label="Probabilità di Successo",
+            value=f"{prob_successo:.1%}",
+            help="La percentuale di simulazioni in cui il patrimonio non si è esaurito prima della fine dell'orizzonte temporale."
+        )
     with col2:
-        fig = go.Figure(go.Indicator(
-            mode = "number",
-            value = tenore_vita_mediano,
-            title = {"text": "Tenore di Vita Annuo<br>(Reale Mediano)"},
-            number = {'prefix': "€", 'valueformat': ',.0f'}
-        ))
-        fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig, use_container_width=True)
-
+        tenore_vita_mediano = stats_prelievi['totale_reale_medio_annuo']
+        st.metric(
+            label="Tenore di Vita Annuo Mediano",
+            value=f"€ {tenore_vita_mediano:,.0f}",
+            help="Rappresenta il tenore di vita **mediano** che puoi aspettarti durante gli anni della pensione. Include i prelievi dal patrimonio, la pensione pubblica e la rendita del fondo pensione. Il valore è espresso in potere d'acquisto di oggi."
+        )
     with col3:
-        fig = go.Figure(go.Indicator(
-            mode = "number",
-            value = patrimonio_reale_finale,
-            title = {"text": "Patrimonio Finale<br>(Reale Mediano)"},
-            number = {'prefix': "€", 'valueformat': ',.0f'}
-        ))
-        fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        patrimonio_reale_finale = stats['patrimonio_finale_mediano_reale']
+        st.metric(
+            label="Patrimonio Finale Mediano (Reale)",
+            value=f"€ {patrimonio_reale_finale:,.0f}",
+            help="Il potere d'acquisto mediano del tuo patrimonio a fine piano, espresso in Euro di oggi. La metrica più importante."
+        )
 
-
-    # --- Riepilogo Statistico ---
-    st.header("Riepilogo Statistico Chiave")
-
-    st.write("---")
-    st.markdown("##### Capitale Nominale")
+    st.markdown("---")
+    
+    # --- Riepilogo Statistiche Principali ---
+    st.subheader("Riepilogo Statistiche")
+    
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric(
-        "Patrimonio Iniziale", f"€ {stats['patrimonio_iniziale']:,.0f}",
-        help="La somma del capitale che hai all'inizio della simulazione."
-    )
-    col2.metric(
-        "Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}",
-        help="Il risultato che si trova esattamente nel mezzo di tutti gli scenari. È la stima più realistica."
-    )
-    col3.metric(
-        "Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}",
-        help="Lo scenario 'da sogno'. C'è solo un 10% di probabilità che le cose vadano meglio di così."
-    )
-    col4.metric(
-        "Patrimonio Finale (Peggior 10% - 10°)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}",
-        help="Lo scenario 'notte insonne'. C'è un 10% di probabilità che le cose vadano peggio di così."
-    )
+    col1.metric("Patrimonio Iniziale", f"€ {stats['patrimonio_iniziale']:,.0f}")
+    col2.metric("Patrimonio Finale Mediano (Nominale)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}")
+    col3.metric("Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}")
+    col4.metric("Patrimonio Finale (Peggior 10% - 10°)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}")
 
     st.write("---")
     st.markdown("##### Capitale Reale & Rischio")
@@ -903,10 +878,14 @@ else:
         # Riorganizzo le colonne per la visualizzazione
         colonne_visualizzate = [
             'Anno', 'Età', 'Obiettivo Prelievo (Nom.)', 'Prelievo Effettivo (Nom.)', 
-            'Fonte: Conto Corrente', 'Fonte: Vendita ETF', 'Vendita ETF (Rebalance)', 
-            'Liquidazione Capitale FP', 'Prelievo Effettivo (Reale)', 'Pensione Pubblica (Reale)', 
-            'Rendita FP (Reale)', 'Entrate Anno (Reali)', 'Saldo Conto Fine Anno (Reale)', 
-            'Valore ETF Fine Anno (Reale)'
+            'Fonte: Conto vs Fonte ETF': st.column_config.NumberColumn(format="€ %.0f"),
+            'Liquidazione Capitale FP': st.column_config.NumberColumn(format="€ %.0f"),
+            'Prelievo Effettivo (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
+            'Pensione Pubblica (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
+            'Rendita FP (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
+            'Entrate Anno (Reali)': st.column_config.NumberColumn(format="€ %.0f", help="La somma di tutte le entrate reali. Questa cifra misura il tuo vero tenore di vita annuale."),
+            'Saldo Conto Fine Anno (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
+            'Valore ETF Fine Anno (Reale)': st.column_config.NumberColumn(format="€ %.0f"),
         ]
         
         st.dataframe(
@@ -915,9 +894,7 @@ else:
             column_config={
                 "Obiettivo Prelievo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
                 "Prelievo Effettivo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Fonte: Conto Corrente": st.column_config.NumberColumn(format="€ %.0f"),
-                "Fonte: Vendita ETF": st.column_config.NumberColumn(format="€ %.0f"),
-                "Vendita ETF (Rebalance)": st.column_config.NumberColumn(format="€ %.0f"),
+                "Fonte Conto vs Fonte ETF": st.column_config.NumberColumn(format="€ %.0f"),
                 "Liquidazione Capitale FP": st.column_config.NumberColumn(format="€ %.0f"),
                 "Prelievo Effettivo (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
                 "Pensione Pubblica (Reale)": st.column_config.NumberColumn(format="€ %.0f"),

@@ -160,27 +160,20 @@ def _esegui_una_simulazione(params):
         prelievo_effettivo_mese = prelievo_da_cc + vendita_netta_etf
 
         # 6. Applica rendimenti di mercato e inflazione
-        # Formula corretta per la distribuzione lognormale
-        # mu = ln(1 + rendimento_medio) - 0.5 * sigma^2
-        # sigma = ln(1 + volatilita)
-        mu_portfolio = np.log(1 + rendimento_medio_portfolio) - 0.5 * (np.log(1 + volatilita_portfolio))**2
-        sigma_portfolio = np.log(1 + volatilita_portfolio)
-        
-        # Converti in parametri mensili
-        mu_mensile = mu_portfolio / 12
-        sigma_mensile = sigma_portfolio / np.sqrt(12)
-        
-        rendimento_mese = np.random.lognormal(mu_mensile, sigma_mensile)
+        # Ripristino la formula corretta per la Geometric Brownian Motion
+        rendimento_mese = np.random.lognormal(
+            rendimento_medio_portfolio / 12 - 0.5 * (volatilita_portfolio / np.sqrt(12))**2, 
+            volatilita_portfolio / np.sqrt(12)
+        )
         stato['patrimonio_etf'] *= rendimento_mese
 
         if params['usa_fp'] and not stato['fp_liquidato']:
-             # Stesso calcolo per il fondo pensione
-             mu_fp = np.log(1 + params['fp_rendimento_netto']) - 0.5 * (np.log(1 + 0.05))**2
-             sigma_fp = np.log(1 + 0.05)
-             mu_fp_mensile = mu_fp / 12
-             sigma_fp_mensile = sigma_fp / np.sqrt(12)
-             
-             rendimento_fp_mese = np.random.lognormal(mu_fp_mensile, sigma_fp_mensile)
+             # Assumiamo una volatilità fissa del 5% per il fondo pensione come prima
+             volatilita_fp = 0.05 
+             rendimento_fp_mese = np.random.lognormal(
+                 params['fp_rendimento_netto'] / 12 - 0.5 * (volatilita_fp / np.sqrt(12))**2, 
+                 volatilita_fp / np.sqrt(12)
+             )
              stato['fp_valore'] *= rendimento_fp_mese
         
         stato['indice_prezzi'] *= (1 + np.random.normal(params['inflazione'] / 12, 0.005))
@@ -270,11 +263,13 @@ def run_full_simulation(params):
     tutti_i_risultati_mensili = []
     lista_df_dettaglio = []
     tutti_i_risultati_nominali = []
+    tutti_i_redditi_reali_annui = []  # Correzione: raccoglie tutti i redditi
 
     for i in range(params['n_simulazioni']):
         patrimonio_reale, patrimonio_nominale, df_dettaglio = _esegui_una_simulazione(params)
         tutti_i_risultati_mensili.append(patrimonio_reale)
         tutti_i_risultati_nominali.append(patrimonio_nominale)
+        tutti_i_redditi_reali_annui.append(df_dettaglio['totale_entrate_reali']) # Correzione
         
         if i == 0: # Salva solo il dettaglio della prima simulazione per ora
             lista_df_dettaglio.append(df_dettaglio)
@@ -285,6 +280,10 @@ def run_full_simulation(params):
     df_risultati_nominali = pd.DataFrame(tutti_i_risultati_nominali).transpose()
     df_risultati_nominali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
     
+    # Correzione: Crea un DataFrame con i redditi di tutte le simulazioni
+    df_redditi_reali_annui = pd.DataFrame(tutti_i_redditi_reali_annui).transpose()
+    df_redditi_reali_annui.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
+
     # Calcolo statistiche principali
     patrimonio_iniziale = params['capitale_iniziale'] + params['etf_iniziale']
     patrimoni_reali_finali = df_risultati_reali.iloc[-1]
@@ -332,18 +331,29 @@ def run_full_simulation(params):
         'percentile_90': df_risultati_reali.quantile(0.90, axis=1),
     }
 
-    # Calcolo statistiche prelievi (dalla prima simulazione)
+    # Calcolo statistiche prelievi
     df_prelievi = lista_df_dettaglio[0] if lista_df_dettaglio else pd.DataFrame()
     
+    # Calcolo tenore di vita mediano da TUTTE le simulazioni
+    totale_reale_medio_annuo_mediano = 0
+    if not df_redditi_reali_annui.empty:
+        anni_pensione_start_index = params['anni_inizio_prelievo']
+        if anni_pensione_start_index < len(df_redditi_reali_annui.index):
+            redditi_in_pensione = df_redditi_reali_annui.iloc[anni_pensione_start_index:]
+            # Evita di calcolare la media su colonne vuote se la pensione dura 0 anni
+            if not redditi_in_pensione.empty:
+                medie_redditi_per_simulazione = redditi_in_pensione.mean(axis=0)
+                totale_reale_medio_annuo_mediano = medie_redditi_per_simulazione.median()
+
     if not df_prelievi.empty:
-        # Filtra solo gli anni di pensione
+        # Filtra solo gli anni di pensione per le statistiche della singola sim (mediana)
         anni_pensione = df_prelievi[df_prelievi['eta'] >= (params['eta_iniziale'] + params['anni_inizio_prelievo'])]
         
         stats_prelievi = {
-            'totale_reale_medio_annuo': df_prelievi['totale_entrate_reali'].mean(),
-            'prelievo_reale_medio': anni_pensione['prelievo_reale_effettivo'].mean() if not anni_pensione.empty else 0,
-            'pensione_pubblica_reale_annua': df_prelievi['pensione_pubblica_reale'].mean(),
-            'rendita_fp_reale_media': df_prelievi['rendita_fp_reale'].mean()
+            'totale_reale_medio_annuo': totale_reale_medio_annuo_mediano, # Metrica corretta, usando la mediana di tutte le simulazioni
+            'prelievo_reale_medio': anni_pensione['prelievo_reale_effettivo'].mean() if not anni_pensione.empty else 0, # Dalla prima sim
+            'pensione_pubblica_reale_annua': df_prelievi['pensione_pubblica_reale'].mean(), # Dalla prima sim
+            'rendita_fp_reale_media': df_prelievi['rendita_fp_reale'].mean() # Dalla prima sim
         }
     else:
         stats_prelievi = {
@@ -357,7 +367,7 @@ def run_full_simulation(params):
     dati_grafici_principali = {
         'reale': df_risultati_reali,
         'nominale': df_risultati_nominali,
-        'reddito_reale_annuo': df_prelievi['totale_entrate_reali'] if not df_prelievi.empty else pd.Series()
+        'reddito_reale_annuo': df_redditi_reali_annui # Correzione: passa il DataFrame completo
     }
     
     dati_grafici_avanzati = {
