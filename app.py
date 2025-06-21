@@ -75,17 +75,35 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
+def get_color_for_probability(p):
+    if p >= 0.85: return "green"
+    if p >= 0.70: return "orange"
+    return "red"
+
 def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali):
     """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
-    anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
+    
+    # Robusteza: Assicura che i dati siano un DataFrame, gestendo anche il caricamento da JSON
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
 
-    # Calcolo percentili
-    p10 = np.percentile(data, 10, axis=0)
-    p25 = np.percentile(data, 25, axis=0)
-    median_data = np.median(data, axis=0)
-    p75 = np.percentile(data, 75, axis=0)
-    p90 = np.percentile(data, 90, axis=0)
+    # Se i dati sono vuoti dopo la conversione, esci per evitare errori
+    if data.empty:
+        fig.add_annotation(text="Nessun dato patrimoniale disponibile.", showarrow=False)
+        return fig
+
+    # L'engine produce dati con shape (mesi, simulazioni).
+    # L'asse X deve avere una lunghezza pari al numero di righe (i punti temporali).
+    anni_asse_x = np.linspace(0, anni_totali, data.shape[0])
+
+    # Calcolo percentili lungo l'asse delle simulazioni (axis=1) per ogni punto nel tempo.
+    # Questo è il modo corretto per ottenere l'intervallo di confidenza nel tempo.
+    p10 = data.quantile(0.10, axis=1)
+    p25 = data.quantile(0.25, axis=1)
+    median_data = data.median(axis=1)
+    p75 = data.quantile(0.75, axis=1)
+    p90 = data.quantile(0.90, axis=1)
 
     rgb_fill = hex_to_rgb(color_fill)
 
@@ -230,6 +248,10 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
     'data' è un DataFrame con anni come indice e simulazioni come colonne.
     """
     fig = go.Figure()
+
+    # Robusteza: Assicura che i dati siano un DataFrame, gestendo anche il caricamento da JSON
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
 
     if data.empty:
         fig.add_annotation(text="Nessun dato sul reddito disponibile.", showarrow=False)
@@ -450,11 +472,11 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
     # Carica i dati del portafoglio dallo stato della sessione o usa i default
     if 'etf_portfolio' not in st.session_state:
         st.session_state.etf_portfolio = p.get('etf_portfolio', pd.DataFrame([
-            {'ETF': 'Vanguard FTSE All-World UCITS ETF (USD) Accumulating', 'Ticker': 'VWCE', 'Allocazione (%)': 90.0, 'TER (%)': 0.22, 'Rendimento Atteso (%)': 8.0, 'Volatilità Attesa (%)': 15.0},
-            {'ETF': 'Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture', 'Ticker': 'CRB', 'Allocazione (%)': 3.0, 'TER (%)': 0.30, 'Rendimento Atteso (%)': 5.0, 'Volatilità Attesa (%)': 18.0},
-            {'ETF': 'iShares MSCI EM UCITS ETF (Acc)', 'Ticker': 'EIMI', 'Allocazione (%)': 3.0, 'TER (%)': 0.18, 'Rendimento Atteso (%)': 9.0, 'Volatilità Attesa (%)': 22.0},
-            {'ETF': 'Amundi MSCI Japan UCITS ETF Acc', 'Ticker': 'SJP', 'Allocazione (%)': 3.0, 'TER (%)': 0.12, 'Rendimento Atteso (%)': 7.0, 'Volatilità Attesa (%)': 16.0},
-            {'ETF': 'iShares Automation & Robotics UCITS ETF', 'Ticker': 'RBOT', 'Allocazione (%)': 1.0, 'TER (%)': 0.40, 'Rendimento Atteso (%)': 12.0, 'Volatilità Attesa (%)': 25.0},
+            {'ETF': 'Vanguard FTSE All-World (VWCE)', 'Allocazione (%)': 90.0, 'TER (%)': 0.22, 'Rendimento Atteso (%)': 8.0, 'Volatilità Attesa (%)': 15.0},
+            {'ETF': 'Commodities (Equal-Weight)', 'Allocazione (%)': 3.0, 'TER (%)': 0.30, 'Rendimento Atteso (%)': 5.0, 'Volatilità Attesa (%)': 18.0},
+            {'ETF': 'MSCI Emerging Markets (EIMI)', 'Allocazione (%)': 3.0, 'TER (%)': 0.18, 'Rendimento Atteso (%)': 9.0, 'Volatilità Attesa (%)': 22.0},
+            {'ETF': 'MSCI Japan (SJP)', 'Allocazione (%)': 3.0, 'TER (%)': 0.12, 'Rendimento Atteso (%)': 7.0, 'Volatilità Attesa (%)': 16.0},
+            {'ETF': 'Automation & Robotics (RBOT)', 'Allocazione (%)': 1.0, 'TER (%)': 0.40, 'Rendimento Atteso (%)': 12.0, 'Volatilità Attesa (%)': 25.0},
         ]))
 
     edited_df = st.data_editor(st.session_state.etf_portfolio, num_rows="dynamic", key="etf_editor")
@@ -676,27 +698,44 @@ else:
     stats_prelievi = st.session_state.risultati['statistiche_prelievi']
     
     col1, col2, col3 = st.columns(3)
+    
     with col1:
         prob_successo = 1 - stats['probabilita_fallimento']
-        st.metric(
-            label="Probabilità di Successo",
-            value=f"{prob_successo:.1%}",
-            help="La percentuale di simulazioni in cui il patrimonio non si è esaurito prima della fine dell'orizzonte temporale."
-        )
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = prob_successo * 100,
+            title = {'text': "Probabilità di Successo"},
+            gauge = {
+                'axis': {'range': [None, 100]},
+                'bar': {'color': get_color_for_probability(prob_successo)},
+            }
+        ))
+        fig.update_layout(height=200, margin=dict(l=20,r=20,t=40,b=20))
+        st.plotly_chart(fig, use_container_width=True)
+
     with col2:
         tenore_vita_mediano = stats_prelievi['totale_reale_medio_annuo']
-        st.metric(
-            label="Tenore di Vita Annuo Mediano",
-            value=f"€ {tenore_vita_mediano:,.0f}",
-            help="Rappresenta il tenore di vita **mediano** che puoi aspettarti durante gli anni della pensione. Include i prelievi dal patrimonio, la pensione pubblica e la rendita del fondo pensione. Il valore è espresso in potere d'acquisto di oggi."
-        )
+        fig = go.Figure(go.Indicator(
+            mode = "number",
+            value = tenore_vita_mediano,
+            title = {"text": "Tenore di Vita Annuo Mediano"},
+            number = {'prefix': "€", 'valueformat': ',.0f'}
+        ))
+        fig.update_layout(height=200, margin=dict(l=20,r=20,t=40,b=20))
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Include prelievi, pensione pubblica e rendita FP durante la pensione (valore mediano, reale).")
+
     with col3:
         patrimonio_reale_finale = stats['patrimonio_finale_mediano_reale']
-        st.metric(
-            label="Patrimonio Finale Mediano (Reale)",
-            value=f"€ {patrimonio_reale_finale:,.0f}",
-            help="Il potere d'acquisto mediano del tuo patrimonio a fine piano, espresso in Euro di oggi. La metrica più importante."
-        )
+        fig = go.Figure(go.Indicator(
+            mode = "number",
+            value = patrimonio_reale_finale,
+            title = {"text": "Patrimonio Finale Mediano (Reale)"},
+            number = {'prefix': "€", 'valueformat': ',.0f'}
+        ))
+        fig.update_layout(height=200, margin=dict(l=20,r=20,t=40,b=20))
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Il potere d'acquisto mediano del tuo patrimonio a fine piano.")
 
     st.markdown("---")
     
