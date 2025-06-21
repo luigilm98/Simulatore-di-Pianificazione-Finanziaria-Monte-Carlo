@@ -5,29 +5,53 @@ import plotly.graph_objects as go
 import pandas as pd
 
 # --- Funzioni di Plotting ---
-def plot_spaghetti_chart(data, title, y_title, color, n_sim, anni_totali):
+def hex_to_rgb(hex_color):
+    """Converte un colore esadecimale in una tupla RGB."""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali):
+    """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
     anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
-    
-    # Sottocampiona le linee da mostrare per non sovraccaricare il grafico
-    n_sim_da_mostrare = min(n_sim, 100)
-    indices = np.random.choice(range(n_sim), n_sim_da_mostrare, replace=False)
 
-    for i in indices:
-        fig.add_trace(go.Scatter(
-            x=anni_asse_x, y=data[i, :], mode='lines',
-            line={'width': 0.5, 'color': 'lightgrey'},
-            hoverinfo='none', showlegend=False
-        ))
-
+    # Calcolo percentili
+    p10 = np.percentile(data, 10, axis=0)
+    p25 = np.percentile(data, 25, axis=0)
     median_data = np.median(data, axis=0)
+    p75 = np.percentile(data, 75, axis=0)
+    p90 = np.percentile(data, 90, axis=0)
+
+    # Area 10-90 percentile (range più ampio)
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
+        y=np.concatenate([p90, p10[::-1]]),
+        fill='toself',
+        fillcolor=f'rgba({hex_to_rgb(color_fill)}, 0.2)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='10-90 Percentile',
+        hoverinfo='none'
+    ))
+
+    # Area 25-75 percentile (range interquartile)
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
+        y=np.concatenate([p75, p25[::-1]]),
+        fill='toself',
+        fillcolor=f'rgba({hex_to_rgb(color_fill)}, 0.4)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='25-75 Percentile',
+        hoverinfo='none'
+    ))
+
+    # Linea mediana
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=median_data, mode='lines',
         name='Scenario Mediano (50°)',
-        line={'width': 3, 'color': color},
-        hovertemplate='Anno %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
+        line={'width': 3, 'color': color_median},
+        hovertemplate='Anno %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
-
+    
     fig.update_layout(
         title=title,
         xaxis_title="Anni",
@@ -49,18 +73,18 @@ def plot_histogram(data, anni_totali):
     return fig
 
 def plot_success_probability(data, anni_totali):
-    anni_grafico = np.arange(anni_totali + 1)
+    anni_grafico = np.arange(data.size)
     fig = go.Figure(data=go.Scatter(
-        x=anni_grafico, y=data, mode='lines', 
+        x=anni_grafico, y=data, mode='lines+markers', 
         line=dict(color='#C00000', width=3),
-        fill='tozeroy'
+        hovertemplate='Anno %{x}:<br>Successo: %{y:.0%}<extra></extra>'
     ))
     fig.update_layout(
         title='Probabilità di Successo nel Tempo',
         xaxis_title='Anni di Simulazione',
-        yaxis_title='Percentuale di Scenari con Patrimonio > 0',
+        yaxis_title='Probabilità di Avere Patrimonio Residuo',
         yaxis_tickformat='.0%',
-        yaxis_range=[0,1]
+        yaxis_range=[0, 1.01]
     )
     return fig
 
@@ -413,17 +437,19 @@ else:
         
         dati_grafici = st.session_state.risultati['dati_grafici_principali']
         
-        fig_reale = plot_spaghetti_chart(
-            dati_grafici['reale'], 'Evoluzione Patrimonio Reale (Tutti gli Scenari)', 'Patrimonio Reale (€)', '#C00000',
-            params['n_simulazioni'], params['anni_totali']
+        fig_reale = plot_percentile_chart(
+            dati_grafici['reale'], 'Evoluzione Patrimonio Reale (Tutti gli Scenari)', 'Patrimonio Reale (€)', 
+            color_median='#C00000', color_fill='#C00000',
+            anni_totali=params['anni_totali']
         )
         fig_reale.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_reale, use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo è il grafico della verità. Tiene conto dell'inflazione, mostrando il vero potere d'acquisto. Ogni linea grigia è un futuro possibile, la linea rossa è lo scenario mediano.</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo è il grafico della verità. Tiene conto dell'inflazione, mostrando il vero potere d'acquisto. La linea rossa è lo scenario mediano (50° percentile), le aree colorate mostrano i range di probabilità (dal 10° al 90° percentile).</div>", unsafe_allow_html=True)
 
-        fig_nominale = plot_spaghetti_chart(
-            dati_grafici['nominale'], 'Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 'Patrimonio (€)', '#4472C4',
-            params['n_simulazioni'], params['anni_totali']
+        fig_nominale = plot_percentile_chart(
+            dati_grafici['nominale'], 'Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 'Patrimonio (€)',
+            color_median='#4472C4', color_fill='#4472C4',
+            anni_totali=params['anni_totali']
         )
         fig_nominale.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_nominale, use_container_width=True)
@@ -431,27 +457,41 @@ else:
 
 
     with tab_decumulo:
+        # Calcolo dinamico delle età
         eta_pensionamento = params['eta_iniziale'] + params['anni_inizio_prelievo']
+        eta_pensione_pubblica = params['eta_iniziale'] + params['inizio_pensione_anni']
+        eta_ritiro_fp = params['eta_ritiro_fp']
+
         st.subheader(f"Dalla pensione (a {eta_pensionamento} anni) in poi")
-        st.markdown(f"A partire da {eta_pensionamento} anni, smetti di versare e inizi a **prelevare dal tuo patrimonio** per sostenere il tuo tenore di vita. A questo si aggiungeranno le altre fonti di reddito che hai configurato, come la pensione pubblica (a {params['eta_iniziale'] + params['inizio_pensione_anni']} anni) e l'eventuale rendita del fondo pensione (a {params['eta_ritiro_fp']} anni). L'obiettivo è far sì che il patrimonio duri per tutto l'orizzonte temporale desiderato.")
+        
+        testo_decumulo = f"""
+        A partire da **{eta_pensionamento} anni**, smetti di versare e inizi a **prelevare dal tuo patrimonio** per sostenere il tuo tenore di vita. 
+        A questo si aggiungeranno le altre fonti di reddito che hai configurato:
+        - La **pensione pubblica** a partire da **{eta_pensione_pubblica} anni**.
+        """
+        if params['attiva_fondo_pensione']:
+            testo_decumulo += f"\n- L'eventuale **rendita del fondo pensione** a partire da **{eta_ritiro_fp} anni**."
+        
+        testo_decumulo += "\n\nL'obiettivo è far sì che il patrimonio duri per tutto l'orizzonte temporale desiderato."
+        st.markdown(testo_decumulo)
         st.markdown("---")
 
         dati_avanzati = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(plot_histogram(stats['patrimoni_reali_finali'], params['anni_totali']), use_container_width=True)
-            st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Le barre più alte indicano le fasce di ricchezza finale più probabili, dandoti un'idea della variabilità dei risultati.</div>", unsafe_allow_html=True)
-            
-            st.plotly_chart(plot_income_composition(dati_avanzati, params['anni_totali']), use_container_width=True)
-            st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Mostra da dove arriveranno i tuoi soldi per vivere (prelievi, pensione pubblica, rendita FP) nello scenario mediano.</div>", unsafe_allow_html=True)
+        st.plotly_chart(plot_histogram(stats['patrimoni_reali_finali'], params['anni_totali']), use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Le barre più alte indicano le fasce di ricchezza finale più probabili, dandoti un'idea della variabilità dei risultati.</div>", unsafe_allow_html=True)
+        st.markdown("---")
 
-        with col2:
-            st.plotly_chart(plot_success_probability(stats['successo_per_anno'], params['anni_totali']), use_container_width=True)
-            st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questa linea è il tuo 'indicatore di tranquillità'. Mostra la percentuale di scenari in cui non hai ancora finito i soldi.</div>", unsafe_allow_html=True)
-            
-            st.plotly_chart(plot_asset_allocation(dati_avanzati, params['anni_totali']), use_container_width=True)
-            st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Rende visibile la strategia 'Glidepath', mostrando come la % di rischio (ETF) diminuisce con l'avanzare dell'età.</div>", unsafe_allow_html=True)
+        st.plotly_chart(plot_success_probability(stats['successo_per_anno'], params['anni_totali']), use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questa linea è il tuo 'indicatore di tranquillità'. Mostra la percentuale di scenari in cui non hai ancora finito i soldi.</div>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        st.plotly_chart(plot_income_composition(dati_avanzati, params['anni_totali']), use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Mostra da dove arriveranno i tuoi soldi per vivere (prelievi, pensione pubblica, rendita FP) nello scenario mediano.</div>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        st.plotly_chart(plot_asset_allocation(dati_avanzati, params['anni_totali']), use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Rende visibile la strategia 'Glidepath', mostrando come la % di rischio (ETF) diminuisce con l'avanzare dell'età.</div>", unsafe_allow_html=True)
     
     with tab_dettaglio:
         st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")

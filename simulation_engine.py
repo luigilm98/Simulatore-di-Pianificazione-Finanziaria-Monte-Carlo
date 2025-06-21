@@ -479,7 +479,7 @@ def run_full_simulation(parametri):
         'sharpe_ratio_medio': np.mean(sharpe_ratios[np.isfinite(sharpe_ratios)]),
         'probabilita_fallimento': prob_fallimento,
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
-        'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim,
+        'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
     }
 
     return {
