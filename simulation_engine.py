@@ -230,15 +230,30 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
         dati_annuali['prelievi_effettivi_reali'][anno_corrente] = dati_annuali['prelievi_effettivi_nominali'][anno_corrente] / indice_prezzi
 
+        # Calcolo dei costi mensili da applicare
+        costo_ter_mensile = parametri['ter_etf'] / 12
+        costo_bollo_mensile = parametri['imposta_bollo_titoli'] / 12
+
+        # Calcolo rendimento e applicazione costi
         rendimento_mensile = np.random.normal(parametri['rendimento_medio']/12, parametri['volatilita']/np.sqrt(12))
+        
+        # 1. Applica il rendimento lordo
         patrimonio_etf *= (1 + rendimento_mensile)
         
+        # 2. Sottrai i costi mensilizzati (TER e Bollo)
+        if patrimonio_etf > 0:
+            patrimonio_etf *= (1 - costo_ter_mensile - costo_bollo_mensile)
+
         if patrimonio_etf > 0:
             patrimonio_etf -= parametri['costo_fisso_etf_mensile']
 
         if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
+            # Anche il fondo pensione ha un TER mensilizzato
+            costo_ter_fp_mensile = parametri['ter_fp'] / 12
             rendimento_fp = np.random.normal(parametri['rendimento_medio_fp']/12, parametri['volatilita_fp']/np.sqrt(12))
             patrimonio_fp *= (1 + rendimento_fp)
+            if patrimonio_fp > 0:
+                patrimonio_fp *= (1 - costo_ter_fp_mensile)
 
         tasso_inflazione_mensile = np.random.normal(parametri['inflazione']/12, 0.005)
         indice_prezzi *= (1 + tasso_inflazione_mensile)
@@ -259,12 +274,11 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             )
 
             if patrimonio_banca > 5000: patrimonio_banca -= parametri['imposta_bollo_conto']
-            if patrimonio_etf > 0:
-                patrimonio_etf -= patrimonio_etf * parametri['imposta_bollo_titoli']
-                patrimonio_etf -= patrimonio_etf * parametri['ter_etf']
             
             if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
-                patrimonio_fp_post_costi = patrimonio_fp * (1 - parametri['ter_fp'])
+                # La gestione del rendimento tassato sul FP è complessa e richiede il confronto con l'anno precedente
+                # quindi la lasciamo nel blocco annuale.
+                patrimonio_fp_post_costi = patrimonio_fp # I costi TER sono già stati applicati mensilmente
                 
                 rendimento_maturato_anno = patrimonio_fp_post_costi - patrimonio_fp_inizio_anno - contributi_fp_anno_corrente
                 

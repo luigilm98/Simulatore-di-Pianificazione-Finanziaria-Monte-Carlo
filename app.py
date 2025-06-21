@@ -337,8 +337,8 @@ def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
     return fig
 
 st.set_page_config(
-    page_title="Simulatore Finanziario Monte Carlo v2.0",
-    page_icon="📈",
+    page_title="Progetta il Tuo Futuro Finanziario",
+    page_icon="✈️",
     layout="wide"
 )
 
@@ -359,8 +359,8 @@ def get_default_portfolio():
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = get_default_portfolio()
 
-st.title("📈 Simulatore di Pianificazione Finanziaria Monte Carlo v2.0")
-st.markdown("Benvenuto nella versione 2.0 del simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria.")
+st.title("✈️ Progetta la Tua Indipendenza Finanziaria")
+st.markdown("Benvenuto nel simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria e scoprire come raggiungere i tuoi obiettivi.")
 
 st.sidebar.header("Configurazione Simulazione")
 
