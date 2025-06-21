@@ -352,7 +352,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         patrimoni_np = np.array(patrimonio_storico)
         picchi = np.maximum.accumulate(patrimoni_np)
         if np.any(picchi > 0):
-            drawdown_values = (patrimonio_np - picchi) / picchi
+            drawdown_values = (patrimoni_np - picchi) / picchi
             drawdown = np.min(drawdown_values)
         
         returns = patrimoni_run[1:] / patrimoni_run[:-1] - 1
