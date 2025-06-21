@@ -148,6 +148,13 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             if is_primo_mese_prelievo or is_inizio_anno_fiscale:
                 patrimonio_attuale = patrimonio_banca + patrimonio_etf
                 
+                # FIX: Esclude la liquidazione del capitale FP dell'anno precedente dalla base di calcolo
+                # per le strategie di prelievo basate su percentuali, per evitare picchi anomali.
+                if anno_corrente > 0:
+                    lump_sum_anno_precedente = dati_annuali['fp_liquidato_nominale'][anno_corrente - 1]
+                    if lump_sum_anno_precedente > 0:
+                        patrimonio_attuale -= lump_sum_anno_precedente
+
                 if patrimonio_attuale <= 0:
                     prelievo_annuo_corrente = 0
                 else:
