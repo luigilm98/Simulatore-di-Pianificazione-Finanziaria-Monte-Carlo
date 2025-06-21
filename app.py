@@ -22,12 +22,14 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
     p75 = np.percentile(data, 75, axis=0)
     p90 = np.percentile(data, 90, axis=0)
 
+    rgb_fill = hex_to_rgb(color_fill)
+
     # Area 10-90 percentile (range più ampio)
     fig.add_trace(go.Scatter(
         x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
         y=np.concatenate([p90, p10[::-1]]),
         fill='toself',
-        fillcolor=f'rgba({hex_to_rgb(color_fill)}, 0.2)',
+        fillcolor=f'rgba({rgb_fill[0]}, {rgb_fill[1]}, {rgb_fill[2]}, 0.2)',
         line={'color': 'rgba(255,255,255,0)'},
         name='10-90 Percentile',
         hoverinfo='none'
@@ -38,7 +40,7 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
         y=np.concatenate([p75, p25[::-1]]),
         fill='toself',
-        fillcolor=f'rgba({hex_to_rgb(color_fill)}, 0.4)',
+        fillcolor=f'rgba({rgb_fill[0]}, {rgb_fill[1]}, {rgb_fill[2]}, 0.4)',
         line={'color': 'rgba(255,255,255,0)'},
         name='25-75 Percentile',
         hoverinfo='none'
