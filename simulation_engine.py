@@ -276,9 +276,13 @@ def run_full_simulation(params):
     df_risultati_nominali = pd.DataFrame(tutti_i_risultati_nominali).transpose()
     df_risultati_nominali.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
     
-    # Crea un DataFrame con i redditi di tutte le simulazioni partendo dai dati di dettaglio raccolti
+    # Crea un DataFrame con i dati di dettaglio di tutte le simulazioni
     df_dettaglio_completo = pd.concat(lista_df_dettaglio, keys=range(params['n_simulazioni']), names=['Sim_Num', 'Anno_Index'])
-    df_redditi_reali_annui = df_dettaglio_completo.reset_index().pivot(index='Anno_Index', columns='Sim_Num', values='totale_entrate_reali')
+    
+    # Crea un DataFrame con i redditi di tutte le simulazioni partendo dai dati di dettaglio raccolti
+    df_redditi_reali_annui = df_dettaglio_completo.reset_index().pivot(
+        index='Anno_Index', columns='Sim_Num', values='totale_entrate_reali'
+    )
     df_redditi_reali_annui.columns = [f'Sim_{i+1}' for i in range(params['n_simulazioni'])]
 
     # Calcolo statistiche principali
