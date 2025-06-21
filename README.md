@@ -124,11 +124,11 @@ git clone https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-
 cd Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo
 
 # 2. Crea e attiva un ambiente virtuale
-python3 -m venv venv
+    python3 -m venv venv
 source venv/bin/activate  # Su Windows: venv\Scripts\activate
 
 # 3. Installa le dipendenze
-pip install -r requirements.txt
+    pip install -r requirements.txt
 
 # 4. Avvia l'applicazione
 streamlit run app.py

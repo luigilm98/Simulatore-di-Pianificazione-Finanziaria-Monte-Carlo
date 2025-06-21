@@ -79,13 +79,18 @@ def reconstruct_data_from_json(results):
     for key in ['reale', 'nominale', 'reddito_reale_annuo']:
         if key in results.get('dati_grafici_principali', {}):
             df_dict = results['dati_grafici_principali'][key]
-            # Controlla se è un dizionario nel formato 'split'
             if isinstance(df_dict, dict) and 'data' in df_dict and 'index' in df_dict:
-                results['dati_grafici_principali'][key] = pd.DataFrame(
+                # 1. Ricostruisci la struttura del DataFrame
+                df = pd.DataFrame(
                     df_dict['data'],
                     index=pd.to_numeric(df_dict['index']),
                     columns=df_dict['columns']
                 )
+                # 2. Sanificazione finale: Assicura che tutti i dati siano numerici
+                for col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                df = df.fillna(0)
+                results['dati_grafici_principali'][key] = df
 
     # Ricostruisci la Series dei patrimoni finali
     if 'patrimoni_reali_finali' in results.get('statistiche', {}):
