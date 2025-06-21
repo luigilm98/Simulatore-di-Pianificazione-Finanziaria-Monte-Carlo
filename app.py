@@ -415,8 +415,16 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
 
 # --- Sezione Portafoglio ETF ---
 with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
-    st.markdown("Modifica l'allocazione, il TER e le stime di rendimento/volatilità per ogni ETF.")
+    st.markdown("""
+    **Definisci qui la composizione del tuo portafoglio di investimenti.**
+    - **Allocazione (%):** La percentuale di ogni strumento sul totale. La somma deve fare 100%.
+    - **Rendimento Atteso Annuo (%):** La stima del rendimento medio annuo per ogni ETF, al lordo dei costi.
+    - **Volatilità Annuo (%):** La deviazione standard dei rendimenti. Misura il rischio dello strumento. Valori più alti indicano maggiori oscillazioni di prezzo.
+    - **Costo Annuo (TER) (%):** Il costo totale che l'emittente dell'ETF addebita annualmente per la gestione.
+    """)
     
+    # Recupera il portafoglio di default o quello in sessione
+    portfolio_key = 'etf_portfolio'
     edited_portfolio = st.data_editor(
         st.session_state.portfolio,
         column_config={
@@ -426,7 +434,7 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
             "Volatilità Attesa (%)": st.column_config.NumberColumn(format="%.2f%%"),
         },
         num_rows="dynamic",
-        key="portfolio_editor"
+        key=portfolio_key
     )
 
     total_allocation = edited_portfolio["Allocazione (%)"].sum()
@@ -451,49 +459,58 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
     col3.metric("TER Ponderato", f"{ter_etf_portfolio:.4%}")
     st.caption("La volatilità aggregata è una media ponderata semplificata.")
 
+# --- Sezione Tassazione ---
+with st.sidebar.expander("3. Tassazione"):
+    p = st.session_state.get('parametri', {})
+    tassazione_capital_gain = st.slider(
+        "Tassazione Capital Gain (%)", 0.0, 50.0, p.get('tassazione_capital_gain', 0.26) * 100, 1.0, 
+        help="**Quale aliquota si applica ai profitti?** Imposta la tassazione sui guadagni in conto capitale (la differenza tra prezzo di vendita e di acquisto). In Italia, l'aliquota standard per gli strumenti finanziari è del 26%."
+    ) / 100
+
 # --- Sezione Strategie di Prelievo ---
-with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
+with st.sidebar.expander("4. Strategie di Prelievo", expanded=True):
     p = st.session_state.get('parametri', {})
     strategia_prelievo = st.selectbox(
         "Strategia di Prelievo",
         options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'],
         index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
-        help="Scegli come verranno calcolati i prelievi dal tuo patrimonio una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
+        help="""
+        **Come vuoi prelevare i soldi in pensione?**
+        - **FISSO:** Prelevi ogni anno un importo fisso (rivalutato per l'inflazione), definito da te. Semplice ma rigido.
+        - **REGOLA 4%:** Ogni anno prelevi una percentuale fissa (es. 4%) del **capitale residuo**. Il prelievo si adatta all'andamento del mercato (più alto se il mercato sale, più basso se scende).
+        - **GUARDRAIL:** Una versione avanzata della regola del 4%. Definisci un prelievo target, ma questo viene aggiustato verso l'alto o il basso solo se il portafoglio supera delle "barriere" (guardrail) predefinite. Protegge dai prelievi eccessivi durante i crolli e permette di beneficiare dei rialzi.
+        """
     )
     prelievo_annuo = st.number_input(
         "Importo Prelievo Fisso Annuo (€)",
         min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
-        help="Usato SOLO con la strategia 'FISSO'. Imposta l'esatto importo lordo che vuoi prelevare ogni anno. Lascia a 0 per far calcolare al simulatore il prelievo massimo sostenibile."
+        help="**Usato SOLO con la strategia 'FISSO'.** Imposta l'esatto importo lordo che vuoi prelevare il primo anno di pensione. Gli anni successivi, questo importo verrà adeguato all'inflazione."
     )
     percentuale_regola_4 = st.slider(
         "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
-        help="Il tasso di prelievo iniziale per le strategie 'REGOLA_4_PERCENTO' e 'GUARDRAIL'. Il 4% è una regola standard, ma puoi adattarla alla tua situazione."
+        help="**Tasso di prelievo per le strategie 'REGOLA 4%' e 'GUARDRAIL'.** La 'regola del 4%' è uno standard basato su studi storici, ma puoi adattarla. È la percentuale del patrimonio che prelevi il primo anno."
     ) / 100
     banda_guardrail = st.slider(
         "Banda Guardrail (%)", 0.0, 50.0, p.get('banda_guardrail', 0.10) * 100, 1.0,
-        help="Solo per 'GUARDRAIL'. Se il mercato va molto bene o molto male, questa banda determina se aumentare o diminuire i prelievi per proteggere il capitale o realizzare profitti. Un valore del 10-20% è tipico."
+        help="**Solo per 'GUARDRAIL'.** Definisce le barriere. Esempio: con 10%, se il prelievo calcolato è il 10% più alto o più basso di quello dell'anno precedente, viene 'tagliato' per evitare scossoni eccessivi."
     ) / 100
 
 # --- Sezione Asset Allocation Dinamica (Glidepath) ---
-with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)"):
+with st.sidebar.expander("5. Asset Allocation Dinamica (Glidepath)"):
     p = st.session_state.get('parametri', {})
-    attiva_glidepath = st.checkbox("Attiva Glidepath", value=p.get('attiva_glidepath', True), help="Se attivato, il simulatore ridurrà progressivamente l'esposizione azionaria (ETF) a favore della liquidità con l'avvicinarsi e durante la pensione, per ridurre il rischio.")
-    inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=p.get('inizio_glidepath_anni', 20), disabled=not attiva_glidepath, help="L'anno in cui inizi a rendere il tuo portafoglio più conservativo. Spesso si imposta 10-15 anni prima della pensione.")
-    fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=p.get('fine_glidepath_anni', 40), disabled=not attiva_glidepath, help="L'anno in cui raggiungi l'allocazione finale desiderata. Solitamente coincide con l'inizio della pensione o pochi anni dopo.")
-    allocazione_etf_finale = st.slider(
-        "Allocazione ETF Finale (%)", 0.0, 100.0, p.get('allocazione_etf_finale', 0.333) * 100, 1.0,
-        help="La percentuale di patrimonio che rimarrà investita in ETF alla fine del percorso di de-risking. Il resto sarà liquidità. Un valore comune è tra il 30% e il 50%.",
-        disabled=not attiva_glidepath
-    ) / 100
-
-# --- Sezione Tassazione e Costi ---
-with st.sidebar.expander("5. Tassazione e Costi (Italia)"):
-    p = st.session_state.get('parametri', {})
-    tassazione_capital_gain = st.slider("Tassazione Capital Gain (%)", 0.0, 50.0, p.get('tassazione_capital_gain', 0.26) * 100, 1.0, help="L'aliquota applicata ai profitti derivanti dalla vendita di ETF. In Italia è tipicamente il 26%.") / 100
-    imposta_bollo_titoli = st.slider("Imposta di Bollo Titoli (annua, %)", 0.0, 1.0, p.get('imposta_bollo_titoli', 0.002) * 100, 0.01, help="Tassa patrimoniale annuale sul valore totale del tuo portafoglio titoli. In Italia è lo 0,2%.") / 100
-    imposta_bollo_conto = st.number_input("Imposta di Bollo Conto (>5k€)", min_value=0, value=p.get('imposta_bollo_conto', 34), help="Imposta fissa annuale sui conti correnti con giacenza media superiore a 5.000€. In Italia è 34,20€.")
-    # ter_etf è ora calcolato dal portafoglio
-    costo_fisso_etf_mensile = st.number_input("Costo Fisso Deposito Titoli (€/mese)", min_value=0.0, value=p.get('costo_fisso_etf_mensile', 4.0), step=0.5, help="Eventuali costi fissi mensili o annuali addebitati dal tuo broker per il mantenimento del conto titoli.")
+    attiva_glidepath = st.checkbox(
+        "Attiva Glidepath (Ribilanciamento Automatico)", 
+        value=p.get('attiva_glidepath', False),
+        help="**Vuoi ridurre il rischio con l'avvicinarsi della pensione?** Se attivato, il glidepath riduce gradualmente l'esposizione azionaria (più rischiosa) a favore di quella obbligazionaria (più sicura) man mano che ti avvicini all'età del ritiro."
+    )
+    anni_glidepath = st.number_input(
+        "Anni di Durata Glidepath", min_value=1, value=p.get('anni_glidepath', 20), disabled=not attiva_glidepath,
+        help="**In quanti anni vuoi completare la transizione?** Definisce il periodo prima della pensione in cui inizia il ribilanciamento. Es: 20 anni significa che la transizione inizia 20 anni prima del ritiro."
+    )
+    allocazione_finale_obbligazionario = st.slider(
+        "Allocazione Finale Obbligazionario (%)", 0, 100, p.get('allocazione_finale_obbligazionario', 60), disabled=not attiva_glidepath,
+        help="**Qual è l'asset allocation target alla fine del percorso?** Indica la percentuale di portafoglio che sarà investita in obbligazionario (bond) al momento della pensione."
+    )
 
 # --- Sezione Fondo Pensione ---
 with st.sidebar.expander("6. Fondo Pensione"):
@@ -529,12 +546,8 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
             'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
             'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
-            'attiva_glidepath': attiva_glidepath, 'inizio_glidepath_anni': inizio_glidepath_anni, 'fine_glidepath_anni': fine_glidepath_anni,
-            'allocazione_etf_finale': allocazione_etf_finale,
-            'tassazione_capital_gain': tassazione_capital_gain, 'imposta_bollo_titoli': imposta_bollo_titoli, 'imposta_bollo_conto': imposta_bollo_conto,
-            'ter_etf': ter_etf_portfolio, 
-            'costo_fisso_etf_mensile': costo_fisso_etf_mensile,
-            'attiva_fondo_pensione': attiva_fondo_pensione, 'contributo_annuo_fp': contributo_annuo_fp, 'rendimento_medio_fp': rendimento_medio_fp,
+            'attiva_glidepath': attiva_glidepath, 'anni_glidepath': anni_glidepath, 'allocazione_finale_obbligazionario': allocazione_finale_obbligazionario,
+            'tassazione_capital_gain': tassazione_capital_gain, 'attiva_fondo_pensione': attiva_fondo_pensione, 'contributo_annuo_fp': contributo_annuo_fp, 'rendimento_medio_fp': rendimento_medio_fp,
             'volatilita_fp': volatilita_fp, 'ter_fp': ter_fp, 'tassazione_rendimenti_fp': tassazione_rendimenti_fp, 'aliquota_finale_fp': aliquota_finale_fp,
             'eta_ritiro_fp': eta_ritiro_fp, 'percentuale_capitale_fp': percentuale_capitale_fp, 'durata_rendita_fp_anni': durata_rendita_fp_anni,
             'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni
