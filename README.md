@@ -195,12 +195,20 @@ Il TER rappresenta i costi annuali di gestione di un fondo o ETF, espressi come 
 
 ---
 
-## 🤝 Contributi
+## 🤝 Contributi e Deploy Personale
 
-Questo progetto è open source e i contributi sono benvenuti! Se hai idee per miglioramenti, correzioni o nuove funzionalità, non esitare a:
+Questo progetto è open source e i contributi sono benvenuti!
+
+### Contribuire al Progetto
+Se hai idee per miglioramenti, correzioni o nuove funzionalità, non esitare a:
 
 1. Aprire una [Issue](https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo/issues) per segnalare bug o suggerire miglioramenti
 2. Fare un [Pull Request](https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo/pulls) con le tue modifiche
+
+### Deployare la Tua Versione
+Se vuoi sperimentare con il codice o deployare la tua versione personale dell'app, puoi farlo con un solo click:
+
+[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo&branch=main&mainModule=app.py)
 
 ---
 
