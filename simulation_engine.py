@@ -83,6 +83,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     patrimonio_fp = 0
     patrimonio_fp_inizio_anno = 0
     contributi_fp_anno_corrente = 0
+    totale_contributi_versati_nominale = 0
     fp_convertito_in_rendita = False
     rendita_mensile_nominale_tassata_fp = 0
     rendita_annua_reale_fp = 0
@@ -110,10 +111,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         eta_attuale = eta_iniziale + anno_corrente
         
         if mese < inizio_prelievo_mesi:
-            patrimonio_banca += (parametri['contributo_mensile_banca'] * indice_prezzi)
-            investimento_indicizzato_etf = (parametri['contributo_mensile_etf'] * indice_prezzi)
-            patrimonio_etf += investimento_indicizzato_etf
-            etf_cost_basis += investimento_indicizzato_etf
+            contrib_banca = (parametri['contributo_mensile_banca'] * indice_prezzi)
+            contrib_etf = (parametri['contributo_mensile_etf'] * indice_prezzi)
+            patrimonio_banca += contrib_banca
+            patrimonio_etf += contrib_etf
+            etf_cost_basis += contrib_etf
+            totale_contributi_versati_nominale += contrib_banca + contrib_etf
         
         if parametri['attiva_fondo_pensione'] and eta_attuale < parametri['eta_ritiro_fp']:
             contributo_mensile_fp_indicizzato = (parametri['contributo_annuo_fp'] / 12) * indice_prezzi
@@ -363,7 +366,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         "dati_annuali": dati_annuali,
         "drawdown": drawdown,
         "sharpe_ratio": sharpe_ratio,
-        "fallimento": patrimonio_negativo
+        "fallimento": patrimonio_negativo,
+        "totale_contributi_versati_nominale": totale_contributi_versati_nominale
     }
 
 def run_full_simulation(parametri):
@@ -388,6 +392,7 @@ def run_full_simulation(parametri):
     pensioni_annuali_reali_agg = np.zeros((n_sim, num_anni))
     saldi_fp_reali_agg = np.zeros((n_sim, num_anni))
     redditi_totali_reali_agg = np.zeros((n_sim, num_anni))
+    contributi_totali_agg = np.zeros(n_sim)
 
     prelievo_annuo_da_usare = parametri['prelievo_annuo']
     calcolo_sostenibile_attivo = parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0
@@ -411,6 +416,7 @@ def run_full_simulation(parametri):
         pensioni_annuali_reali_agg[sim, :] = risultati_run['dati_annuali']['pensioni_pubbliche_reali']
         saldi_fp_reali_agg[sim, :] = risultati_run['dati_annuali']['saldo_fp_reale']
         redditi_totali_reali_agg[sim, :] = risultati_run['dati_annuali']['reddito_totale_reale']
+        contributi_totali_agg[sim] = risultati_run['totale_contributi_versati_nominale']
 
     # 3. CALCOLO STATISTICHE E SCENARIO MEDIANO
     prob_fallimento = fallimenti / n_sim
@@ -489,6 +495,7 @@ def run_full_simulation(parametri):
         'probabilita_fallimento': prob_fallimento,
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
         'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
+        'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg)
     }
 
     return {
