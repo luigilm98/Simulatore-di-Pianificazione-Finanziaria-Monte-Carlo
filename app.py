@@ -701,49 +701,34 @@ else:
         df = pd.DataFrame({
             'Anno': np.arange(1, num_anni + 1),
             'Età': params['eta_iniziale'] + np.arange(num_anni),
-            'Obiettivo Prelievo (Nom.)': dati_tabella['prelievi_target_nominali'][:num_anni],
-            'Prelievo Effettivo (Nom.)': dati_tabella['prelievi_effettivi_nominali'][:num_anni],
-            'Fonte: Conto Corrente': dati_tabella['prelievi_da_banca_nominali'][:num_anni],
-            'Fonte: Vendita ETF': dati_tabella['prelievi_da_etf_nominali'][:num_anni],
-            'Vendita ETF (Rebalance)': dati_tabella['vendite_rebalance_nominali'][:num_anni],
-            'Prelievo Effettivo (Reale)': dati_tabella['prelievi_effettivi_reali'][:num_anni],
-            'Pensione Pubblica (Reale)': dati_tabella['pensioni_pubbliche_reali'][:num_anni],
-            'Rendita FP (Reale)': dati_tabella['rendite_fp_reali'][:num_anni],
-            'Liquidazione Capitale FP (Nom.)': dati_tabella['fp_liquidato_nominale'][:num_anni],
-            'Saldo Conto Fine Anno (Reale)': dati_tabella['saldo_banca_reale'][:num_anni],
-            'Valore ETF Fine Anno (Reale)': dati_tabella['saldo_etf_reale'][:num_anni]
+            'Obiettivo Prelievo (Nom.)': dati_tabella.get('prelievi_target_nominali', np.zeros(num_anni))[:num_anni],
+            'Prelievo Effettivo (Nom.)': dati_tabella.get('prelievi_effettivi_nominali', np.zeros(num_anni))[:num_anni],
+            'Fonte: Conto Corrente': dati_tabella.get('prelievi_da_banca_nominali', np.zeros(num_anni))[:num_anni],
+            'Fonte: Vendita ETF': dati_tabella.get('prelievi_da_etf_nominali', np.zeros(num_anni))[:num_anni],
+            'Vendita ETF (Rebalance)': dati_tabella.get('vendite_rebalance_nominali', np.zeros(num_anni))[:num_anni],
+            'Prelievo Effettivo (Reale)': dati_tabella.get('prelievi_effettivi_reali', np.zeros(num_anni))[:num_anni],
+            'Pensione Pubblica (Nom.)': dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(num_anni))[:num_anni],
+            'Rendita FP (Nom.)': dati_tabella.get('rendite_fp_nominali', np.zeros(num_anni))[:num_anni],
+            'Liquidazione FP (Nom.)': dati_tabella.get('fp_liquidato_nominale', np.zeros(num_anni))[:num_anni],
+            'Patrimonio Banca (Nom.)': dati_tabella.get('saldo_banca_nominale', np.zeros(num_anni))[:num_anni],
+            'Patrimonio ETF (Nom.)': dati_tabella.get('saldo_etf_nominale', np.zeros(num_anni))[:num_anni],
+            'Patrimonio FP (Nom.)': dati_tabella.get('saldo_fp_nominale', np.zeros(num_anni))[:num_anni],
         })
-
-        # Aggiungo la colonna calcolata
-        df['Entrate Anno (Reali)'] = df['Prelievo Effettivo (Reale)'] + df['Pensione Pubblica (Reale)'] + df['Rendita FP (Reale)']
         
-        # Riorganizzo le colonne per la visualizzazione
-        colonne_visualizzate = [
-            'Anno', 'Età', 'Obiettivo Prelievo (Nom.)', 'Prelievo Effettivo (Nom.)', 
-            'Fonte: Conto Corrente', 'Fonte: Vendita ETF', 'Vendita ETF (Rebalance)', 
-            'Liquidazione Capitale FP (Nom.)', 'Prelievo Effettivo (Reale)', 'Pensione Pubblica (Reale)', 
-            'Rendita FP (Reale)', 'Entrate Anno (Reali)', 'Saldo Conto Fine Anno (Reale)', 
-            'Valore ETF Fine Anno (Reale)'
-        ]
-        
-        st.dataframe(
-            df[colonne_visualizzate],
-            height=500,
-            column_config={
-                "Obiettivo Prelievo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Prelievo Effettivo (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Fonte: Conto Corrente": st.column_config.NumberColumn(format="€ %.0f"),
-                "Fonte: Vendita ETF": st.column_config.NumberColumn(format="€ %.0f"),
-                "Vendita ETF (Rebalance)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Liquidazione Capitale FP (Nom.)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Prelievo Effettivo (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Pensione Pubblica (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Rendita FP (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Entrate Anno (Reali)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Saldo Conto Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f"),
-                "Valore ETF Fine Anno (Reale)": st.column_config.NumberColumn(format="€ %.0f")
-            }
-        )
+        st.dataframe(df.style.format({
+            'Obiettivo Prelievo (Nom.)': "€ {:,.0f}",
+            'Prelievo Effettivo (Nom.)': "€ {:,.0f}",
+            'Fonte: Conto Corrente': "€ {:,.0f}",
+            'Fonte: Vendita ETF': "€ {:,.0f}",
+            'Vendita ETF (Rebalance)': "€ {:,.0f}",
+            'Prelievo Effettivo (Reale)': "€ {:,.0f}",
+            'Pensione Pubblica (Nom.)': "€ {:,.0f}",
+            'Rendita FP (Nom.)': "€ {:,.0f}",
+            'Liquidazione FP (Nom.)': "€ {:,.0f}",
+            'Patrimonio Banca (Nom.)': "€ {:,.0f}",
+            'Patrimonio ETF (Nom.)': "€ {:,.0f}",
+            'Patrimonio FP (Nom.)': "€ {:,.0f}",
+        }))
 
         with st.expander("Guida alla Lettura della Tabella"):
             st.markdown("""
