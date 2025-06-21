@@ -401,20 +401,24 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                     delete_simulation(sim['filename'])
 
 # --- Sezione Parametri di Base ---
-with st.sidebar.expander("1. Parametri di Base", expanded=True):
-    p = st.session_state.get('parametri', {})
-    eta_iniziale = st.number_input("Età Iniziale", min_value=1, max_value=100, value=p.get('eta_iniziale', 27), help="La tua età attuale. È il punto di partenza per tutti i calcoli temporali.")
-    capitale_iniziale = st.number_input("Capitale Conto Corrente (€)", min_value=0, step=1000, value=p.get('capitale_iniziale', 17000), help="La liquidità che hai oggi sul conto corrente o in asset a bassissimo rischio/rendimento.")
-    etf_iniziale = st.number_input("Valore Portafoglio ETF (€)", min_value=0, step=1000, value=p.get('etf_iniziale', 600), help="Il valore di mercato attuale di tutti i tuoi investimenti in ETF/azioni.")
-    contributo_mensile_banca = st.number_input("Contributo Mensile Conto (€)", min_value=0, step=50, value=p.get('contributo_mensile_banca', 1300), help="La cifra che riesci a risparmiare e accantonare sul conto corrente ogni mese. Questi soldi verranno usati per il ribilanciamento o per le spese.")
-    contributo_mensile_etf = st.number_input("Contributo Mensile ETF (€)", min_value=0, step=50, value=p.get('contributo_mensile_etf', 300), help="La cifra che investi attivamente ogni mese nel tuo portafoglio ETF. Questo è il motore principale del tuo Piano di Accumulo (PAC).")
-    inflazione = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, p.get('inflazione', 0.03) * 100, 0.1, help="Il tasso a cui i prezzi aumentano e il denaro perde potere d'acquisto. Un'inflazione del 3% significa che tra un anno, 100€ compreranno beni per 97€.") / 100
-    anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
-    n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Più simulazioni esegui, più accurata sarà la stima delle probabilità. 250 è un buon compromesso tra velocità e precisione.")
-    anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p.get('anni_totali', 80), help="La durata totale della simulazione. Assicurati che sia abbastanza lunga da coprire tutta la tua aspettativa di vita.")
+with st.sidebar.expander("Liquidità e Portafoglio Iniziale", expanded=True):
+    st.session_state['patrimonio_iniziale'] = st.number_input(
+        'Liquidità sul Conto Corrente (€)', 
+        min_value=0.0, 
+        value=st.session_state.get('patrimonio_iniziale', 10000.0), 
+        step=1000.0,
+        help="Inserisci la somma di denaro che hai attualmente disponibile sul conto corrente e che vuoi includere nella simulazione. Questo rappresenta il tuo punto di partenza finanziario."
+    )
+    st.session_state['valore_attuale_investimenti'] = st.number_input(
+        'Valore Attuale del Portafoglio ETF (€)', 
+        min_value=0.0, 
+        value=st.session_state.get('valore_attuale_investimenti', 5000.0), 
+        step=1000.0,
+        help="Inserisci il valore totale di mercato del tuo portafoglio di ETF (o altri investimenti simili). Questo capitale, sommato alla liquidità, costituisce il tuo patrimonio iniziale."
+    )
 
 # --- Sezione Portafoglio ETF ---
-with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
+with st.sidebar.expander("Costruttore di Portafoglio ETF", expanded=True):
     st.markdown("Modifica l'allocazione, il TER e le stime di rendimento/volatilità per ogni ETF.")
     
     edited_portfolio = st.data_editor(
@@ -431,7 +435,7 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
 
     total_allocation = edited_portfolio["Allocazione (%)"].sum()
     if not np.isclose(total_allocation, 100):
-        st.warning(f"L'allocazione totale è {total_allocation:.2f}%. Assicurati che sia 100%.")
+        st.warning(f"Allocazione totale: {total_allocation}%. Aggiusta per raggiungere il 100%.", disabled=edited_portfolio.columns.drop('Allocazione (%)'))
     else:
         st.success("Allocazione totale: 100%.")
     
@@ -452,27 +456,28 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
     st.caption("La volatilità aggregata è una media ponderata semplificata.")
 
 # --- Sezione Strategie di Prelievo ---
-with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
-    p = st.session_state.get('parametri', {})
-    strategia_prelievo = st.selectbox(
-        "Strategia di Prelievo",
-        options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'],
-        index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
-        help="Scegli come verranno calcolati i prelievi dal tuo patrimonio una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
+with st.sidebar.expander("Gestione della Fase di Decumulo (Pensione)", expanded=False):
+    st.session_state['anni_prelievo'] = st.number_input(
+        'Anni all\'Inizio dei Prelievi (Età)',
+        min_value=1,
+        max_value=100,
+        value=st.session_state.get('anni_prelievo', 35),
+        step=1,
+        help="Indica l'età in cui prevedi di smettere di lavorare e iniziare a prelevare dal tuo patrimonio per vivere. Questo segna l'inizio della fase di 'decumulo'."
     )
-    prelievo_annuo = st.number_input(
-        "Importo Prelievo Fisso Annuo (€)",
-        min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
-        help="Usato SOLO con la strategia 'FISSO'. Imposta l'esatto importo lordo che vuoi prelevare ogni anno. Lascia a 0 per far calcolare al simulatore il prelievo massimo sostenibile."
+    st.session_state['percentuale_prelievo_iniziale'] = st.slider(
+        'Percentuale di Prelievo Annuale Iniziale (%)',
+        min_value=0.0,
+        max_value=10.0,
+        value=st.session_state.get('percentuale_prelievo_iniziale', 4.0),
+        step=0.1,
+        help="Quale percentuale del tuo patrimonio totale prevedi di prelevare il primo anno di pensione? La 'regola del 4%' è un punto di partenza comune, ma puoi aggiustarla. Ogni anno successivo, l'importo prelevato verrà adeguato all'inflazione."
     )
-    percentuale_regola_4 = st.slider(
-        "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
-        help="Il tasso di prelievo iniziale per le strategie 'REGOLA_4_PERCENTO' e 'GUARDRAIL'. Il 4% è una regola standard, ma puoi adattarla alla tua situazione."
-    ) / 100
-    banda_guardrail = st.slider(
-        "Banda Guardrail (%)", 0.0, 50.0, p.get('banda_guardrail', 0.10) * 100, 1.0,
-        help="Solo per 'GUARDRAIL'. Se il mercato va molto bene o molto male, questa banda determina se aumentare o diminuire i prelievi per proteggere il capitale o realizzare profitti. Un valore del 10-20% è tipico."
-    ) / 100
+    st.session_state['usa_safe_withdrawal_rate'] = st.checkbox(
+        "Usa Tasso di Prelievo Massimo Sostenibile (SWR)",
+        value=st.session_state.get('usa_safe_withdrawal_rate', True),
+        help="Se spuntato, il simulatore calcolerà per te il tasso di prelievo massimo che puoi sostenere con una probabilità di successo del 95%. Questo ignorerà il valore da te impostato sopra, dandoti un'indicazione più scientifica."
+    )
 
 # --- Sezione Asset Allocation Dinamica (Glidepath) ---
 with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)"):
@@ -496,24 +501,75 @@ with st.sidebar.expander("5. Tassazione e Costi (Italia)"):
     costo_fisso_etf_mensile = st.number_input("Costo Fisso Deposito Titoli (€/mese)", min_value=0.0, value=p.get('costo_fisso_etf_mensile', 4.0), step=0.5, help="Eventuali costi fissi mensili o annuali addebitati dal tuo broker per il mantenimento del conto titoli.")
 
 # --- Sezione Fondo Pensione ---
-with st.sidebar.expander("6. Fondo Pensione"):
-    p = st.session_state.get('parametri', {})
-    attiva_fondo_pensione = st.checkbox("Attiva Fondo Pensione", value=p.get('attiva_fondo_pensione', True))
-    contributo_annuo_fp = st.number_input("Contributo Annuo FP (€)", min_value=0, step=100, value=p.get('contributo_annuo_fp', 3000), disabled=not attiva_fondo_pensione)
-    rendimento_medio_fp = st.slider("Rendimento Medio Annuo FP (%)", 0.0, 15.0, p.get('rendimento_medio_fp', 0.04) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
-    volatilita_fp = st.slider("Volatilità Annuo FP (%)", 0.0, 30.0, p.get('volatilita_fp', 0.08) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
-    ter_fp = st.slider("Costo Annuo (TER) FP (%)", 0.0, 3.0, p.get('ter_fp', 0.01) * 100, 0.1, disabled=not attiva_fondo_pensione) / 100
-    tassazione_rendimenti_fp = st.slider("Tassazione Rendimenti FP (%)", 0.0, 30.0, p.get('tassazione_rendimenti_fp', 0.20) * 100, 1.0, disabled=not attiva_fondo_pensione) / 100
-    aliquota_finale_fp = st.slider("Aliquota Finale Ritiro FP (%)", 9.0, 23.0, p.get('aliquota_finale_fp', 0.15) * 100, 0.5, disabled=not attiva_fondo_pensione, help="La tassazione agevolata applicata al momento del ritiro del capitale o della rendita dal fondo pensione. Varia dal 15% al 9% in base agli anni di contribuzione.")
-    eta_ritiro_fp = st.number_input("Età Ritiro Fondo Pensione", min_value=50, max_value=80, value=p.get('eta_ritiro_fp', 67), disabled=not attiva_fondo_pensione, help="L'età in cui maturi i requisiti per accedere al tuo fondo pensione.")
-    percentuale_capitale_fp = st.slider("% Ritiro in Capitale FP", 0.0, 100.0, p.get('percentuale_capitale_fp', 0.33) * 100, 1.0, help="La parte del montante finale che desideri ritirare subito come capitale tassato. Il resto verrà convertito in una rendita mensile.", disabled=not attiva_fondo_pensione) / 100
-    durata_rendita_fp_anni = st.number_input("Durata Rendita FP (Anni)", min_value=1, value=p.get('durata_rendita_fp_anni', 40), disabled=not attiva_fondo_pensione, help="Per quanti anni vuoi che venga erogata la rendita calcolata dal tuo fondo pensione.")
+with st.sidebar.expander("Opzioni Fondo Pensione Complementare", expanded=False):
+    st.session_state['attiva_fondo_pensione'] = st.checkbox(
+        "Includi un Fondo Pensione nel Piano",
+        value=st.session_state.get('attiva_fondo_pensione', False),
+        help="Spunta questa casella se versi contributi in un fondo pensione complementare e vuoi includerlo nella simulazione."
+    )
+    if st.session_state.get('attiva_fondo_pensione', False):
+        st.session_state['valore_attuale_fp'] = st.number_input(
+            'Valore Attuale del Fondo Pensione (€)',
+            min_value=0.0,
+            value=st.session_state.get('valore_attuale_fp', 0.0),
+            step=500.0,
+            help="Inserisci il montante già accumulato nel tuo fondo pensione complementare."
+        )
+        st.session_state['contributo_annuo_fp'] = st.number_input(
+            'Contributo Annuo al Fondo Pensione (€)',
+            min_value=0.0,
+            value=st.session_state.get('contributo_annuo_fp', 1500.0),
+            step=100.0,
+            help="L'importo totale che versi ogni anno nel fondo pensione (include i tuoi versamenti, quelli del datore di lavoro e il TFR)."
+        )
+        st.session_state['rendimento_medio_fp'] = st.slider(
+            'Rendimento Medio Annuo Stimato del Fondo Pensione (%)',
+            min_value=0.0,
+            max_value=10.0,
+            value=st.session_state.get('rendimento_medio_fp', 4.0),
+            step=0.5,
+            help="Il rendimento medio annuo che ti aspetti dal tuo comparto del fondo pensione, al netto dei costi di gestione. Controlla il KID o la scheda del tuo fondo per una stima realistica."
+        )
+        st.session_state['eta_ritiro_fp'] = st.number_input(
+            'Età di Pensionamento (Accesso al Fondo Pensione)',
+            min_value=50,
+            max_value=75,
+            value=st.session_state.get('eta_ritiro_fp', 67),
+            step=1,
+            help="L'età in cui maturerai i requisiti per accedere alla prestazione del fondo pensione (solitamente coincide con l'età della pensione di vecchiaia)."
+        )
+        st.session_state['percentuale_liquidazione_fp'] = st.slider(
+            'Percentuale del Fondo Liquidato in Capitale (%)',
+            min_value=0,
+            max_value=50,
+            value=st.session_state.get('percentuale_liquidazione_fp', 50),
+            step=5,
+            help="Per legge, puoi richiedere fino al 50% del montante accumulato come capitale immediato al pensionamento. Il resto verrà convertito in una rendita annuale. Imposta qui la percentuale desiderata."
+        )
 
 # --- Sezione Altre Entrate ---
-with st.sidebar.expander("7. Altre Entrate"):
-    p = st.session_state.get('parametri', {})
-    pensione_pubblica_annua = st.number_input("Pensione Pubblica Annua (€)", min_value=0, step=500, value=p.get('pensione_pubblica_annua', 8400), help="L'importo annuo lordo della pensione statale (es. INPS) che prevedi di ricevere.")
-    inizio_pensione_anni = st.number_input("Inizio Pensione (Anni da oggi)", min_value=0, value=p.get('inizio_pensione_anni', 40), help="Tra quanti anni inizierai a ricevere la pensione pubblica.")
+with st.sidebar.expander("Opzioni Pensione Pubblica (INPS)", expanded=False):
+    st.session_state['attiva_pensione_pubblica'] = st.checkbox(
+        "Includi la Pensione Pubblica nel Piano",
+        value=st.session_state.get('attiva_pensione_pubblica', False),
+        help="Spunta questa casella se vuoi includere una stima della tua pensione pubblica futura nei calcoli."
+    )
+    if st.session_state.get('attiva_pensione_pubblica', False):
+        st.session_state['eta_pensione_pubblica'] = st.number_input(
+            'Età di Accesso alla Pensione Pubblica',
+            min_value=60,
+            max_value=75,
+            value=st.session_state.get('eta_pensione_pubblica', 67),
+            step=1,
+            help="L'età in cui prevedi di ricevere il tuo primo assegno pensionistico dall'INPS."
+        )
+        st.session_state['importo_pensione_pubblica_annua'] = st.number_input(
+            'Importo Annuo Stimato della Pensione Pubblica (€)',
+            min_value=0.0,
+            value=st.session_state.get('importo_pensione_pubblica_annua', 12000.0),
+            step=500.0,
+            help="Inserisci una stima dell'importo annuo lordo della tua pensione pubblica. Puoi usare il simulatore 'La Mia Pensione' sul sito dell'INPS per ottenere una stima personalizzata."
+        )
 
 # --- Pulsante Esecuzione ---
 if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
