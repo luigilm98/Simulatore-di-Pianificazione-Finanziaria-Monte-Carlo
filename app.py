@@ -369,15 +369,17 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                 st.markdown(f"**{sim['name']}**")
                 st.caption(f"Salvata il: {sim['timestamp']}")
             with col2:
-                if st.button("📂", key=f"load_{sim['filename']}", help="Carica questa simulazione"):
+                if st.button(f"🗑️ Elimina", key=f"del_{sim['filename']}"):
+                    delete_simulation(sim['filename'])
+                    st.rerun()
+
+            with col3:
+                if st.button(f"Carica", key=f"load_{sim['filename']}"):
                     data = load_simulation_data(sim['filename'])
                     st.session_state.parametri = data['parameters']
                     st.session_state.risultati = data['results']
                     st.session_state.simulazione_eseguita = True
                     st.rerun()
-            with col3:
-                if st.button("🗑️", key=f"delete_{sim['filename']}", help="Elimina questa simulazione"):
-                    delete_simulation(sim['filename'])
 
 with st.sidebar.expander("1. Parametri di Base", expanded=True):
     p = st.session_state.get('parametri', {})
