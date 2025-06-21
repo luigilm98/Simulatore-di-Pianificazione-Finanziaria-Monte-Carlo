@@ -1,8 +1,18 @@
 # 📈 Simulatore di Pianificazione Finanziaria Monte Carlo
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://simulatore-pianificazione-finanziaria.streamlit.app)
+
 Ciao a tutti,
 
 Non sono un programmatore né un esperto di finanza, ho solo un diploma professionale e lavoro nel mio laboratorio odontotecnio. Da tempo seguo con enorme interesse il mondo della pianificazione finanziaria e dell'indipendenza economica, questo piccolo software è il risultato di un mix di idee, concetti e strategie che ho assorbito seguendo due figure che stimo tantissimo: **Mr. RIP** e **Paolo Coletti**. Ho cercato di prendere spunto dai loro insegnamenti per creare uno strumento pratico, un simulatore Monte Carlo che potesse aiutarmi (e spero anche voi) a visualizzare concretamente il futuro finanziario.
+
+## 🚀 Prova l'Applicazione Online
+
+**[👉 CLICCA QUI PER PROVARE IL SIMULATORE ONLINE](https://simulatore-pianificazione-finanziaria.streamlit.app)**
+
+*Non serve installare nulla! L'applicazione funziona direttamente nel browser.*
+
+---
 
 ## Come è nato questo progetto?
 
@@ -99,11 +109,21 @@ Il simulatore è specificamente progettato per il contesto italiano:
 
 ## 🚀 Installazione e Utilizzo
 
-### Prerequisiti
+### 🎯 Opzione 1: Usa Online (Consigliato)
+
+**Non serve installare nulla!** L'applicazione è disponibile online:
+
+**[👉 PROVA SUBITO ONLINE](https://simulatore-pianificazione-finanziaria.streamlit.app)**
+
+### 💻 Opzione 2: Installa Localmente
+
+Se preferisci eseguire l'applicazione sul tuo computer:
+
+#### Prerequisiti
 - [Python 3.8+](https://www.python.org/downloads/)
 - Connessione internet (per installare le dipendenze)
 
-### Installazione Rapida
+#### Installazione Rapida
 
 ```bash
 # 1. Clona il repository
