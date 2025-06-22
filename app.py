@@ -150,7 +150,7 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, 5_000_000]
+        yaxis_range=[0, 2_000_000]
     )
 
     return fig
@@ -194,7 +194,7 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         hovermode="x unified",
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, 5_000_000]
+        yaxis_range=[0, 2_000_000]
     )
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
     return fig
@@ -249,7 +249,7 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, 5_000_000]
+        yaxis_range=[0, 2_000_000]
     )
     
     # Aggiungi linea verticale per l'inizio dei prelievi
@@ -294,7 +294,7 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, 5_000_000]
+        yaxis_range=[0, 2_000_000]
     )
     
     return fig
@@ -387,7 +387,7 @@ def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, 5_000_000]
+        yaxis_range=[0, 2_000_000]
     )
     
     return fig
