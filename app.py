@@ -820,12 +820,12 @@ if 'risultati' in st.session_state:
     )
     col2.metric(
         "Contributi Totali Versati", f"€ {contributi_versati:,.0f}",
-        help="La stima di tutto il denaro che verserai di tasca tua durante la fase di accumulo. Questo è il tuo sacrificio."
+        help="La stima di tutto il denaro che verserai di tasca tua durante la fase di accumulo. Include: accantonamenti sul conto corrente, investimenti in ETF, e contributi al fondo pensione (se attivato). Questo è il tuo sacrificio finanziario totale."
     )
     col3.metric(
         "Guadagni da Investimento", f"€ {guadagni_da_investimento:,.0f}",
         delta=f"{((guadagni_da_investimento / contributi_versati) * 100) if contributi_versati > 0 else 0:,.0f}% vs Contributi",
-        help="La ricchezza generata dai soli rendimenti di mercato (interessi composti), al netto dei costi, fino all'inizio della pensione. È il premio per la tua pazienza e per il rischio che ti sei assunto."
+        help="La ricchezza generata dai soli rendimenti di mercato (interessi composti), al netto dei costi, fino all'inizio della pensione. Include: rendimenti degli ETF, rendimenti del fondo pensione, e crescita degli accantonamenti liquidi. È il premio per la tua pazienza e per il rischio che ti sei assunto."
     )
     col4.metric(
         "Patrimonio Finale in Anni di Spesa", f"{anni_di_spesa_coperti:,.1f} Anni",
