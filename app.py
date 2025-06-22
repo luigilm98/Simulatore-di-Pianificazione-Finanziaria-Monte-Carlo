@@ -1231,10 +1231,12 @@ if 'risultati' in st.session_state:
     media_accumulo = np.mean(variazioni_accumulo) if variazioni_accumulo.size > 0 else 0
     media_prelievo = np.mean(variazioni_prelievo) if variazioni_prelievo.size > 0 else 0
 
+    anni_prelievo = params['anni_totali'] - idx_inizio_prelievo
+
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}", delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse", help="La percentuale di simulazioni in cui il tuo patrimonio è sceso a zero prima della fine dell'orizzonte temporale. Un valore basso è l'obiettivo principale.")
-    col2.metric("Crescita Media (Accumulo)", f"{media_accumulo:+.2%}", help="La crescita percentuale media annua del patrimonio durante la fase di accumulo (prima dei prelievi).")
-    col3.metric("Crescita Media (Prelievo)", f"{media_prelievo:+.2%}", help="La variazione percentuale media annua del patrimonio durante la fase di prelievo. È normale che sia negativa, poiché i prelievi superano i rendimenti.")
+    col2.metric("Crescita Media (Accumulo)", f"{media_accumulo:+.2%}", help=f"La crescita percentuale media annua del patrimonio durante i primi {idx_inizio_prelievo} anni (fase di accumulo).")
+    col3.metric("Crescita Media (Prelievo)", f"{media_prelievo:+.2%}", help=f"La variazione percentuale media annua del patrimonio durante gli ultimi {anni_prelievo} anni (fase di prelievo). È normale che sia negativa, poiché i prelievi superano i rendimenti.")
     col4.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse", help="La perdita massima percentuale subita dal tuo portafoglio dal suo picco al suo minimo in una singola simulazione. Misura la 'botta' peggiore che il tuo piano ha dovuto sopportare.")
     col5.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}", help="Un indicatore che misura il rendimento del tuo portafoglio rispetto al rischio che ti sei preso. Un valore più alto indica un miglior rendimento per unità di rischio. Sopra 1.0 è considerato ottimo.")
 

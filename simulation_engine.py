@@ -441,28 +441,11 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     dati_annuali['saldo_etf_reale'][final_year_index] = patrimonio_etf / indice_prezzi
     dati_annuali['saldo_fp_reale'][final_year_index] = patrimonio_fp / indice_prezzi
 
-    drawdown = 0
-    sharpe_ratio = 0
-    with np.errstate(divide='ignore', invalid='ignore'):
-        patrimoni_np = np.array(patrimonio_storico)
-        picchi = np.maximum.accumulate(patrimoni_np)
-        if np.any(picchi > 0):
-            drawdown_values = (patrimoni_np - picchi) / picchi
-            drawdown = np.min(drawdown_values)
-        
-        returns = patrimoni_run[1:] / patrimoni_run[:-1] - 1
-        finite_returns = returns[np.isfinite(returns)]
-        if finite_returns.size > 1 and np.std(finite_returns) > 0:
-            risk_free_month = (1 + 0.02) ** (1/12) - 1
-            sharpe_ratio = (np.mean(finite_returns) - risk_free_month) * np.sqrt(12) / np.std(finite_returns)
-            
     return {
         "patrimoni_run": patrimoni_run,
         "patrimoni_reali_run": patrimoni_reali_run,
         "reddito_annuo_reale": dati_annuali['reddito_totale_reale'][:parametri['anni_totali']],
         "dati_annuali": dati_annuali,
-        "drawdown": drawdown,
-        "sharpe_ratio": sharpe_ratio,
         "fallimento": patrimonio_negativo,
         "totale_contributi_versati_nominale": totale_contributi_versati_nominale,
         "guadagni_accumulo": guadagni_accumulo
@@ -685,8 +668,8 @@ def run_full_simulation(parametri):
         'patrimonio_inizio_prelievi_mediano_nominale': np.median(patrimoni_inizio_prelievi_nominali),
         'patrimonio_inizio_prelievi_mediano_reale': np.median(patrimoni_inizio_prelievi_reali),
 
-        'probabilita_fallimento': np.mean(fallimenti),
-        'drawdown_massimo_peggiore': np.min(drawdowns) if len(drawdowns) > 0 else 0,
+        'probabilita_fallimento': contatori_statistiche['fallimenti'] / n_sim,
+        'drawdown_massimo_peggiore': np.min(contatori_statistiche['drawdowns']) if contatori_statistiche['drawdowns'].size > 0 else 0,
         'sharpe_ratio_medio': np.mean(sharpe_ratios_successo[np.isfinite(sharpe_ratios_successo)]) if sharpe_ratios_successo.size > 0 else 0,
         
         'patrimoni_reali_finali': patrimoni_finali_reali,
