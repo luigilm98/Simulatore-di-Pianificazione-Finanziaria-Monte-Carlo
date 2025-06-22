@@ -345,34 +345,32 @@ def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
     
     anni_asse_x = eta_iniziale + np.arange(1, anni_totali + 1)  # Escludiamo l'anno 0
     
-    # Estrai i dati di reddito
+    # Estrai i dati di reddito usando i valori reali calcolati dall'engine
     prelievi_reali = dati_tabella.get('prelievi_effettivi_reali', np.zeros(anni_totali))
-    pensioni_pubbliche = dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(anni_totali))
-    rendite_fp = dati_tabella.get('rendite_fp_nominali', np.zeros(anni_totali))
-    
-    # Converti le pensioni e rendite in valori reali (semplificato)
-    # In un'implementazione completa, dovremmo applicare l'inflazione
-    pensioni_reali = pensioni_pubbliche
-    rendite_fp_reali = rendite_fp
+    pensioni_reali = dati_tabella.get('pensioni_pubbliche_reali', np.zeros(anni_totali))
+    rendite_fp_reali = dati_tabella.get('rendite_fp_reali', np.zeros(anni_totali))
     
     # Crea il grafico a area stack
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=prelievi_reali, mode='lines',
-        fill='tonexty', name='Prelievi dal Patrimonio',
+        stackgroup='one', # Imposta lo stack group per un corretto stacking
+        name='Prelievi dal Patrimonio',
         line={'color': '#dc3545'},
         hovertemplate='Età %{x}<br>Prelievi: €%{y:,.0f}<extra></extra>'
     ))
     
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=pensioni_reali, mode='lines',
-        fill='tonexty', name='Pensione Pubblica',
+        stackgroup='one',
+        name='Pensione Pubblica',
         line={'color': '#28a745'},
         hovertemplate='Età %{x}<br>Pensione: €%{y:,.0f}<extra></extra>'
     ))
     
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=rendite_fp_reali, mode='lines',
-        fill='tonexty', name='Rendita Fondo Pensione',
+        stackgroup='one',
+        name='Rendita Fondo Pensione',
         line={'color': '#ffc107'},
         hovertemplate='Età %{x}<br>Rendita FP: €%{y:,.0f}<extra></extra>'
     ))
@@ -862,17 +860,18 @@ if 'risultati' in st.session_state:
         col_keys = [
             ('Obiettivo Prelievo (Nom.)', 'prelievi_target_nominali'),
             ('Prelievo Effettivo (Nom.)', 'prelievi_effettivi_nominali'),
+            ('Prelievo Effettivo (Reale)', 'prelievi_effettivi_reali'),
             ('Fonte: Conto Corrente', 'prelievi_da_banca_nominali'),
             ('Fonte: Vendita ETF', 'prelievi_da_etf_nominali'),
             ('Vendita ETF (Rebalance)', 'vendite_rebalance_nominali'),
-            ('Prelievo Effettivo (Reale)', 'prelievi_effettivi_reali'),
             ('Pensione Pubblica (Nom.)', 'pensioni_pubbliche_nominali'),
             ('Rendita FP (Nom.)', 'rendite_fp_nominali'),
             ('Liquidazione FP (Nom.)', 'fp_liquidato_nominale'),
             # Per i saldi, partiamo dall'anno 1 per allinearli con gli anni del dataframe
             ('Patrimonio Banca (Nom.)', 'saldo_banca_nominale'),
             ('Patrimonio ETF (Nom.)', 'saldo_etf_nominale'),
-            ('Patrimonio FP (Nom.)', 'saldo_fp_nominale')
+            ('Patrimonio FP (Nom.)', 'saldo_fp_nominale'),
+            ('Patrimonio Banca (Reale)', 'saldo_banca_reale')
         ]
 
         for col, key in col_keys:
@@ -899,6 +898,7 @@ if 'risultati' in st.session_state:
             'Patrimonio Banca (Nom.)': "€ {:,.0f}",
             'Patrimonio ETF (Nom.)': "€ {:,.0f}",
             'Patrimonio FP (Nom.)': "€ {:,.0f}",
+            'Patrimonio Banca (Reale)': "€ {:,.0f}",
         }))
 
         with st.expander("Guida alla Lettura della Tabella"):
