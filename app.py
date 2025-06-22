@@ -199,19 +199,19 @@ def plot_income_composition(data, anni_totali, eta_iniziale):
     anni_asse_x_annuale = eta_iniziale + np.arange(1, anni_totali + 1)
     fig = go.Figure()
     
-    # I dati partono dall'indice 1 per escludere l'anno 0 (iniziale)
+    # Usiamo :anni_totali per prendere i primi N anni di flussi, escludendo l'ultimo punto non calcolato
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['prelievi_effettivi_reali'][1:],
+        x=anni_asse_x_annuale, y=data['prelievi_effettivi_reali'][:anni_totali],
         name='Prelievi dal Patrimonio', stackgroup='one',
         line={'color': '#4472C4'}
     ))
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['pensioni_pubbliche_reali'][1:],
+        x=anni_asse_x_annuale, y=data['pensioni_pubbliche_reali'][:anni_totali],
         name='Pensione Pubblica', stackgroup='one',
         line={'color': '#ED7D31'}
     ))
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['rendite_fp_reali'][1:],
+        x=anni_asse_x_annuale, y=data['rendite_fp_reali'][:anni_totali],
         name='Rendita Fondo Pensione', stackgroup='one',
         line={'color': '#A5A5A5'}
     ))

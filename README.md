@@ -217,4 +217,32 @@ Questo progetto è rilasciato sotto licenza [MIT](LICENSE). Puoi usare, modifica
 
 ---
 
-*Grazie a Mr. RIP e Paolo Coletti per l'ispirazione e gli insegnamenti che hanno reso possibile questo progetto.* 
+*Grazie a Mr. RIP e Paolo Coletti per l'ispirazione e gli insegnamenti che hanno reso possibile questo progetto.*
+
+## Guida all'Interpretazione dei Grafici
+
+### Perché il grafico del patrimonio totale "crolla" al momento della pensione?
+
+Potresti notare che, in un certo punto della fase di decumulo (tipicamente intorno all'età di ritiro dal fondo pensione), il grafico del patrimonio totale mostra una discesa netta e improvvisa. **Questo non è un errore**, ma la rappresentazione corretta di un evento finanziario complesso: la liquidazione del fondo pensione.
+
+Ecco cosa succede, spiegato con un esempio:
+
+Immagina che, al momento del ritiro, la tua situazione sia:
+- **Conto Corrente:** 50.000 €
+- **Portafoglio ETF:** 450.000 €
+- **Fondo Pensione:** 300.000 €
+- **PATRIMONIO TOTALE:** `50.000 + 450.000 + 300.000 = 800.000 €`
+
+Quando il fondo pensione viene liquidato:
+
+1.  **Il Fondo Pensione si azzera:** L'intero valore del fondo (300.000 €) viene rimosso dal calcolo del tuo patrimonio, che in quell'istante scende a 500.000 €.
+2.  **Ti arriva la liquidità:** Una parte del fondo (es. il 50%, ovvero 150.000 €) viene tassata (es. al 15%, pagando 22.500 €) e l'importo netto (**127.500 €**) viene accreditato sul tuo conto corrente.
+3.  **Nasce la rendita:** La parte rimanente del fondo (gli altri 150.000 €) viene convertita in una rendita futura, un flusso di reddito che riceverai negli anni a venire. Questi soldi **non sono più patrimonio**, ma sono diventati una promessa di pagamento.
+
+La situazione finale del patrimonio è:
+- **Conto Corrente:** `50.000 + 127.500 = 177.500 €`
+- **Portafoglio ETF:** 450.000 €
+- **Fondo Pensione:** 0 €
+- **NUOVO PATRIMONIO TOTALE:** `177.500 + 450.000 + 0 = 627.500 €`
+
+Sei passato da 800.000 € a 627.500 €. Il "crollo" nel grafico rappresenta la parte di ricchezza che hai scambiato per ottenere un reddito futuro sicuro.

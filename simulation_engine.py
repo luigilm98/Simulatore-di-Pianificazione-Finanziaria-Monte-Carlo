@@ -375,6 +375,15 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             patrimonio_negativo = True
 
     # Calcoli finali per la singola run
+    # Popoliamo i dati dell'ultimo anno che altrimenti rimarrebbero a zero
+    final_year_index = parametri['anni_totali']
+    dati_annuali['saldo_banca_nominale'][final_year_index] = patrimonio_banca
+    dati_annuali['saldo_etf_nominale'][final_year_index] = patrimonio_etf
+    dati_annuali['saldo_fp_nominale'][final_year_index] = patrimonio_fp
+    dati_annuali['saldo_banca_reale'][final_year_index] = patrimonio_banca / indice_prezzi
+    dati_annuali['saldo_etf_reale'][final_year_index] = patrimonio_etf / indice_prezzi
+    dati_annuali['saldo_fp_reale'][final_year_index] = patrimonio_fp / indice_prezzi
+
     drawdown = 0
     sharpe_ratio = 0
     with np.errstate(divide='ignore', invalid='ignore'):
