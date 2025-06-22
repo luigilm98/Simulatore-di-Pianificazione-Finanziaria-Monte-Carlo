@@ -111,6 +111,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     
     inizio_prelievo_mesi = parametri['anni_inizio_prelievo'] * 12 + 1
     
+    # Stato specifico per la gestione della rendita del FP
+    capitale_fp_per_rendita = 0
+    rendita_annua_nominale_lorda_fp = 0
+    
     for mese in range(1, mesi_totali + 1):
         anno_corrente = (mese - 1) // 12
         eta_attuale = eta_iniziale + anno_corrente
@@ -148,6 +152,11 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             rendita_mensile_indicizzata = rendita_mensile_nominale_tassata_fp * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
             patrimonio_banca += rendita_mensile_indicizzata
             entrate_passive_mensili += rendita_mensile_indicizzata
+            # Riduci il capitale rimanente nel FP
+            if capitale_fp_per_rendita > 0:
+                quota_capitale_erosa = (rendita_annua_nominale_lorda_fp / 12) * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
+                capitale_fp_per_rendita = max(0, capitale_fp_per_rendita - quota_capitale_erosa)
+                patrimonio_fp = capitale_fp_per_rendita # Aggiorna il saldo principale del FP
 
         prelievo_mensile = 0
         if mese >= inizio_prelievo_mesi:
@@ -250,20 +259,22 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # 1. Applica il rendimento lordo
         patrimonio_etf *= (1 + rendimento_mensile)
         
-        # 2. Sottrai i costi mensilizzati (TER e Bollo)
-        if patrimonio_etf > 0:
-            patrimonio_etf *= (1 - costo_ter_mensile - costo_bollo_mensile)
+        # 2. Applica i costi sugli ETF
+        patrimonio_etf -= patrimonio_etf * costo_ter_mensile
+        patrimonio_etf -= patrimonio_etf * costo_bollo_mensile
+        patrimonio_etf -= parametri['costo_fisso_etf_mensile']
 
-        if patrimonio_etf > 0:
-            patrimonio_etf -= parametri['costo_fisso_etf_mensile']
+        # 3. Applica rendimento e costi al Fondo Pensione (se attivo e prima del ritiro completo)
+        if parametri['attiva_fondo_pensione'] and (eta_attuale < parametri['eta_ritiro_fp'] or capitale_fp_per_rendita > 0):
+             rendimento_mensile_fp = np.random.normal(parametri['rendimento_medio_fp']/12, parametri['volatilita_fp']/np.sqrt(12))
+             
+             # Se la rendita è attiva, il rendimento si applica solo sul capitale residuo
+             if fp_convertito_in_rendita:
+                 patrimonio_fp *= (1 + rendimento_mensile_fp)
+             else: # Altrimenti sul totale accumulato
+                 patrimonio_fp *= (1 + rendimento_mensile_fp)
 
-        if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
-            # Anche il fondo pensione ha un TER mensilizzato
-            costo_ter_fp_mensile = parametri['ter_fp'] / 12
-            rendimento_fp = np.random.normal(parametri['rendimento_medio_fp']/12, parametri['volatilita_fp']/np.sqrt(12))
-            patrimonio_fp *= (1 + rendimento_fp)
-            if patrimonio_fp > 0:
-                patrimonio_fp *= (1 - costo_ter_fp_mensile)
+             patrimonio_fp -= patrimonio_fp * (parametri['ter_fp'] / 12)
 
         tasso_inflazione_mensile = np.random.normal(parametri['inflazione']/12, 0.005)
         indice_prezzi *= (1 + tasso_inflazione_mensile)

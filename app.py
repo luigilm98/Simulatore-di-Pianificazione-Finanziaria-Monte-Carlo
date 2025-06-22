@@ -742,11 +742,11 @@ if 'risultati' in st.session_state:
     col3.metric(
         "Guadagni da Investimento", f"€ {guadagni_da_investimento:,.0f}",
         delta=f"{((guadagni_da_investimento / contributi_versati) * 100) if contributi_versati > 0 else 0:,.0f}% vs Contributi",
-        help="La ricchezza generata dai soli rendimenti di mercato, calcolata ESCLUSIVAMENTE durante la fase di accumulo (fino all'inizio dei prelievi). Questo valore non tiene conto dei prelievi fatti in pensione."
+        help="La ricchezza generata dai soli rendimenti di mercato (interessi composti), al netto dei costi, fino all'inizio della pensione. È il premio per la tua pazienza e per il rischio che ti sei assunto."
     )
     col4.metric(
         "Patrimonio Finale in Anni di Spesa", f"{anni_di_spesa_coperti:,.1f} Anni",
-        help=f"Il tuo patrimonio finale reale mediano, tradotto in quanti anni del tuo tenore di vita pensionistico (€{reddito_annuo_reale_pensione:,.0f}/anno) può coprire."
+        help=f"Il tuo patrimonio finale reale mediano, tradotto in quanti anni del tuo tenore di vita pensionistico (€{reddito_annuo_reale_pensione:,.0f}/anno) può coprire. Un valore alto indica una maggiore sicurezza."
     )
 
     # --- Messaggio speciale per il calcolo del prelievo sostenibile ---
@@ -765,16 +765,16 @@ if 'risultati' in st.session_state:
     
     st.header("Risultati Finali della Simulazione (Patrimonio Nominale)")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}")
-    col2.metric("Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}")
-    col3.metric("Patrimonio Finale (Peggior 10% - 10°)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}")
-    col4.metric("Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}")
+    col1.metric("Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}", help="Il valore nominale (non aggiustato per l'inflazione) del tuo patrimonio alla fine della simulazione nello scenario mediano (il più probabile).")
+    col2.metric("Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto fortunato (migliore del 90% delle simulazioni).")
+    col3.metric("Patrimonio Finale (Peggior 10% - 10°)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto sfortunato (peggiore del 90% delle simulazioni).")
+    col4.metric("Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}", help="Il POTERE D'ACQUISTO reale del tuo patrimonio finale nello scenario mediano. Questo è il valore che conta davvero, perché tiene conto dell'inflazione.")
 
     st.markdown("##### Indicatori di Rischio del Piano")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}", delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse")
-    col2.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse")
-    col3.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}")
+    col1.metric("Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}", delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse", help="La percentuale di simulazioni in cui il tuo patrimonio è sceso a zero prima della fine dell'orizzonte temporale. Un valore basso è l'obiettivo principale.")
+    col2.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse", help="La perdita massima percentuale subita dal tuo portafoglio dal suo picco al suo minimo in una singola simulazione. Misura la 'botta' peggiore che il tuo piano ha dovuto sopportare.")
+    col3.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}", help="Un indicatore che misura il rendimento del tuo portafoglio rispetto al rischio che ti sei preso. Un valore più alto indica un miglior rendimento per unità di rischio. Sopra 1.0 è considerato ottimo.")
 
     st.header("Riepilogo Entrate in Pensione (Valori Reali, Scenario Mediano)")
     dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
@@ -792,10 +792,10 @@ if 'risultati' in st.session_state:
     totale_medio = prelievo_medio + pensione_media + rendita_fp_media
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio:,.0f}")
-    col2.metric("Pensione Pubblica Annua", f"€ {pensione_media:,.0f}")
-    col3.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media:,.0f}")
-    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio:,.0f}")
+    col1.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che preleverai dal tuo patrimonio (ETF e liquidità) per vivere durante la pensione.")
+    col2.metric("Pensione Pubblica Annua", f"€ {pensione_media:,.0f}", help="La stima della tua pensione statale annua (es. INPS) in potere d'acquisto di oggi.")
+    col3.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che riceverai dal tuo fondo pensione, se attivato.")
+    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio:,.0f}", help="Il tuo tenore di vita totale! La somma di tutte le tue entrate annue medie (in potere d'acquisto di oggi) durante la pensione.")
 
     with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
         st.write("Array dei patrimoni finali reali (tutte le simulazioni):")
@@ -851,6 +851,23 @@ if 'risultati' in st.session_state:
         fig_reale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_reale, use_container_width=True)
 
+        st.markdown("---")
+        st.subheader("Evoluzione Patrimonio Nominale (Valori Assoluti)")
+        st.markdown("Questo grafico mostra l'evoluzione del patrimonio in **valori nominali**. È utile per vedere la crescita assoluta del capitale, ma ricorda che questi valori non riflettono il vero potere d'acquisto futuro.")
+        fig_nominale = plot_wealth_summary_chart(
+            data=st.session_state.risultati['dati_grafici_principali']['nominale'], 
+            title='Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 
+            y_title='Patrimonio Nominale (€)', 
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale'],
+            anni_inizio_prelievo=params['anni_inizio_prelievo'],
+            color_median='#007bff',
+            color_fill='#007bff'
+        )
+        fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        st.plotly_chart(fig_nominale, use_container_width=True)
+
+
     with tabs[1]: # Composizione del Patrimonio
         dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
         
@@ -867,6 +884,7 @@ if 'risultati' in st.session_state:
             anni_totali=params['anni_totali'],
             eta_iniziale=params['eta_iniziale']
         )
+        fig_banca.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_banca, use_container_width=True)
 
         # Grafico 2: ETF
@@ -877,6 +895,7 @@ if 'risultati' in st.session_state:
             anni_totali=params['anni_totali'],
             eta_iniziale=params['eta_iniziale']
         )
+        fig_etf.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_etf, use_container_width=True)
         
         # Grafico 3: Fondo Pensione
@@ -888,6 +907,7 @@ if 'risultati' in st.session_state:
                 anni_totali=params['anni_totali'],
                 eta_iniziale=params['eta_iniziale']
             )
+            fig_fp.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
             st.plotly_chart(fig_fp, use_container_width=True)
 
 
@@ -941,7 +961,9 @@ if 'risultati' in st.session_state:
             ('Patrimonio Banca (Nom.)', 'saldo_banca_nominale'),
             ('Patrimonio ETF (Nom.)', 'saldo_etf_nominale'),
             ('Patrimonio FP (Nom.)', 'saldo_fp_nominale'),
-            ('Patrimonio Banca (Reale)', 'saldo_banca_reale')
+            ('Patrimonio Banca (Reale)', 'saldo_banca_reale'),
+            ('Patrimonio ETF (Reale)', 'saldo_etf_reale'),
+            ('Patrimonio FP (Reale)', 'saldo_fp_reale')
         ]
 
         for col, key in col_keys:
@@ -969,6 +991,8 @@ if 'risultati' in st.session_state:
             'Patrimonio ETF (Nom.)': "€ {:,.0f}",
             'Patrimonio FP (Nom.)': "€ {:,.0f}",
             'Patrimonio Banca (Reale)': "€ {:,.0f}",
+            'Patrimonio ETF (Reale)': "€ {:,.0f}",
+            'Patrimonio FP (Reale)': "€ {:,.0f}",
         }))
 
         with st.expander("Guida alla Lettura della Tabella"):
