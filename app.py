@@ -200,7 +200,13 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         yaxis_title=y_title,
         hovermode="x unified",
         showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis=dict(
+            range=[0, 3500000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
     return fig
@@ -244,17 +250,22 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
     fig.add_trace(go.Scatter(
         x=eta_asse_x, y=p50, mode='lines',
         name='Reddito Mediano',
-        line={'width': 3, 'color': '#007bff'},
-        hovertemplate='Età %{x}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
+        line={'width': 3, 'color': '#dc3545'}, # Rosso più scuro per la mediana
+        hovertemplate='Età %{x:.1f}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
     ))
     
     fig.update_layout(
         title='Evoluzione del Reddito Annuo Reale in Pensione',
         xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis=dict(
+            range=[0, 3500000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
     
     # Aggiungi linea verticale per l'inizio dei prelievi
@@ -296,9 +307,14 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         title='Analisi degli Scenari Peggiori (10% più sfortunati)',
         xaxis_title="Età",
         yaxis_title="Patrimonio Reale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis=dict(
+            range=[0, 3500000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
     
     return fig
@@ -340,9 +356,14 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
         title='Composizione del Patrimonio nel Tempo (Valori Nominali)',
         xaxis_title="Età",
         yaxis_title="Patrimonio Nominale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis=dict(
+            range=[0, 3500000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
     
     return fig
@@ -387,9 +408,14 @@ def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
         title='Composizione del Reddito Annuo nel Tempo (Valori Reali)',
         xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis=dict(
+            range=[0, 3500000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
     
     return fig
