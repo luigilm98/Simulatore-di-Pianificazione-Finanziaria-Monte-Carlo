@@ -421,53 +421,40 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
 def _calcola_prelievo_sostenibile(parametri):
     """
-    Calcola il prelievo annuo sostenibile usando un approccio di ricerca binaria.
-    Trova il prelievo massimo che garantisce una probabilità di successo del 90%
-    (cioè, il patrimonio finale è >= 0 nel 10° percentile degli scenari).
+    Calcola il prelievo annuo sostenibile costante che porta la mediana del patrimonio finale (banca+etf)
+    a zero (o il più vicino possibile a zero, ma non negativo) nell'ultimo anno di simulazione.
     """
     prelievo_min = 0
-    prelievo_max = 150000  # Aumentato il limite superiore per sicurezza
+    prelievo_max = 150000
     tolleranza = 100
-    max_iterazioni = 25 # Aumentate per maggiore precisione
+    max_iterazioni = 25
 
     def testa_prelievo(prelievo_test):
         parametri_test = parametri.copy()
         parametri_test['prelievo_annuo'] = prelievo_test
         parametri_test['strategia_prelievo'] = 'FISSO'
-        parametri_test['n_simulazioni'] = max(200, parametri['n_simulazioni'] // 5) # Più simulazioni per stabilità
-        
+        parametri_test['n_simulazioni'] = max(200, parametri['n_simulazioni'] // 5)
         risultati_test = run_full_simulation(parametri_test, use_sustainable_withdrawal=False)
         tutti_i_dati_annuali_reali = risultati_test['dati_annuali_reali']
-        
         patrimonio_finale_banca = tutti_i_dati_annuali_reali['saldo_banca_reale'][:, -1]
         patrimonio_finale_etf = tutti_i_dati_annuali_reali['saldo_etf_reale'][:, -1]
         patrimonio_finale_totale = patrimonio_finale_banca + patrimonio_finale_etf
-        
-        # Usiamo il 10° percentile invece del minimo assoluto.
-        # Questo rappresenta lo scenario "sfortunato ma non catastrofico".
-        patrimonio_al_10_percentile = np.percentile(patrimonio_finale_totale, 10)
-        
-        return patrimonio_al_10_percentile
-    
+        return np.median(patrimonio_finale_totale)
+
     prelievo_ottimale = 0
-    for iterazione in range(max_iterazioni):
+    for _ in range(max_iterazioni):
         prelievo_test = (prelievo_min + prelievo_max) / 2
-        patrimonio_target = testa_prelievo(prelievo_test)
-        
-        if abs(patrimonio_target) < tolleranza:
+        patrimonio_mediano = testa_prelievo(prelievo_test)
+        if abs(patrimonio_mediano) < tolleranza:
             prelievo_ottimale = prelievo_test
             break
-        elif patrimonio_target > 0:
-            # Il patrimonio è positivo nel 10° percentile, possiamo provare a prelevare di più.
-            prelievo_ottimale = prelievo_test # Salviamo questo risultato come "buono"
+        elif patrimonio_mediano > 0:
+            prelievo_ottimale = prelievo_test
             prelievo_min = prelievo_test
         else:
-            # Il patrimonio è negativo, dobbiamo diminuire il prelievo.
             prelievo_max = prelievo_test
-            
         if (prelievo_max - prelievo_min) / 2 < tolleranza:
             break
-    
     return max(0, round(prelievo_ottimale, -2))
 
 def run_full_simulation(parametri, use_sustainable_withdrawal=True):
