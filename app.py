@@ -156,18 +156,23 @@ def plot_income_composition(data, anni_totali, eta_iniziale):
     fig = go.Figure()
     
     # I dati partono dall'indice 1 per escludere l'anno 0 (iniziale)
+    # Aggiungiamo un controllo per assicurarci che i dati esistano prima di plottare
+    prelievi = data.get('prelievi_effettivi_reali', np.zeros(anni_totali + 1))
+    pensioni = data.get('pensioni_pubbliche_reali', np.zeros(anni_totali + 1))
+    rendite_fp = data.get('rendite_fp_reali', np.zeros(anni_totali + 1))
+
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['prelievi_effettivi_reali'][1:],
+        x=anni_asse_x_annuale, y=prelievi[1:],
         name='Prelievi dal Patrimonio', stackgroup='one',
         line={'color': '#4472C4'}
     ))
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['pensioni_pubbliche_reali'][1:],
+        x=anni_asse_x_annuale, y=pensioni[1:],
         name='Pensione Pubblica', stackgroup='one',
         line={'color': '#ED7D31'}
     ))
     fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['rendite_fp_reali'][1:],
+        x=anni_asse_x_annuale, y=rendite_fp[1:],
         name='Rendita Fondo Pensione', stackgroup='one',
         line={'color': '#A5A5A5'}
     ))
@@ -771,7 +776,7 @@ else:
         
         df = pd.DataFrame({
             'Anno': df_index,
-            'Età': params['eta_iniziale'] + df_index,
+            'Età': params['eta_iniziale'] + df_index -1, # Correzione per allineare l'età all'anno
             # I flussi (come prelievi) hanno senso dall'anno 1 in poi
             'Obiettivo Prelievo (Nom.)': dati_tabella.get('prelievi_target_nominali', np.zeros(num_anni + 1))[1:],
             'Prelievo Effettivo (Nom.)': dati_tabella.get('prelievi_effettivi_nominali', np.zeros(num_anni + 1))[1:],
