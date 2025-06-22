@@ -144,15 +144,21 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
+    tick_values = [50000, 100000, 250000, 500000, 1000000, 2000000, 3500000]
+    tick_text = ["€50k", "€100k", "€250k", "€500k", "€1M", "€2M", "€3.5M"]
+
     fig.update_layout(
         title=title,
         xaxis_title="Età",
         yaxis_title=y_title,
-        yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        # Limita l'asse y in modo robusto, ignorando picchi anomali estremi
-        yaxis_range=[0, np.percentile(p99, 98) * 1.05] 
+        yaxis=dict(
+            range=[0, 3500000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
 
     return fig
@@ -192,7 +198,6 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         title=title,
         xaxis_title="Età",
         yaxis_title=y_title,
-        yaxis_tickformat="€,d",
         hovermode="x unified",
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
