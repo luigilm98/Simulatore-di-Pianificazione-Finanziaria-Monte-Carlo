@@ -12,7 +12,7 @@ import simulation_engine as engine
 
 # --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(
-    page_title="Simulatore Finanziario Monte Carlo",
+    page_title="💸Simulatore Finanziario Monte Carlo💸",
     page_icon="✈️",
     layout="wide"
 )
@@ -517,8 +517,8 @@ if 'portfolio' not in st.session_state:
     st.session_state.portfolio = get_default_portfolio()
 
 st.title("✈️ Progetta la Tua Indipendenza Finanziaria")
-st.markdown("Benvenuto nel simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria e scoprire come raggiungere i tuoi obiettivi.")
-
+st.markdown("Benvenuto in Matrix, Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria e scoprire come raggiungere i tuoi obiettivi.")
+st.markdown("È la tua ultima occasione, se rinunci non ne avrai altre. Pillola azzurra, fine della storia: domani ti sveglierai in camera tua, e crederai a quello che vorrai. Pillola rossa, resti nel paese delle meraviglie, e vedrai quant'è profonda la tana del bianconiglio. Ti sto offrendo solo la verità, ricordalo. Niente di più.")
 st.sidebar.header("Configurazione Simulazione")
 
 with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
@@ -698,7 +698,7 @@ if 'risultati' in st.session_state:
     if 'statistiche' not in st.session_state.risultati or \
        'guadagni_accumulo_mediano_nominale' not in st.session_state.risultati['statistiche']:
         del st.session_state.risultati
-        st.warning("⚠️ La struttura dei dati è cambiata con l'ultimo aggiornamento. Per favore, clicca di nuovo su 'Avvia Simulazione' per ricalcolare i risultati con la nuova logica.")
+        st.warning("⚠️ clicca di nuovo su 'Avvia Simulazione' per ricalcolare i risultati con la nuova logica.")
         st.stop()
 
 # --- SEZIONE VISUALIZZAZIONE RISULTATI ---
