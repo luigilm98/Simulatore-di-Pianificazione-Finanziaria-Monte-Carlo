@@ -516,8 +516,7 @@ def get_default_portfolio():
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = get_default_portfolio()
 
-st.title("✈️ Progetta la Tua Indipendenza Finanziaria")
-st.markdown("Benvenuto in Matrix, Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria e scoprire come raggiungere i tuoi obiettivi.")
+st.title("💸Progetta la Tua Indipendenza Finanziaria💸")
 st.markdown("È la tua ultima occasione, se rinunci non ne avrai altre. Pillola azzurra, fine della storia: domani ti sveglierai in camera tua, e crederai a quello che vorrai. Pillola rossa, resti nel paese delle meraviglie, e vedrai quant'è profonda la tana del bianconiglio. Ti sto offrendo solo la verità, ricordalo. Niente di più.")
 st.sidebar.header("Configurazione Simulazione")
 
