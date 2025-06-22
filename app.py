@@ -688,15 +688,15 @@ if 'risultati' in st.session_state:
     )
 
     # --- Messaggio speciale per il calcolo del prelievo sostenibile ---
-    reddito_sostenibile_calcolato = stats.get('prelievo_sostenibile_calcolato')
-    if reddito_sostenibile_calcolato is not None:
+    prelievo_sostenibile_calcolato = stats.get('prelievo_sostenibile_calcolato')
+    if prelievo_sostenibile_calcolato is not None:
         st.info(f"""
-        **Hai richiesto il calcolo del reddito massimo sostenibile.**
+        **Hai richiesto il calcolo del prelievo massimo sostenibile.**
         
-        Abbiamo calcolato che, nello scenario mediano, puoi sostenere un **reddito annuo reale totale** di circa **€ {reddito_sostenibile_calcolato:,.0f}**.
-        Questo reddito è coperto prima dalle tue pensioni e poi da prelievi dal tuo patrimonio.
-
-        I risultati della simulazione qui sotto (es. Probabilità di Fallimento) rappresentano uno **stress test** di questo piano.
+        Abbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.
+        
+        I risultati della simulazione qui sotto (es. Probabilità di Fallimento) rappresentano uno **stress test** di questo piano. 
+        Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
         """)
 
     st.markdown("---")
@@ -720,12 +720,7 @@ if 'risultati' in st.session_state:
     col1.metric("Prelievo Medio dal Patrimonio", f"€ {stats_prelievi['prelievo_reale_medio']:,.0f}")
     col2.metric("Pensione Pubblica Annua", f"€ {stats_prelievi['pensione_pubblica_reale_annua']:,.0f}")
     col3.metric("Rendita Media da Fondo Pensione", f"€ {stats_prelievi['rendita_fp_reale_media']:,.0f}")
-    
-    # Se abbiamo calcolato il reddito sostenibile, lo mostriamo come metrica principale
-    if reddito_sostenibile_calcolato is not None:
-        col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {reddito_sostenibile_calcolato:,.0f}", help="Questo è il Reddito Annuo Reale Sostenibile calcolato dal simulatore per azzerare il patrimonio alla fine.")
-    else:
-        col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {stats_prelievi['totale_reale_medio_annuo']:,.0f}")
+    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {stats_prelievi['totale_reale_medio_annuo']:,.0f}")
 
     with st.expander("🔍 Guida alla Lettura: Perché il mio piano ha successo (o fallisce)?"):
         st.markdown("""
@@ -736,7 +731,7 @@ if 'risultati' in st.session_state:
         st.plotly_chart(plot_wealth_composition_chart(patrimonio_iniziale_totale, contributi_versati, guadagni_da_investimento), use_container_width=True)
 
         st.markdown("""
-        Come puoi vedere, nel lungo periodo, i **Guadagni da Investimento** (la ricompensa per il rischio e la pazienza nel caso di buy n hold) spesso superano persino il totale dei contributi che hai versato. Questo è l'effetto dell'**interesse composto**: i tuoi guadagni iniziano a generare altri guadagni, in un circolo virtuoso che accelera la crescita del tuo patrimonio.
+        Come puoi vedere, nel lungo periodo, i **Guadagni da Investimento** (la ricompensa per il rischio e la pazienza) spesso superano persino il totale dei contributi che hai versato. Questo è l'effetto dell'**interesse composto**: i tuoi guadagni iniziano a generare altri guadagni, in un circolo virtuoso che accelera la crescita del tuo patrimonio.
 
         **Limiti del Modello da Tenere a Mente:**
         Questo simulatore è un potente strumento matematico, ma non può prevedere il futuro o la vita reale al 100%. Ricorda che:
