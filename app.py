@@ -143,9 +143,9 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
-    # Scala Y: robusta per 'reale', fissa per 'nominale' per leggibilità
-    p98 = np.percentile(data, 98, axis=0)
-    y_max = np.max(p98) * 1.05
+    # Scala Y: robusta basata sull'80° percentile per maggiore leggibilità
+    p80 = np.percentile(data, 80, axis=0)
+    y_max = np.max(p80) * 1.05
         
     fig.update_layout(
         title=title,
@@ -194,9 +194,9 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
-    # Scala dinamica robusta
-    p98 = np.percentile(data, 98, axis=0)
-    y_max = np.max(p98) * 1.05
+    # Scala dinamica robusta basata sull'80° percentile
+    p80 = np.percentile(data, 80, axis=0)
+    y_max = np.max(p80) * 1.05
             
     fig.update_layout(
         title=title,
@@ -256,9 +256,9 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
         hovertemplate='Età %{x}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
     ))
 
-    # Scala dinamica robusta
-    p98 = np.percentile(data, 98, axis=0)
-    y_max = np.max(p98) * 1.05
+    # Scala dinamica robusta basata sull'80° percentile
+    p80 = np.percentile(data, 80, axis=0)
+    y_max = np.max(p80) * 1.05
 
     fig.update_layout(
         title='Quale sarà il mio tenore di vita in pensione?',
@@ -329,9 +329,9 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano (Peggiori): €%{y:,.0f}<extra></extra>'
     ))
 
-    # Scala dinamica robusta basata sui dati degli scenari peggiori
-    p98_worst = np.percentile(worst_data, 98, axis=0)
-    y_max = np.max(p98_worst) * 1.05
+    # Scala dinamica robusta basata sui dati degli scenari peggiori (80° percentile)
+    p80_worst = np.percentile(worst_data, 80, axis=0)
+    y_max = np.max(p80_worst) * 1.05
 
     fig.update_layout(
         title='Il piano sopravviverà a una crisi di mercato iniziale? (Focus sul 10% degli scenari peggiori)',
