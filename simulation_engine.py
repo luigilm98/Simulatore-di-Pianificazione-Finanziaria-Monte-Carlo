@@ -602,6 +602,8 @@ def run_full_simulation(parametri):
         prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
 
     # --- ESECUZIONE SIMULAZIONI PRINCIPALI ---
+    # Eseguiamo SEMPRE la simulazione completa qui con il numero di simulazioni corretto
+    # e il prelievo appena calcolato, per garantire che i risultati finali siano accurati.
     (
         patrimoni_tutte_le_run,
         patrimoni_reali_tutte_le_run,
