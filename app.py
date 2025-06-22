@@ -887,81 +887,54 @@ if 'risultati' in st.session_state:
 
     st.markdown("---")
     
-    st.header("Risultati Finali della Simulazione")
-    st.caption("Confronto tra patrimonio **nominale** (la cifra assoluta che vedrai) e **reale** (il potere d'acquisto di oggi).")
-    
+    st.header("Risultati Finali della Simulazione (Valori Nominali)")
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("##### Mediano (50° percentile)")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>€ {stats['patrimonio_finale_mediano_nominale']:,.0f}", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>€ {stats['patrimonio_finale_mediano_reale']:,.0f}", unsafe_allow_html=True)
+    col1.metric("Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}", help="Il valore nominale (non aggiustato per l'inflazione) del tuo patrimonio alla fine della simulazione nello scenario mediano.")
+    col2.metric("Patrimonio Finale (Top 10%)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto fortunato (migliore del 90% delle simulazioni).")
+    col3.metric("Patrimonio Finale (Peggior 10%)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto sfortunato (peggiore del 90% delle simulazioni).")
 
-    with col2:
-        st.markdown("##### Fortunato (90° percentile)")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>€ {stats['patrimonio_finale_top_10_nominale']:,.0f}", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>€ {stats['patrimonio_finale_top_10_reale']:,.0f}", unsafe_allow_html=True)
-
-    with col3:
-        st.markdown("##### Sfortunato (10° percentile)")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>€ {stats['patrimonio_finale_peggior_10_reale']:,.0f}", unsafe_allow_html=True)
-
+    st.header("Risultati Finali della Simulazione (Valori Reali - Potere d'Acquisto di Oggi)")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}", help="Il POTERE D'ACQUISTO reale del tuo patrimonio finale nello scenario mediano. Questo è il valore che conta davvero, perché tiene conto dell'inflazione.")
+    col2.metric("Patrimonio Reale Finale (Top 10%)", f"€ {stats['patrimonio_finale_top_10_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio finale in uno scenario molto fortunato.")
+    col3.metric("Patrimonio Reale Finale (Peggior 10%)", f"€ {stats['patrimonio_finale_peggior_10_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio finale in uno scenario molto sfortunato.")
 
     st.markdown("##### Indicatori di Rischio del Piano")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     col1.metric("Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}", delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse", help="La percentuale di simulazioni in cui il tuo patrimonio è sceso a zero prima della fine dell'orizzonte temporale. Un valore basso è l'obiettivo principale.")
     col2.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse", help="La perdita massima percentuale subita dal tuo portafoglio dal suo picco al suo minimo in una singola simulazione. Misura la 'botta' peggiore che il tuo piano ha dovuto sopportare.")
     col3.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}", help="Un indicatore che misura il rendimento del tuo portafoglio rispetto al rischio che ti sei preso. Un valore più alto indica un miglior rendimento per unità di rischio. Sopra 1.0 è considerato ottimo.")
 
-    st.header("Riepilogo Entrate in Pensione (Scenario Mediano)")
-    st.caption("Confronto tra reddito **reale** (potere d'acquisto odierno) e **nominale** (cifra futura) medio annuo durante la fase di decumulo.")
+    # --- Riepilogo Entrate ---
     dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
     
-    # --- Calcoli per i valori REALI ---
-    anni_prelievo_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
-    prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_reali]) if anni_prelievo_reali.size > 0 else 0
-
-    anni_pensione_reali = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
-    pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_reali]) if anni_pensione_reali.size > 0 else 0
-
-    anni_rendita_fp_reali = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
-    rendita_fp_media_reale = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_reali]) if anni_rendita_fp_reali.size > 0 else 0
-    
+    st.header("Riepilogo Entrate in Pensione (Valori Reali, Scenario Mediano)")
+    anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
+    prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi_reali]) if anni_prelievo_effettivi_reali.size > 0 else 0
+    anni_pensione_effettivi_reali = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
+    pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi_reali]) if anni_pensione_effettivi_reali.size > 0 else 0
+    anni_rendita_fp_effettivi_reali = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
+    rendita_fp_media_reale = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_effettivi_reali]) if anni_rendita_fp_effettivi_reali.size > 0 else 0
     totale_medio_reale = prelievo_medio_reale + pensione_media_reale + rendita_fp_media_reale
-
-    # --- Calcoli per i valori NOMINALI ---
-    anni_prelievo_nominali = np.where(dati_mediana['prelievi_effettivi_nominali'] > 0)[0]
-    prelievo_medio_nominale = np.mean(dati_mediana['prelievi_effettivi_nominali'][anni_prelievo_nominali]) if anni_prelievo_nominali.size > 0 else 0
-
-    anni_pensione_nominali = np.where(dati_mediana['pensioni_pubbliche_nominali'] > 0)[0]
-    pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_nominali]) if anni_pensione_nominali.size > 0 else 0
-
-    anni_rendita_fp_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
-    rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_nominali]) if anni_rendita_fp_nominali.size > 0 else 0
-    
-    totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale
-
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown("Prelievo Medio dal Patrimonio", help="La cifra media annua che preleverai dal tuo patrimonio per vivere.")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>€ {prelievo_medio_reale:,.0f}", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>€ {prelievo_medio_nominale:,.0f}", unsafe_allow_html=True)
+    col1.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che preleverai dal tuo patrimonio.")
+    col2.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua (es. INPS) in potere d'acquisto di oggi.")
+    col3.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che riceverai dal tuo fondo pensione.")
+    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="Il tuo tenore di vita totale! La somma di tutte le tue entrate annue medie (in potere d'acquisto di oggi).")
 
-    with col2:
-        st.markdown("Pensione Pubblica Annua", help="La stima della tua pensione statale annua (es. INPS).")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>€ {pensione_media_reale:,.0f}", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>€ {prelievo_medio_nominale:,.0f}", unsafe_allow_html=True)
-
-    with col3:
-        st.markdown("Rendita Media da Fondo Pensione", help="La cifra media annua che riceverai dal tuo fondo pensione, se attivato.")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>€ {rendita_fp_media_reale:,.0f}", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>€ {rendita_fp_media_nominale:,.0f}", unsafe_allow_html=True)
-
-    with col4:
-        st.markdown("TOTALE ENTRATE MEDIE ANNUE", help="Il tuo tenore di vita totale! La somma di tutte le tue entrate annue medie.")
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Reale</p>**€ {totale_medio_reale:,.0f}**", unsafe_allow_html=True)
-        st.markdown(f"<p style='margin:0; font-size: 0.9em; color: #aaa;'>Nominale</p>**€ {totale_medio_nominale:,.0f}**", unsafe_allow_html=True)
-
+    st.header("Riepilogo Entrate in Pensione (Valori Nominali, Scenario Mediano)")
+    anni_prelievo_effettivi_nominali = np.where(dati_mediana['prelievi_effettivi_nominali'] > 0)[0]
+    prelievo_medio_nominale = np.mean(dati_mediana['prelievi_effettivi_nominali'][anni_prelievo_effettivi_nominali]) if anni_prelievo_effettivi_nominali.size > 0 else 0
+    anni_pensione_effettivi_nominali = np.where(dati_mediana['pensioni_pubbliche_nominali'] > 0)[0]
+    pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_effettivi_nominali]) if anni_pensione_effettivi_nominali.size > 0 else 0
+    anni_rendita_fp_effettivi_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
+    rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_effettivi_nominali]) if anni_rendita_fp_effettivi_nominali.size > 0 else 0
+    totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Prelievo Medio dal Patrimonio (Nominale)", f"€ {prelievo_medio_nominale:,.0f}", help="La cifra media annua nominale che preleverai dal tuo patrimonio. Questo valore non tiene conto dell'inflazione.")
+    col2.metric("Pensione Pubblica Annua (Nominale)", f"€ {pensione_media_nominale:,.0f}", help="La stima della tua pensione statale annua nominale. Questo valore non tiene conto dell'inflazione.")
+    col3.metric("Rendita Media da FP (Nominale)", f"€ {rendita_fp_media_nominale:,.0f}", help="La cifra media annua nominale che riceverai dal tuo fondo pensione. Questo valore non tiene conto dell'inflazione.")
+    col4.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
 
     with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
         st.write("Array dei patrimoni finali reali (tutte le simulazioni):")

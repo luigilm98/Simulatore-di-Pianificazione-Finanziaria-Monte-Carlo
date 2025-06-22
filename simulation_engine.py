@@ -668,12 +668,13 @@ def run_full_simulation(parametri):
         'patrimonio_finale_mediano_nominale': np.median(patrimoni_finali_nominali),
         'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finali_nominali, 90),
         'patrimonio_finale_peggior_10_nominale': np.percentile(patrimoni_finali_nominali, 10),
+        
         'patrimonio_finale_mediano_reale': np.median(patrimoni_finali_reali),
         'patrimonio_finale_top_10_reale': np.percentile(patrimoni_finali_reali, 90),
         'patrimonio_finale_peggior_10_reale': np.percentile(patrimoni_finali_reali, 10),
-        
-        'probabilita_fallimento': contatori_statistiche['fallimenti'] / parametri['n_simulazioni'],
-        'drawdown_massimo_peggiore': np.max(contatori_statistiche['drawdowns']) if contatori_statistiche['drawdowns'].size > 0 else 0,
+
+        'probabilita_fallimento': np.mean(fallimenti),
+        'drawdown_massimo_peggiore': np.min(drawdowns) if len(drawdowns) > 0 else 0,
         'sharpe_ratio_medio': np.mean(sharpe_ratios_successo[np.isfinite(sharpe_ratios_successo)]) if sharpe_ratios_successo.size > 0 else 0,
         
         'patrimoni_reali_finali': patrimoni_finali_reali,
