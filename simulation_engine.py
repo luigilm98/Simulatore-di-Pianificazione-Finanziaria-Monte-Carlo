@@ -613,14 +613,11 @@ def run_full_simulation(parametri):
     ) = _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare)
 
     # --- CALCOLO STATISTICHE FINALI ---
-    statistiche = {}
-    
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
     patrimoni_finali_nominali = patrimoni_tutte_le_run[:, -1]
     
     # Filtra i drawdown e sharpe ratio degli scenari di successo per non distorcere le medie
-    scenari_successo_mask = patrimoni_finali_reali > 0
-    drawdowns_successo = contatori_statistiche['drawdowns'][scenari_successo_mask]
+    scenari_successo_mask = patrimoni_finali_reali > 1.0 # Considera successo se resta almeno 1€
     sharpe_ratios_successo = contatori_statistiche['sharpe_ratios'][scenari_successo_mask]
 
     statistiche = {
@@ -632,10 +629,10 @@ def run_full_simulation(parametri):
         'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finali_nominali, 90),
         
         'probabilita_fallimento': contatori_statistiche['fallimenti'] / parametri['n_simulazioni'],
-        'drawdown_massimo_peggiore': np.max(contatori_statistiche['drawdowns']) if len(contatori_statistiche['drawdowns']) > 0 else 0,
-        'sharpe_ratio_medio': np.mean(sharpe_ratios_successo[np.isfinite(sharpe_ratios_successo)]) if len(sharpe_ratios_successo) > 0 else 0,
+        'drawdown_massimo_peggiore': np.max(contatori_statistiche['drawdowns']) if contatori_statistiche['drawdowns'].size > 0 else 0,
+        'sharpe_ratio_medio': np.mean(sharpe_ratios_successo[np.isfinite(sharpe_ratios_successo)]) if sharpe_ratios_successo.size > 0 else 0,
         
-        'patrimoni_reali_finali': patrimoni_finali_reali, # Per il grafico scenari peggiori
+        'patrimoni_reali_finali': patrimoni_finali_reali,
         
         'contributi_totali_versati_mediano_nominale': np.median(contatori_statistiche['totale_contributi_versati_nominale']),
         'guadagni_accumulo_mediano_nominale': np.median(contatori_statistiche['guadagni_accumulo_nominale']),
