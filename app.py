@@ -1212,3 +1212,32 @@ if 'risultati' in st.session_state:
             - **Liquidazione Capitale FP**: Somma che ricevi tutta in una volta dal fondo pensione all'età scelta. Aumenta di molto la tua liquidità in quell'anno.
             - **Entrate Anno (Reali)**: La somma di tutte le tue entrate (prelievi, pensioni) in potere d'acquisto di oggi. Questa cifra misura il tuo vero tenore di vita annuale.
             """)
+
+    st.markdown("---")
+    st.subheader("Indicatori di Rischio e Performance del Piano (Scenario Mediano)")
+    
+    # Calcolo delle variazioni medie per fase
+    dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+    variazioni_annue = np.array(dati_mediana.get('variazione_patrimonio_percentuale', [0]))
+    
+    idx_inizio_prelievo = params['anni_inizio_prelievo']
+    
+    # Filtra solo le variazioni pertinenti all'orizzonte temporale
+    variazioni_valide = variazioni_annue[:params['anni_totali']]
+    
+    variazioni_accumulo = variazioni_valide[:idx_inizio_prelievo]
+    variazioni_prelievo = variazioni_valide[idx_inizio_prelievo:]
+    
+    media_accumulo = np.mean(variazioni_accumulo) if variazioni_accumulo.size > 0 else 0
+    media_prelievo = np.mean(variazioni_prelievo) if variazioni_prelievo.size > 0 else 0
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Probabilità di Fallimento", f"{stats['probabilita_fallimento']:.2%}", delta=f"{-stats['probabilita_fallimento']:.2%}", delta_color="inverse", help="La percentuale di simulazioni in cui il tuo patrimonio è sceso a zero prima della fine dell'orizzonte temporale. Un valore basso è l'obiettivo principale.")
+    col2.metric("Crescita Media (Accumulo)", f"{media_accumulo:+.2%}", help="La crescita percentuale media annua del patrimonio durante la fase di accumulo (prima dei prelievi).")
+    col3.metric("Crescita Media (Prelievo)", f"{media_prelievo:+.2%}", help="La variazione percentuale media annua del patrimonio durante la fase di prelievo. È normale che sia negativa, poiché i prelievi superano i rendimenti.")
+    col4.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse", help="La perdita massima percentuale subita dal tuo portafoglio dal suo picco al suo minimo in una singola simulazione. Misura la 'botta' peggiore che il tuo piano ha dovuto sopportare.")
+    col5.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}", help="Un indicatore che misura il rendimento del tuo portafoglio rispetto al rischio che ti sei preso. Un valore più alto indica un miglior rendimento per unità di rischio. Sopra 1.0 è considerato ottimo.")
+
+    st.markdown("---")
+    # --- Riepilogo Entrate ---
+    dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
