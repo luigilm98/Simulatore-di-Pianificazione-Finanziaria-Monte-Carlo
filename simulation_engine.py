@@ -425,38 +425,46 @@ def _calcola_prelievo_sostenibile(parametri):
     Questa funzione viene chiamata solo quando l'utente imposta il prelievo fisso a 0.
     Simula l'evoluzione del patrimonio fino all'inizio dei prelievi per stimare
     il capitale mediano reale disponibile e calcola la rata di un'annualità
-    che esaurirebbe quel capitale durante gli anni di pensione.
+    che esaurirebbe quel capitale durante gli anni di pensione, tenendo conto dei rendimenti futuri.
     """
     # Eseguiamo una simulazione "leggera" solo per trovare il capitale a inizio prelievo
     parametri_pre_sim = parametri.copy()
-    # Usiamo un numero ridotto di simulazioni per la stima, è sufficiente
     parametri_pre_sim['n_simulazioni'] = max(100, parametri['n_simulazioni'] // 10)
     
     # Eseguiamo la simulazione completa ma con prelievo a zero
     risultati_pre_sim = run_full_simulation(parametri_pre_sim, use_sustainable_withdrawal=False)
     
-    # Estraiamo i dati annuali di tutte le pre-simulazioni
     tutti_i_dati_annuali_reali = risultati_pre_sim['dati_annuali_reali']
     
     anni_accumulo = parametri['anni_inizio_prelievo']
     anni_prelievo = parametri['anni_totali'] - anni_accumulo
     
-    # Se non ci sono anni di prelievo, il prelievo è zero.
     if anni_prelievo <= 0:
         return 0
 
-    # Troviamo il saldo mediano del *solo conto corrente* all'inizio dei prelievi.
-    # Usiamo i valori reali per calcolare un prelievo che mantenga il potere d'acquisto.
+    # Troviamo il patrimonio totale reale mediano (banca + etf) all'inizio dei prelievi
     saldo_reale_banca_inizio_prelievo = tutti_i_dati_annuali_reali['saldo_banca_reale'][:, anni_accumulo]
     saldo_reale_etf_inizio_prelievo = tutti_i_dati_annuali_reali['saldo_etf_reale'][:, anni_accumulo]
-
-    # Sommiamo il capitale liquido e quello investito per una stima più realistica
     patrimonio_totale_reale_mediano = np.median(saldo_reale_banca_inizio_prelievo + saldo_reale_etf_inizio_prelievo)
-    
-    # Calcoliamo il prelievo annuo sulla base del patrimonio totale (banca + etf)
-    prelievo_annuo_calcolato = patrimonio_totale_reale_mediano / anni_prelievo if anni_prelievo > 0 else 0
+
+    # Stima del rendimento reale annuo atteso durante il decumulo
+    # NOTA: Questa è una semplificazione. Un modello più complesso considererebbe il glidepath.
+    rend_reale_atteso = parametri['rendimento_medio'] - parametri['ter_etf'] - parametri['inflazione']
+
+    # Calcolo del prelievo annuo usando la formula della rata di un'annualità (PMT)
+    # per far sì che il capitale si esaurisca esattamente in 'anni_prelievo'.
+    if rend_reale_atteso > 1e-6:  # Se il tasso di interesse è significativo
+        try:
+            fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
+            prelievo_annuo_calcolato = patrimonio_totale_reale_mediano * fattore_rendita
+        except (OverflowError, ZeroDivisionError):
+            # Fallback in caso di problemi numerici (improbabile con i controlli)
+            prelievo_annuo_calcolato = patrimonio_totale_reale_mediano / anni_prelievo
+    else:
+        # Se il rendimento reale è nullo o negativo, si divide semplicemente il capitale
+        prelievo_annuo_calcolato = patrimonio_totale_reale_mediano / anni_prelievo
              
-    return prelievo_annuo_calcolato
+    return max(0, prelievo_annuo_calcolato)
 
 def run_full_simulation(parametri, use_sustainable_withdrawal=True):
     """

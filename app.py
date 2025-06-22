@@ -261,27 +261,27 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
     # Trova il 10% degli scenari peggiori
     n_worst = max(1, int(data.shape[0] * 0.1))
     worst_indices = np.argsort(patrimoni_finali)[:n_worst]
+    worst_data = data[worst_indices, :]
     
     anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
     
     # Disegna le linee degli scenari peggiori
-    for idx in worst_indices:
+    for i in range(worst_data.shape[0]):
         fig.add_trace(go.Scatter(
-            x=anni_asse_x, y=data[idx, :], mode='lines',
-            line={'width': 1, 'color': '#dc3545'},
-            opacity=0.7,
+            x=anni_asse_x, y=worst_data[i, :], mode='lines',
+            line={'width': 1, 'color': 'rgba(220, 53, 69, 0.5)'}, # Rosso con trasparenza
             hoverinfo='none',
             showlegend=False,
-            name=f'Scenario Peggiore {idx}'
+            name=f'Scenario Peggiore {i}'
         ))
     
-    # Aggiungi la mediana per riferimento
-    median_data = np.median(data, axis=0)
+    # Aggiungi la mediana DEI SOLI SCENARI PEGGIORI per riferimento
+    median_worst_data = np.median(worst_data, axis=0)
     fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_data, mode='lines',
-        name='Scenario Mediano',
-        line={'width': 3, 'color': '#28a745'},
-        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
+        x=anni_asse_x, y=median_worst_data, mode='lines',
+        name='Mediana Scenari Peggiori',
+        line={'width': 3, 'color': '#dc3545'}, # Rosso più scuro per la mediana
+        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano (Peggiori): €%{y:,.0f}<extra></extra>'
     ))
     
     fig.update_layout(
