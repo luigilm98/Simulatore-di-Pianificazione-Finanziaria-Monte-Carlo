@@ -519,37 +519,20 @@ def run_full_simulation(parametri):
         # In questo scenario semplificato non calcoliamo la rendita FP per la statistica
         statistiche_prelievi['totale_reale_medio_annuo'] = prelievo_annuo_calcolato + parametri['pensione_pubblica_annua']
 
+    # --- Calcolo statistica corretta per la rendita FP ---
+    # La statistica deve essere calcolata sui dati reali, non su quelli nominali divisi per l'inflazione.
+    # Usiamo i dati delle simulazioni di successo.
+    if np.any(rendite_fp_reali_successo > 0):
+         # Filtra gli anni e le simulazioni dove la rendita è effettivamente pagata (non zero)
+        anni_rendita = rendite_fp_reali_successo[rendite_fp_reali_successo > 0]
+        statistiche_prelievi['rendita_fp_reale_media'] = np.median(anni_rendita)
+    else:
+        statistiche_prelievi['rendita_fp_reale_media'] = 0
 
-    elif prelievi_reali_successo.shape[0] > 0:
-        anno_inizio_prelievo = parametri['anni_inizio_prelievo']
-        anno_inizio_pensione = parametri['inizio_pensione_anni']
-        anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
-
-        # Calcola le medie solo sugli anni in cui ogni flusso è attivo e > 0
-        prelievi_reali_attivi = prelievi_reali_successo[:, anno_inizio_prelievo:]
-        prelievi_reali_validi = prelievi_reali_attivi[prelievi_reali_attivi > 1e-6]
-
-        pensioni_reali_attive = pensioni_reali_successo[:, anno_inizio_pensione:]
-        pensioni_validi = pensioni_reali_attive[pensioni_reali_attive > 1e-6]
-        
-        rendite_fp_reali_attive = rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]
-        rendite_fp_validi = rendite_fp_reali_attive[rendite_fp_reali_attive > 1e-6]
-
-        # Calcola il totale solo per gli scenari di successo
-        totali_reali_agg_successo = prelievi_reali_successo + pensioni_reali_successo + rendite_fp_reali_successo
-        
-        # Determina da quale anno iniziare a calcolare il reddito totale medio
-        anno_inizio_reddito_pensione = min(anno_inizio_prelievo, anno_inizio_pensione)
-        if parametri['attiva_fondo_pensione'] and anno_inizio_rendita_fp < parametri['anni_totali']:
-            anno_inizio_reddito_pensione = min(anno_inizio_reddito_pensione, anno_inizio_rendita_fp)
-
-        totali_reali_attivi = totali_reali_agg_successo[:, anno_inizio_reddito_pensione:]
-        totali_reali_validi = totali_reali_attivi[totali_reali_attivi > 1e-6]
-
-        statistiche_prelievi['prelievo_reale_medio'] = np.mean(prelievi_reali_validi) if prelievi_reali_validi.size > 0 else 0
-        statistiche_prelievi['pensione_pubblica_reale_annua'] = np.mean(pensioni_validi) if pensioni_validi.size > 0 else 0
-        statistiche_prelievi['rendita_fp_reale_media'] = np.mean(rendite_fp_validi) if rendite_fp_validi.size > 0 else 0
-        statistiche_prelievi['totale_reale_medio_annuo'] = np.mean(totali_reali_validi) if totali_reali_validi.size > 0 else 0
+    # --- Calcolo Statistiche Finali ---
+    patrimoni_reali_finale_validi = patrimoni_reali_finale_validi[sim_di_successo_mask]
+    patrimoni_finale_validi = patrimoni_finale_validi[sim_di_successo_mask]
+    drawdowns_successo = drawdowns[sim_di_successo_mask]
 
     # 4. PREPARAZIONE OUTPUT
     statistiche_finali = {
@@ -558,7 +541,7 @@ def run_full_simulation(parametri):
         'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finale_validi, 90),
         'patrimonio_finale_peggior_10_nominale': np.percentile(patrimoni_finale_validi, 10),
         'patrimonio_finale_mediano_reale': np.median(patrimoni_reali_finale_validi),
-        'drawdown_massimo_peggiore': np.min(drawdowns) if drawdowns.size > 0 else 0,
+        'drawdown_massimo_peggiore': np.min(drawdowns_successo) if drawdowns_successo.size > 0 else 0,
         'sharpe_ratio_medio': np.mean(sharpe_ratios[np.isfinite(sharpe_ratios)]),
         'probabilita_fallimento': prob_fallimento,
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
