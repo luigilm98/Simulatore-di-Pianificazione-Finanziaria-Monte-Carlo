@@ -594,11 +594,19 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni
         }
 
-        with st.spinner("Esecuzione della simulazione Monte Carlo... Questo potrebbe richiedere alcuni istanti."):
+        with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
             try:
+                # Pulisce i risultati precedenti prima di una nuova simulazione
+                if 'risultati' in st.session_state:
+                    del st.session_state.risultati
+                
+                # Esegui la simulazione. La nuova logica in `run_full_simulation`
+                # gestirà automaticamente il calcolo del prelievo sostenibile se necessario.
                 st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
-                st.session_state.simulazione_eseguita = True
-                st.rerun()
+                
+                st.success('Simulazione completata con successo!')
+                # Un piccolo trucco per "pulire" i parametri ?run=... dall'URL dopo la prima esecuzione
+                st.query_params.clear()
             except ValueError as e:
                 st.error(f"Errore nei parametri: {e}")
             except Exception as e:

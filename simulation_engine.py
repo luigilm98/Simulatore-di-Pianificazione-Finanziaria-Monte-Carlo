@@ -419,7 +419,53 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         "guadagni_accumulo": guadagni_accumulo
     }
 
-def run_full_simulation(parametri):
+def _calcola_prelievo_sostenibile(parametri):
+    """
+    Esegue una pre-simulazione per calcolare il prelievo annuo sostenibile.
+    Questa funzione viene chiamata solo quando l'utente imposta il prelievo fisso a 0.
+    Simula l'evoluzione del patrimonio fino all'inizio dei prelievi per stimare
+    il capitale mediano reale disponibile e calcola la rata di un'annualità
+    che esaurirebbe quel capitale durante gli anni di pensione.
+    """
+    # Eseguiamo una simulazione "leggera" solo per trovare il capitale a inizio prelievo
+    parametri_pre_sim = parametri.copy()
+    # Usiamo un numero ridotto di simulazioni per la stima, è sufficiente
+    parametri_pre_sim['n_simulazioni'] = max(100, parametri['n_simulazioni'] // 10)
+    
+    # Eseguiamo la simulazione completa ma con prelievo a zero
+    risultati_pre_sim = run_full_simulation(parametri_pre_sim, use_sustainable_withdrawal=False)
+    
+    patrimoni_reali = risultati_pre_sim['dati_grafici_principali']['reale']
+    
+    anni_accumulo = parametri['anni_inizio_prelievo']
+    anni_prelievo = parametri['anni_totali'] - anni_accumulo
+    
+    # Se non ci sono anni di prelievo, non ha senso calcolare un prelievo
+    if anni_prelievo <= 0:
+        return 0
+
+    mese_inizio_prelievo = anni_accumulo * 12
+    patrimonio_reale_a_inizio_prelievo_mediano = np.median(patrimoni_reali[:, mese_inizio_prelievo])
+    
+    prelievo_annuo_calcolato = 0
+    if patrimonio_reale_a_inizio_prelievo_mediano > 0:
+        # Usiamo il rendimento reale atteso per il calcolo dell'annualità
+        rend_reale_atteso = parametri['rendimento_medio'] - parametri['ter_etf'] - parametri['inflazione']
+
+        # Formula della rendita per calcolare il prelievo costante
+        if rend_reale_atteso > 1e-6: # Evitiamo divisione per zero
+            try:
+                fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
+                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
+            except (OverflowError, ZeroDivisionError):
+                # Fallback in caso di problemi numerici con numeri molto grandi o piccoli
+                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+        else:
+             prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+             
+    return prelievo_annuo_calcolato
+
+def run_full_simulation(parametri, use_sustainable_withdrawal=True):
     """
     Esegue la simulazione Monte Carlo completa, orchestrando migliaia di singole run.
 
@@ -480,10 +526,14 @@ def run_full_simulation(parametri):
     contributi_totali_agg = np.zeros(n_sim)
 
     prelievo_annuo_da_usare = parametri['prelievo_annuo']
-    calcolo_sostenibile_attivo = parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0
+    calcolo_sostenibile_attivo = (
+        use_sustainable_withdrawal and 
+        parametri['strategia_prelievo'] == 'FISSO' and 
+        parametri['prelievo_annuo'] == 0
+    )
 
     if calcolo_sostenibile_attivo:
-        prelievo_annuo_da_usare = 0
+        prelievo_annuo_da_usare = _calcola_prelievo_sostenibile(parametri)
 
     # 2. ESECUZIONE SIMULAZIONI
     for sim in range(n_sim):
@@ -538,7 +588,7 @@ def run_full_simulation(parametri):
     # Se si calcola il prelievo sostenibile, si fa una stima, ma i dati
     # per la tabella di dettaglio vengono comunque dallo scenario mediano della
     # simulazione originale (con prelievo zero).
-    if calcolo_sostenibile_attivo:
+    if False: # Disabilitiamo completamente la vecchia logica errata
         anni_accumulo = parametri['anni_inizio_prelievo']
         anni_prelievo = parametri['anni_totali'] - anni_accumulo
         patrimonio_reale_a_inizio_prelievo_mediano = np.median(patrimoni_reali[:, anni_accumulo * 12])
