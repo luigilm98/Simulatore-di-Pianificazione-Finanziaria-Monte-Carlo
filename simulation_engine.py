@@ -432,6 +432,23 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             patrimonio_negativo = True
 
     # Calcoli finali per la singola run
+    drawdown = 0
+    sharpe_ratio = 0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        patrimoni_np = np.array(patrimonio_storico)
+        picchi = np.maximum.accumulate(patrimoni_np)
+        if np.any(picchi > 0):
+            drawdown_values = (patrimoni_np - picchi) / picchi
+            drawdown = np.min(drawdown_values)
+        
+        returns = patrimoni_run[1:] / patrimoni_run[:-1] - 1
+        finite_returns = returns[np.isfinite(returns)]
+        if finite_returns.size > 1 and np.std(finite_returns) > 0:
+            risk_free_month = (1 + 0.02) ** (1/12) - 1 # Assumiamo un tasso risk-free del 2% annuo
+            sharpe_ratio = (np.mean(finite_returns) - risk_free_month) * np.sqrt(12) / np.std(finite_returns)
+            if not np.isfinite(sharpe_ratio):
+                sharpe_ratio = 0
+            
     # Popoliamo i dati dell'ultimo anno che altrimenti rimarrebbero a zero
     final_year_index = parametri['anni_totali']
     dati_annuali['saldo_banca_nominale'][final_year_index] = patrimonio_banca
@@ -440,12 +457,14 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     dati_annuali['saldo_banca_reale'][final_year_index] = patrimonio_banca / indice_prezzi
     dati_annuali['saldo_etf_reale'][final_year_index] = patrimonio_etf / indice_prezzi
     dati_annuali['saldo_fp_reale'][final_year_index] = patrimonio_fp / indice_prezzi
-
+            
     return {
         "patrimoni_run": patrimoni_run,
         "patrimoni_reali_run": patrimoni_reali_run,
         "reddito_annuo_reale": dati_annuali['reddito_totale_reale'][:parametri['anni_totali']],
         "dati_annuali": dati_annuali,
+        "drawdown": drawdown,
+        "sharpe_ratio": sharpe_ratio,
         "fallimento": patrimonio_negativo,
         "totale_contributi_versati_nominale": totale_contributi_versati_nominale,
         "guadagni_accumulo": guadagni_accumulo
