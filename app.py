@@ -560,6 +560,14 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
         help="🎯 Scegli come vuoi che si comportino i mercati nel futuro. 'REALISTICA' usa i rendimenti che hai definito nel portafoglio. 'PESSIMISTICA' li riduce del 20%, 'MOLTO_PESSIMISTICA' del 40%. 'OTTIMISTICA' li aumenta del 20%, 'MOLTO_OTTIMISTICA' del 40%. Questo ti permette di testare la robustezza del tuo piano in scenari di mercato diversi."
     )
     
+    # Nuovo parametro: Range di Volatilità
+    range_volatilita = st.selectbox(
+        "📈 Range di Volatilità",
+        options=['STANDARD', 'CONSERVATIVO', 'AGGRESSIVO', 'CATASTROFICO'],
+        index=['STANDARD', 'CONSERVATIVO', 'AGGRESSIVO', 'CATASTROFICO'].index(p.get('range_volatilita', 'STANDARD')),
+        help="📈 Scegli quanto estremi possono essere i movimenti di mercato. 'STANDARD' usa la volatilità che hai definito. 'CONSERVATIVO' la riduce del 30% (movimenti più stabili). 'AGGRESSIVO' la aumenta del 50% (più variabilità). 'CATASTROFICO' la raddoppia (simula crisi estreme come 2008 o 2020)."
+    )
+    
     anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
     n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Più simulazioni esegui, più accurata sarà la stima delle probabilità. 250 è un buon compromesso tra velocità e precisione.")
     anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p.get('anni_totali', 80), help="La durata totale della simulazione. Assicurati che sia abbastanza lunga da coprire tutta la tua aspettativa di vita.")
@@ -607,13 +615,27 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
         else:
             return base_return
 
+    # Applica il range di volatilità
+    def adjust_volatility_for_range(base_volatility, range_type):
+        if range_type == 'STANDARD':
+            return base_volatility
+        elif range_type == 'CONSERVATIVO':
+            return base_volatility * 0.7  # Riduce del 30%
+        elif range_type == 'AGGRESSIVO':
+            return base_volatility * 1.5  # Aumenta del 50%
+        elif range_type == 'CATASTROFICO':
+            return base_volatility * 2.0  # Raddoppia
+        else:
+            return base_volatility
+
     rendimento_medio_portfolio_adjusted = adjust_returns_for_market_trend(rendimento_medio_portfolio, tendenza_mercato)
+    volatilita_portfolio_adjusted = adjust_volatility_for_range(volatilita_portfolio, range_volatilita)
 
     st.markdown("---")
     st.markdown("##### Parametri Calcolati dal Portafoglio:")
     col1, col2, col3 = st.columns(3)
     col1.metric("Rendimento Medio", f"{rendimento_medio_portfolio:.2%}", delta=f"{rendimento_medio_portfolio_adjusted - rendimento_medio_portfolio:+.2%}", help="Il rendimento medio ponderato del tuo portafoglio ETF. La variazione (delta) mostra l'effetto della tendenza di mercato selezionata.")
-    col2.metric("Volatilità Attesa", f"{volatilita_portfolio:.2%}", help="La volatilità media ponderata del tuo portafoglio ETF. Misura quanto i rendimenti possono variare nel tempo.")
+    col2.metric("Volatilità Attesa", f"{volatilita_portfolio:.2%}", delta=f"{volatilita_portfolio_adjusted - volatilita_portfolio:+.2%}", help="La volatilità media ponderata del tuo portafoglio ETF. La variazione (delta) mostra l'effetto del range di volatilità selezionato. Misura quanto i rendimenti possono variare nel tempo.")
     col3.metric("TER Ponderato", f"{ter_etf_portfolio:.4%}", help="Il costo totale annuo ponderato del tuo portafoglio ETF. Include tutte le commissioni e spese di gestione.")
     st.caption("La volatilità aggregata è una media ponderata semplificata.")
 
@@ -683,7 +705,7 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'eta_iniziale': eta_iniziale, 'capitale_iniziale': capitale_iniziale, 'etf_iniziale': etf_iniziale,
             'contributo_mensile_banca': contributo_mensile_banca, 'contributo_mensile_etf': contributo_mensile_etf, 
             'rendimento_medio': rendimento_medio_portfolio_adjusted,
-            'volatilita': volatilita_portfolio, 
+            'volatilita': volatilita_portfolio_adjusted, 
             'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
             'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
             'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
@@ -696,7 +718,7 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'volatilita_fp': volatilita_fp, 'ter_fp': ter_fp, 'tassazione_rendimenti_fp': tassazione_rendimenti_fp, 'aliquota_finale_fp': aliquota_finale_fp,
             'eta_ritiro_fp': eta_ritiro_fp, 'percentuale_capitale_fp': percentuale_capitale_fp, 'durata_rendita_fp_anni': durata_rendita_fp_anni,
             'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni,
-            'tendenza_mercato': tendenza_mercato
+            'tendenza_mercato': tendenza_mercato, 'range_volatilita': range_volatilita
         }
 
         with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
@@ -788,21 +810,36 @@ if 'risultati' in st.session_state:
         """)
 
     # --- Messaggio informativo sulla tendenza di mercato ---
-    if params.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA':
+    if params.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA' or params.get('range_volatilita', 'STANDARD') != 'STANDARD':
         trend_descriptions = {
             'PESSIMISTICA': 'ridotti del 20%',
             'MOLTO_PESSIMISTICA': 'ridotti del 40%',
             'OTTIMISTICA': 'aumentati del 20%',
             'MOLTO_OTTIMISTICA': 'aumentati del 40%'
         }
-        trend_desc = trend_descriptions.get(params['tendenza_mercato'], 'modificati')
-        st.info(f"""
-        🎯 **Scenario di Mercato: {params['tendenza_mercato'].replace('_', ' ').title()}**
+        volatility_descriptions = {
+            'CONSERVATIVO': 'ridotta del 30%',
+            'AGGRESSIVO': 'aumentata del 50%',
+            'CATASTROFICO': 'raddoppiata'
+        }
         
-        I rendimenti del tuo portafoglio ETF sono stati {trend_desc} rispetto ai valori base che hai definito.
+        trend_desc = trend_descriptions.get(params.get('tendenza_mercato', 'REALISTICA'), '')
+        volatility_desc = volatility_descriptions.get(params.get('range_volatilita', 'STANDARD'), '')
+        
+        message_parts = []
+        if params.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA':
+            message_parts.append(f"**Tendenza di Mercato: {params['tendenza_mercato'].replace('_', ' ').title()}** - I rendimenti sono stati {trend_desc}")
+        if params.get('range_volatilita', 'STANDARD') != 'STANDARD':
+            message_parts.append(f"**Range di Volatilità: {params['range_volatilita'].title()}** - La volatilità è stata {volatility_desc}")
+        
+        st.info(f"""
+        🎯 **Scenario di Mercato Modificato**
+        
+        {' | '.join(message_parts)}
+        
         Questo ti permette di testare la robustezza del tuo piano in condizioni di mercato diverse.
         
-        **Ricorda:** I risultati mostrati riflettono questo scenario specifico. Per un'analisi completa, confronta i risultati con diverse tendenze di mercato.
+        **Ricorda:** I risultati mostrati riflettono questo scenario specifico. Per un'analisi completa, confronta i risultati con diverse combinazioni di tendenza e volatilità.
         """)
 
     st.markdown("---")
