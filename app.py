@@ -669,16 +669,38 @@ with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
         help="Solo per 'GUARDRAIL'. Se il mercato va molto bene o molto male, questa banda determina se aumentare o diminuire i prelievi per proteggere il capitale o realizzare profitti. Un valore del 10-20% è tipico."
     ) / 100
 
-with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)"):
+with st.sidebar.expander("4. Strategie di Ribilanciamento", expanded=False):
     p = st.session_state.get('parametri', {})
-    attiva_glidepath = st.checkbox("Attiva Glidepath", value=p.get('attiva_glidepath', True), help="Se attivato, il simulatore ridurrà progressivamente l'esposizione azionaria (ETF) a favore della liquidità con l'avvicinarsi e durante la pensione, per ridurre il rischio.")
-    inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=p.get('inizio_glidepath_anni', 20), disabled=not attiva_glidepath, help="L'anno in cui inizi a rendere il tuo portafoglio più conservativo. Spesso si imposta 10-15 anni prima della pensione.")
-    fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=p.get('fine_glidepath_anni', 40), disabled=not attiva_glidepath, help="L'anno in cui raggiungi l'allocazione finale desiderata. Solitamente coincide con l'inizio della pensione o pochi anni dopo.")
-    allocazione_etf_finale = st.slider(
-        "Allocazione ETF Finale (%)", 0.0, 100.0, p.get('allocazione_etf_finale', 0.333) * 100, 1.0,
-        help="La percentuale di patrimonio che rimarrà investita in ETF alla fine del percorso di de-risking. Il resto sarà liquidità. Un valore comune è tra il 30% e il 50%.",
-        disabled=not attiva_glidepath
-    ) / 100
+    
+    strategia_ribilanciamento = st.selectbox(
+        "⚖️ Strategia di Ribilanciamento",
+        options=['GLIDEPATH', 'ANNUALE_FISSO', 'NESSUNO'],
+        index=['GLIDEPATH', 'ANNUALE_FISSO', 'NESSUNO'].index(p.get('strategia_ribilanciamento', 'GLIDEPATH')),
+        help="Scegli come ribilanciare il tuo portafoglio nel tempo. **GLIDEPATH**: Riduci progressivamente il rischio con l'età (consigliato). **ANNUALE_FISSO**: Mantieni un'allocazione ETF/Liquidità costante ogni anno. **NESSUNO**: Lascia che il portafoglio segua il mercato senza interventi (sconsigliato)."
+    )
+
+    # Inizializza i valori per evitare errori se non vengono definiti
+    inizio_glidepath_anni = p.get('inizio_glidepath_anni', 20)
+    fine_glidepath_anni = p.get('fine_glidepath_anni', 40)
+    allocazione_etf_finale = p.get('allocazione_etf_finale', 0.333)
+    allocazione_etf_fissa = p.get('allocazione_etf_fissa', 0.60)
+
+    if strategia_ribilanciamento == 'GLIDEPATH':
+        st.markdown("##### Configurazione Glidepath")
+        inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=inizio_glidepath_anni, help="L'anno in cui inizi a rendere il tuo portafoglio più conservativo. Spesso si imposta 10-15 anni prima della pensione.")
+        fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=fine_glidepath_anni, help="L'anno in cui raggiungi l'allocazione finale desiderata. Solitamente coincide con l'inizio della pensione o pochi anni dopo.")
+        allocazione_etf_finale = st.slider(
+            "Allocazione ETF Finale (%)", 0.0, 100.0, allocazione_etf_finale * 100, 1.0,
+            help="La percentuale di patrimonio che rimarrà investita in ETF alla fine del percorso di de-risking. Il resto sarà liquidità."
+        ) / 100
+    
+    if strategia_ribilanciamento == 'ANNUALE_FISSO':
+        st.markdown("##### Configurazione Ribilanciamento Fisso")
+        allocazione_etf_fissa = st.slider(
+            "Allocazione ETF Fissa Target (%)", 0.0, 100.0, allocazione_etf_fissa * 100, 1.0,
+            help="La percentuale target da mantenere investita in ETF. Ogni anno, il portafoglio verrà ribilanciato per tornare a questa allocazione."
+        ) / 100
+
 
 with st.sidebar.expander("5. Tassazione e Costi (Italia)"):
     p = st.session_state.get('parametri', {})
@@ -717,8 +739,13 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
             'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
             'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
-            'attiva_glidepath': attiva_glidepath, 'inizio_glidepath_anni': inizio_glidepath_anni, 'fine_glidepath_anni': fine_glidepath_anni,
+            
+            'strategia_ribilanciamento': strategia_ribilanciamento, 
+            'inizio_glidepath_anni': inizio_glidepath_anni, 
+            'fine_glidepath_anni': fine_glidepath_anni,
             'allocazione_etf_finale': allocazione_etf_finale,
+            'allocazione_etf_fissa': allocazione_etf_fissa,
+
             'tassazione_capital_gain': tassazione_capital_gain, 'imposta_bollo_titoli': imposta_bollo_titoli, 'imposta_bollo_conto': imposta_bollo_conto,
             'ter_etf': ter_etf_portfolio, 
             'costo_fisso_etf_mensile': costo_fisso_etf_mensile,
