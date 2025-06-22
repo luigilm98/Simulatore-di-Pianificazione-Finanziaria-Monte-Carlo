@@ -421,34 +421,35 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
 def _calcola_prelievo_sostenibile(parametri):
     """
-    Calcola il prelievo annuo sostenibile costante che porta la mediana del patrimonio finale (banca+etf)
-    a zero (o il più vicino possibile a zero, ma non negativo) nell'ultimo anno di simulazione.
+    Calcola il prelievo annuo sostenibile costante che porta la mediana del patrimonio (banca+etf)
+    a zero esattamente nell'ultimo anno di simulazione.
     """
     prelievo_min = 0.0
     prelievo_max = 200000.0
     tolleranza = 1.0
     max_iterazioni = 40
 
-    def testa_prelievo(prelievo_test):
+    def mediana_finale(prelievo_test):
         parametri_test = parametri.copy()
         parametri_test['prelievo_annuo'] = prelievo_test
         parametri_test['strategia_prelievo'] = 'FISSO'
         parametri_test['n_simulazioni'] = max(500, parametri['n_simulazioni'])
         risultati_test = run_full_simulation(parametri_test, use_sustainable_withdrawal=False)
-        tutti_i_dati_annuali_reali = risultati_test['dati_annuali_reali']
-        patrimonio_finale_banca = tutti_i_dati_annuali_reali['saldo_banca_reale'][:, -1]
-        patrimonio_finale_etf = tutti_i_dati_annuali_reali['saldo_etf_reale'][:, -1]
-        patrimonio_finale_totale = patrimonio_finale_banca + patrimonio_finale_etf
-        return np.median(patrimonio_finale_totale)
+        dati = risultati_test['dati_annuali_reali']
+        saldo_banca = dati['saldo_banca_reale']
+        saldo_etf = dati['saldo_etf_reale']
+        patrimonio = saldo_banca + saldo_etf  # shape: (n_sim, n_anni)
+        mediana_per_anno = np.median(patrimonio, axis=0)
+        return mediana_per_anno[-1]
 
     prelievo_ottimale = 0.0
     for _ in range(max_iterazioni):
         prelievo_test = (prelievo_min + prelievo_max) / 2
-        patrimonio_mediano = testa_prelievo(prelievo_test)
-        if abs(patrimonio_mediano) < tolleranza:
+        mediana_ultimo_anno = mediana_finale(prelievo_test)
+        if abs(mediana_ultimo_anno) < tolleranza:
             prelievo_ottimale = prelievo_test
             break
-        elif patrimonio_mediano > 0:
+        elif mediana_ultimo_anno > 0:
             prelievo_ottimale = prelievo_test
             prelievo_min = prelievo_test
         else:
