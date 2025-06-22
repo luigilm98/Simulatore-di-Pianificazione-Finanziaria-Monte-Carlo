@@ -376,10 +376,27 @@ def plot_wealth_composition_chart(initial, contributions, gains):
     )
     return fig
 
-def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali, eta_iniziale):
+def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale):
     """Mostra un'analisi degli scenari peggiori (es. 10% dei casi)."""
-    fig = go.Figure()
     
+    # FIX: Se non ci sono scenari di successo (es. fallimento 100%), non possiamo
+    # analizzare i "peggiori tra i successi". Mostriamo un messaggio all'utente.
+    if patrimoni_finali.size == 0:
+        fig = go.Figure()
+        fig.add_annotation(text="Probabilità di fallimento del 100%: non ci sono scenari di successo da analizzare.",
+                           xref="paper", yref="paper",
+                           x=0.5, y=0.5, showarrow=False,
+                           font=dict(size=16))
+        fig.update_layout(
+            xaxis_visible=False,
+            yaxis_visible=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)'
+        )
+        return fig
+
+    fig = go.Figure()
+
     soglia_peggiore = np.percentile(patrimoni_finali, 10)
     indici_peggiori = np.where(patrimoni_finali <= soglia_peggiore)[0]
     
@@ -814,8 +831,8 @@ if 'risultati' in st.session_state:
         - **Cosa osservare:** Il tuo piano è robusto se, anche in questi scenari, il patrimonio non si azzera troppo in fretta. Se vedi che molte linee crollano a zero rapidamente, potrebbe essere un segnale che il tuo piano è troppo aggressivo o la tua percentuale di prelievo troppo alta per resistere a una "tempesta perfetta" iniziale.
         """)
         fig_worst = plot_worst_scenarios_chart(
-            dati_principali['reale'],
             st.session_state.risultati['statistiche']['patrimoni_reali_finali'],
+            dati_principali['reale'],
             params['anni_totali'],
             eta_iniziale=params['eta_iniziale']
         )
