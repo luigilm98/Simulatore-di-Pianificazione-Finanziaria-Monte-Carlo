@@ -217,7 +217,7 @@ Questo progetto è rilasciato sotto licenza [MIT](LICENSE). Puoi usare, modifica
 
 ---
 
-*Grazie a Mr. RIP e Paolo Coletti per l'ispirazione e gli insegnamenti che hanno reso possibile questo progetto.*
+*Grazie a Mr. RIP e Paolo Coletti per l'ispirazione e gli insegnamenti che hanno reso possibile questo progetto.* 
 
 ## Guida all'Interpretazione dei Grafici
 
