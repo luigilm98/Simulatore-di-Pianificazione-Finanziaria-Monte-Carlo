@@ -534,7 +534,73 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                     st.session_state.simulazione_eseguita = True
                     st.rerun()
 
-with st.sidebar.expander("1. Impostazioni Generali", expanded=False):
+# --- Sezione 1: Patrimonio e Contributi ---
+with st.sidebar.expander("1. Patrimonio e Contributi", expanded=True):
+    st.session_state.parametri['capitale_iniziale'] = st.number_input(
+        "Capitale Conto Corrente (€)", min_value=0, step=1000,
+        value=st.session_state.parametri.get('capitale_iniziale', 10000),
+        help="La liquidità che hai oggi sul conto corrente o in asset a bassissimo rischio/rendimento."
+    )
+    st.session_state.parametri['etf_iniziale'] = st.number_input(
+        "Valore Portafoglio ETF (€)", min_value=0, step=1000,
+        value=st.session_state.parametri.get('etf_iniziale', 5000),
+        help="Il valore di mercato attuale di tutti i tuoi investimenti in ETF/azioni."
+    )
+    st.session_state.parametri['contributo_mensile_banca'] = st.number_input(
+        "Contributo Mensile Conto (€)", min_value=0, step=50,
+        value=st.session_state.parametri.get('contributo_mensile_banca', 200),
+        help="La cifra che riesci a risparmiare e accantonare sul conto corrente ogni mese."
+    )
+    st.session_state.parametri['contributo_mensile_etf'] = st.number_input(
+        "Contributo Mensile ETF (€)", min_value=0, step=50,
+        value=st.session_state.parametri.get('contributo_mensile_etf', 800),
+        help="La cifra che investi attivamente ogni mese nel tuo portafoglio ETF (PAC)."
+    )
+
+# --- Sezione 2: Costruttore di Portafoglio ---
+def get_portfolio_summary():
+    """Calcola rendimento, volatilità e TER ponderati del portafoglio."""
+    portfolio_df = st.session_state.portfolio
+    weights = portfolio_df["Allocazione (%)"] / 100
+    rendimento_medio = np.sum(weights * portfolio_df["Rendimento Atteso (%)"]) / 100
+    volatilita = np.sum(weights * portfolio_df["Volatilità Attesa (%)"]) / 100
+    ter_ponderato = np.sum(weights * portfolio_df["TER (%)"]) / 100
+    return rendimento_medio, volatilita, ter_ponderato
+
+with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
+    st.markdown("Modifica l'allocazione, il TER e le stime di rendimento/volatilità per ogni asset.")
+    
+    edited_portfolio = st.data_editor(
+        st.session_state.portfolio,
+        column_config={
+            "Allocazione (%)": st.column_config.NumberColumn(format="%.1f%%", min_value=0, max_value=100),
+            "TER (%)": st.column_config.NumberColumn(format="%.2f%%", min_value=0),
+            "Rendimento Atteso (%)": st.column_config.NumberColumn(format="%.1f%%"),
+            "Volatilità Attesa (%)": st.column_config.NumberColumn(format="%.1f%%"),
+        },
+        num_rows="dynamic",
+        key="portfolio_editor"
+    )
+
+    total_allocation = edited_portfolio["Allocazione (%)"].sum()
+    if not np.isclose(total_allocation, 100):
+        st.warning(f"L'allocazione totale è {total_allocation:.2f}%. Assicurati che sia 100%.")
+    else:
+        st.success("Allocazione totale: 100%.")
+    
+    st.session_state.portfolio = edited_portfolio
+    
+    rendimento_medio_p, volatilita_p, ter_p = get_portfolio_summary()
+
+    st.markdown("---")
+    st.markdown("##### Parametri Calcolati dal Portafoglio:")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Rendimento Medio", f"{rendimento_medio_p:.2%}")
+    col2.metric("Volatilità Attesa", f"{volatilita_p:.2%}")
+    col3.metric("TER Ponderato", f"{ter_p:.4f}%")
+    st.caption("La volatilità aggregata è una media ponderata semplificata.")
+
+with st.sidebar.expander("3. Impostazioni Generali", expanded=False):
     # Usiamo .get() per sicurezza, anche se l'inizializzazione dovrebbe aver già creato la chiave
     st.session_state.parametri['eta_iniziale'] = st.number_input(
         "Età Iniziale", min_value=18, max_value=100, 
@@ -557,8 +623,8 @@ with st.sidebar.expander("1. Impostazioni Generali", expanded=False):
         help="Il numero di scenari futuri da simulare. Più alto è il numero, più accurati i risultati ma più lenta la simulazione."
     )
 
-# --- Sezione 3: Strategia di Prelievo ---
-with st.sidebar.expander("3. Strategia di Prelievo", expanded=False):
+# --- Sezione 4: Strategia di Prelievo ---
+with st.sidebar.expander("4. Strategia di Prelievo", expanded=False):
     st.session_state.parametri['strategia_prelievo'] = st.selectbox(
         "Strategia di Prelievo", 
         options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'], 
@@ -596,8 +662,8 @@ with st.sidebar.expander("3. Strategia di Prelievo", expanded=False):
         help="Tra quanti anni inizierai a prelevare dal tuo patrimonio per le spese di vita."
     )
 
-# --- Sezione 4: Glidepath ---
-with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)", expanded=False):
+# --- Sezione 5: Glidepath ---
+with st.sidebar.expander("5. Asset Allocation Dinamica (Glidepath)", expanded=False):
     st.session_state.parametri['attiva_glidepath'] = st.checkbox(
         "Attiva Glidepath", 
         value=st.session_state.parametri.get('attiva_glidepath', True),
@@ -626,8 +692,8 @@ with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)", expanded=Fa
         help="La percentuale di ETF (rischiosa) che vuoi avere alla fine del Glidepath. Il resto sarà liquidità."
     )
 
-# --- Sezione 5: Tassazione e Costi ---
-with st.sidebar.expander("5. Tassazione e Costi (Italia)", expanded=False):
+# --- Sezione 6: Tassazione e Costi ---
+with st.sidebar.expander("6. Tassazione e Costi (Italia)", expanded=False):
     st.session_state.parametri['tassazione_capital_gain'] = st.slider(
         "Tassazione Capital Gain (%)", 0.0, 50.0, 
         st.session_state.parametri.get('tassazione_capital_gain', 0.26) * 100, 0.5,
@@ -651,8 +717,8 @@ with st.sidebar.expander("5. Tassazione e Costi (Italia)", expanded=False):
         help="Eventuali costi fissi mensili del tuo broker/conto titoli."
     )
 
-# --- Sezione 6: Fondo Pensione ---
-with st.sidebar.expander("6. Fondo Pensione", expanded=False):
+# --- Sezione 7: Fondo Pensione ---
+with st.sidebar.expander("7. Fondo Pensione", expanded=False):
     st.session_state.parametri['attiva_fondo_pensione'] = st.checkbox(
         "Attiva Fondo Pensione", 
         value=st.session_state.parametri.get('attiva_fondo_pensione', False),
@@ -717,8 +783,8 @@ with st.sidebar.expander("6. Fondo Pensione", expanded=False):
         help="Per quanti anni vuoi che venga erogata la rendita calcolata dal tuo fondo pensione."
     )
 
-# --- Sezione 7: Pensione Statale ---
-with st.sidebar.expander("7. Pensione Statale", expanded=False):
+# --- Sezione 8: Pensione Statale ---
+with st.sidebar.expander("8. Pensione Statale", expanded=False):
     st.session_state.parametri['pensione_pubblica_annua'] = st.number_input(
         "Pensione Pubblica Annua Lorda Attesa (€)",
         min_value=0,
