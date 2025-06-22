@@ -194,6 +194,9 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
             
+    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
+    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+
     fig.update_layout(
         title=title,
         xaxis_title="Età",
@@ -201,8 +204,9 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         hovermode="x unified",
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=600,
         yaxis=dict(
-            range=[0, 3500000],
+            range=[0, 10000000],
             tickmode='array',
             tickvals=tick_values,
             ticktext=tick_text
@@ -254,18 +258,17 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
         hovertemplate='Età %{x:.1f}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
     ))
     
+    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
+    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+
     fig.update_layout(
         title='Evoluzione del Reddito Annuo Reale in Pensione',
         xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€)",
+        yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis=dict(
-            range=[0, 3500000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
-        )
+        height=500,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     
     # Aggiungi linea verticale per l'inizio dei prelievi
@@ -303,14 +306,18 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano (Peggiori): €%{y:,.0f}<extra></extra>'
     ))
     
+    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
+    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+
     fig.update_layout(
         title='Analisi degli Scenari Peggiori (10% più sfortunati)',
         xaxis_title="Età",
         yaxis_title="Patrimonio Reale (€)",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=600,
         yaxis=dict(
-            range=[0, 3500000],
+            range=[0, 10000000],
             tickmode='array',
             tickvals=tick_values,
             ticktext=tick_text
@@ -352,14 +359,18 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
         hovertemplate='Età %{x}<br>Fondo Pensione: €%{y:,.0f}<extra></extra>'
     ))
     
+    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
+    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+
     fig.update_layout(
         title='Composizione del Patrimonio nel Tempo (Valori Nominali)',
         xaxis_title="Età",
         yaxis_title="Patrimonio Nominale (€)",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=600,
         yaxis=dict(
-            range=[0, 3500000],
+            range=[0, 10000000],
             tickmode='array',
             tickvals=tick_values,
             ticktext=tick_text
@@ -404,18 +415,17 @@ def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
         hovertemplate='Età %{x}<br>Rendita FP: €%{y:,.0f}<extra></extra>'
     ))
     
+    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
+    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+
     fig.update_layout(
         title='Composizione del Reddito Annuo nel Tempo (Valori Reali)',
         xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€)",
+        yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis=dict(
-            range=[0, 3500000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
-        )
+        height=500,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
     
     return fig
