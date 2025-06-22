@@ -66,6 +66,30 @@ def load_simulation_data(filename):
 
 # --- FUNZIONI DI PLOTTING ---
 
+def plot_wealth_composition_chart(initial, contributions, gains):
+    """Crea un grafico a barre per mostrare la composizione della ricchezza."""
+    labels = ['Patrimonio Iniziale', 'Contributi Versati', 'Guadagni da Investimento']
+    values = [initial, contributions, gains]
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+
+    fig = go.Figure(data=[go.Bar(
+        x=labels, 
+        y=values,
+        marker_color=colors,
+        text=[f"€{v:,.0f}" for v in values],
+        textposition='auto',
+        hovertemplate='Fonte: %{x}<br>Valore: €%{y:,.0f}<extra></extra>'
+    )])
+    
+    fig.update_layout(
+        title_text='Da Dove Viene la Tua Ricchezza? (Scenario Mediano)',
+        yaxis_title_text='Euro (€)',
+        xaxis_title_text='Fonte del Patrimonio',
+        bargap=0.4,
+        yaxis_tickformat="€,d"
+    )
+    return fig
+
 def plot_wealth_summary_chart(data, anni_totali, eta_iniziale, anni_inizio_prelievo):
     """
     Crea il grafico principale che mostra l'evoluzione del patrimonio
@@ -382,7 +406,7 @@ if 'risultati' in st.session_state:
         Se vedi un fallimento dello 0%, non significa che il simulatore sia rotto. Significa che, date le ipotesi che hai inserito (contributi costanti, orizzonte lungo, rendimenti positivi), il tuo piano è matematicamente molto solido. Questo grafico ti aiuta a capire perché.
         """)
         
-        st.plotly_chart(plot_wealth_summary_chart(patrimonio_iniziale_totale, contributi_versati, guadagni_da_investimento, anni_inizio_prelievo), use_container_width=True)
+        st.plotly_chart(plot_wealth_composition_chart(patrimonio_iniziale_totale, contributi_versati, guadagni_da_investimento), use_container_width=True)
 
         st.markdown("""
         Come puoi vedere, nel lungo periodo, i **Guadagni da Investimento** (la ricompensa per il rischio e la pazienza) spesso superano persino il totale dei contributi che hai versato. Questo è l'effetto dell'**interesse composto**: i tuoi guadagni iniziano a generare altri guadagni, in un circolo virtuoso che accelera la crescita del tuo patrimonio.
