@@ -618,11 +618,15 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
             anno_inizio_pensione = parametri['inizio_pensione_anni']
             anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
 
+            # Funzione helper per calcolare la mediana solo su array non vuoti, evitando warnings.
+            def median_if_not_empty(a):
+                return np.median(a) if a.size > 0 else np.nan
+
             # Calcoliamo la mediana per ogni simulazione, solo sugli anni attivi
-            with np.errstate(invalid='ignore'): # Ignora warning per mediana di slice vuote
-                prelievi_mediani_per_sim = np.array([np.median(s[s > 1e-6]) for s in prelievi_reali_successo[:, anno_inizio_prelievo:]])
-                pensioni_mediane_per_sim = np.array([np.median(s[s > 1e-6]) for s in pensioni_reali_successo[:, anno_inizio_pensione:]])
-                rendite_fp_mediane_per_sim = np.array([np.median(s[s > 1e-6]) for s in rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]])
+            with np.errstate(invalid='ignore'): # Manteniamo errstate per ulteriore sicurezza
+                prelievi_mediani_per_sim = np.array([median_if_not_empty(s[s > 1e-6]) for s in prelievi_reali_successo[:, anno_inizio_prelievo:]])
+                pensioni_mediane_per_sim = np.array([median_if_not_empty(s[s > 1e-6]) for s in pensioni_reali_successo[:, anno_inizio_pensione:]])
+                rendite_fp_mediane_per_sim = np.array([median_if_not_empty(s[s > 1e-6]) for s in rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]])
 
             # Ora calcoliamo la mediana di queste mediane
             prel_medio = np.median(prelievi_mediani_per_sim[~np.isnan(prelievi_mediani_per_sim)]) if np.any(~np.isnan(prelievi_mediani_per_sim)) else 0
