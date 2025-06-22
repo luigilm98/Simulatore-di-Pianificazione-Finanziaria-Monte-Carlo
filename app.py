@@ -230,114 +230,125 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
 def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale):
     """Crea un grafico a cono per mostrare l'evoluzione del reddito reale annuo."""
     fig = go.Figure()
-    
-    # Calcola i percentili per il reddito
+
     p10 = np.percentile(data, 10, axis=0)
     p25 = np.percentile(data, 25, axis=0)
     p50 = np.median(data, axis=0)
     p75 = np.percentile(data, 75, axis=0)
     p90 = np.percentile(data, 90, axis=0)
-    
-    # Asse x (età)
+    p95 = np.percentile(data, 95, axis=0) # Usiamo p95 per la scala
+
     eta_asse_x = eta_iniziale + np.arange(data.shape[1])
-    
+
     # Aree di confidenza
     fig.add_trace(go.Scatter(
         x=np.concatenate([eta_asse_x, eta_asse_x[::-1]]),
         y=np.concatenate([p90, p10[::-1]]),
         fill='toself',
-        fillcolor='rgba(0, 123, 255, 0.2)',
+        fillcolor='rgba(0, 176, 246, 0.2)', # Azzurro chiaro
         line={'color': 'rgba(255,255,255,0)'},
         name='10-90 Percentile',
         hoverinfo='none'
     ))
-    
+
     fig.add_trace(go.Scatter(
         x=np.concatenate([eta_asse_x, eta_asse_x[::-1]]),
         y=np.concatenate([p75, p25[::-1]]),
         fill='toself',
-        fillcolor='rgba(0, 123, 255, 0.4)',
+        fillcolor='rgba(0, 176, 246, 0.4)', # Azzurro più scuro
         line={'color': 'rgba(255,255,255,0)'},
         name='25-75 Percentile',
         hoverinfo='none'
     ))
-    
+
     # Linea mediana
     fig.add_trace(go.Scatter(
         x=eta_asse_x, y=p50, mode='lines',
         name='Reddito Mediano',
-        line={'width': 3, 'color': '#dc3545'}, # Rosso più scuro per la mediana
-        hovertemplate='Età %{x:.1f}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
+        line={'width': 3, 'color': '#005c9e'}, # Blu scuro
+        hovertemplate='Età %{x}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
     ))
-    
-    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
-    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
 
     fig.update_layout(
-        title='Analisi degli Scenari Peggiori (10% più sfortunati)',
+        title='Quale sarà il mio tenore di vita in pensione?',
         xaxis_title="Età",
-        yaxis_title="Patrimonio Reale (€)",
+        yaxis_title="Reddito Annuo Reale (€)",
+        yaxis_tickformat="€,d",
         hovermode="x unified",
+        height=600,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=700, # Aumenta l'altezza del grafico
-        yaxis=dict(
-            range=[0, 10000000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
-        )
+        yaxis_range=[0, np.max(p95) * 1.05] # Scala dinamica
     )
-    
+
+    fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+
     return fig
 
 def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale):
-    """Crea un grafico che mostra i 10% scenari peggiori."""
+    """
+    Crea un grafico a CONO che mostra la distribuzione di probabilità
+    dei soli scenari peggiori (10% più sfortunati).
+    """
     fig = go.Figure()
-    
+
     # Trova il 10% degli scenari peggiori
     n_worst = max(1, int(data.shape[0] * 0.1))
     worst_indices = np.argsort(patrimoni_finali)[:n_worst]
     worst_data = data[worst_indices, :]
-    
+
+    # Calcola i percentili ALL'INTERNO del gruppo dei peggiori
+    p10_worst = np.percentile(worst_data, 10, axis=0)
+    p25_worst = np.percentile(worst_data, 25, axis=0)
+    p50_worst = np.median(worst_data, axis=0)
+    p75_worst = np.percentile(worst_data, 75, axis=0)
+    p90_worst = np.percentile(worst_data, 90, axis=0)
+
     anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
-    
-    # Disegna le linee degli scenari peggiori
-    for i in range(worst_data.shape[0]):
-        fig.add_trace(go.Scatter(
-            x=anni_asse_x, y=worst_data[i, :], mode='lines',
-            line={'width': 1, 'color': 'rgba(220, 53, 69, 0.5)'}, # Rosso con trasparenza
-            hoverinfo='none',
-            showlegend=False,
-            name=f'Scenario Peggiore {i}'
-        ))
-    
-    # Aggiungi la mediana DEI SOLI SCENARI PEGGIORI per riferimento
-    median_worst_data = np.median(worst_data, axis=0)
+
+    # Area di confidenza larga (10-90)
     fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_worst_data, mode='lines',
+        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
+        y=np.concatenate([p90_worst, p10_worst[::-1]]),
+        fill='toself',
+        fillcolor='rgba(255, 159, 64, 0.2)',  # Arancione chiaro
+        line={'color': 'rgba(255,255,255,0)'},
+        name='10-90 Percentile (Peggiori)',
+        hoverinfo='none'
+    ))
+
+    # Area di confidenza stretta (25-75)
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
+        y=np.concatenate([p75_worst, p25_worst[::-1]]),
+        fill='toself',
+        fillcolor='rgba(255, 159, 64, 0.4)',  # Arancione più scuro
+        line={'color': 'rgba(255,255,255,0)'},
+        name='25-75 Percentile (Peggiori)',
+        hoverinfo='none'
+    ))
+
+    # Mediana degli scenari peggiori
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=p50_worst, mode='lines',
         name='Mediana Scenari Peggiori',
-        line={'width': 3, 'color': '#dc3545'}, # Rosso più scuro per la mediana
+        line={'width': 3, 'color': '#ff6347'},  # Rosso pomodoro
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano (Peggiori): €%{y:,.0f}<extra></extra>'
     ))
-    
-    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
-    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+
+    # Imposta il limite superiore dell'asse Y in base al 99° percentile dei dati peggiori
+    y_max = np.percentile(worst_data, 99) * 1.10
 
     fig.update_layout(
-        title='Analisi degli Scenari Peggiori (10% più sfortunati)',
+        title='Il piano sopravviverà a una crisi di mercato iniziale? (Focus sul 10% degli scenari peggiori)',
         xaxis_title="Età",
         yaxis_title="Patrimonio Reale (€)",
+        yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=700, # Aumenta l'altezza del grafico
-        yaxis=dict(
-            range=[0, 10000000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
-        )
+        height=600,
+        yaxis_range=[0, y_max] # Scala dinamica
     )
-    
+
     return fig
 
 def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_iniziale):
