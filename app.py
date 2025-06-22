@@ -687,7 +687,21 @@ if 'risultati' in st.session_state:
         help=f"Il tuo patrimonio finale reale mediano, tradotto in quanti anni del tuo tenore di vita pensionistico (€{reddito_annuo_reale_pensione:,.0f}/anno) può coprire."
     )
 
-    st.markdown("##### Risultati Finali della Simulazione (Patrimonio Nominale)")
+    # --- Messaggio speciale per il calcolo del prelievo sostenibile ---
+    prelievo_sostenibile_calcolato = stats.get('prelievo_sostenibile_calcolato')
+    if prelievo_sostenibile_calcolato is not None:
+        st.info(f"""
+        **Hai richiesto il calcolo del prelievo massimo sostenibile.**
+        
+        Abbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.
+        
+        I risultati della simulazione qui sotto (es. Probabilità di Fallimento) rappresentano uno **stress test** di questo piano. 
+        Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
+        """)
+
+    st.markdown("---")
+    
+    st.header("Risultati Finali della Simulazione (Patrimonio Nominale)")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}")
     col2.metric("Patrimonio Finale (Top 10% - 90°)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}")

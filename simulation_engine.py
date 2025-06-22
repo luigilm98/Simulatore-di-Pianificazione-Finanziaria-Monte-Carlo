@@ -534,10 +534,13 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
 
     if calcolo_sostenibile_attivo:
         prelievo_annuo_da_usare = _calcola_prelievo_sostenibile(parametri)
+    else:
+        # Se non stiamo calcolando, ci assicuriamo che il valore sia 0 per non inquinar le statistiche
+        prelievo_annuo_da_usare = parametri['prelievo_annuo']
 
     # 2. ESECUZIONE SIMULAZIONI
     for sim in range(n_sim):
-        risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
+        risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare if calcolo_sostenibile_attivo else parametri['prelievo_annuo'])
         
         patrimoni[sim, :] = risultati_run['patrimoni_mensili']
         patrimoni_reali[sim, :] = risultati_run['patrimoni_reali_mensili']
@@ -657,7 +660,8 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
         'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
         'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg),
-        'guadagni_accumulo_mediano_nominale': np.median(guadagni_accumulo_agg)
+        'guadagni_accumulo_mediano_nominale': np.median(guadagni_accumulo_agg),
+        'prelievo_sostenibile_calcolato': prelievo_annuo_da_usare if calcolo_sostenibile_attivo else None
     }
 
     return {
