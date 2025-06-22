@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 import json
 import os
 from datetime import datetime
+import plotly.express as px
 
 import simulation_engine as engine
 
@@ -151,6 +152,49 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
 
+    return fig
+
+def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000'):
+    """Crea un grafico 'spaghetti' con le singole simulazioni e la mediana."""
+    fig = go.Figure()
+    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
+
+    # Mostra un sottoinsieme di simulazioni per non appesantire il grafico
+    n_sim_da_mostrare = min(50, data.shape[0])
+    indici_da_mostrare = np.random.choice(data.shape[0], size=n_sim_da_mostrare, replace=False)
+
+    # Usa una palette di colori per le linee
+    color_palette = px.colors.qualitative.Plotly
+
+    for i, idx in enumerate(indici_da_mostrare):
+        fig.add_trace(go.Scatter(
+            x=anni_asse_x, y=data[idx, :], mode='lines',
+            line={'width': 1.5, 'color': color_palette[i % len(color_palette)]},
+            opacity=0.6,
+            hoverinfo='none',
+            showlegend=False,
+            name=f'Simulazione {i}'
+        ))
+
+    # Aggiungi la mediana in evidenza
+    median_data = np.median(data, axis=0)
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=median_data, mode='lines',
+        name='Scenario Mediano (50°)',
+        line={'width': 4, 'color': color_median},
+        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
+    ))
+            
+    fig.update_layout(
+        title=title,
+        xaxis_title="Età",
+        yaxis_title=y_title,
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
     return fig
 
 if 'simulazione_eseguita' not in st.session_state:
@@ -491,28 +535,23 @@ if 'risultati' in st.session_state:
 
         st.subheader("Quali sono i percorsi possibili? (Visione di dettaglio)")
         st.markdown("""
-        Se il grafico precedente era una "mappa meteorologica", questo è come guardare le traiettorie di 50 aerei diversi che volano nella stessa tempesta. Ogni linea colorata è **una delle possibili vite del tuo portafoglio** tra le migliaia simulate.
+        Se il grafico precedente era una "mappa meteorologica", questo è come guardare le traiettorie di 50 aerei diversi che volano nella stessa tempesta. Ogni linea colorata è una delle possibili vite del tuo portafoglio tra le migliaia simulate. 
         
-        Questo grafico ti aiuta a capire la natura caotica dei mercati: alcuni percorsi sono fortunati (linee che finiscono in alto), altri meno. La **linea rossa più spessa** è sempre lo scenario mediano, il tuo punto di riferimento. Osserva come, nonostante le partenze simili, le traiettorie divergano enormemente nel tempo. Questo è il motivo per cui diversificare e avere un piano a lungo termine è fondamentale.
+        Questo grafico ti aiuta a capire la natura caotica dei mercati: alcuni percorsi sono fortunati (linee che finiscono in alto), altri meno. La **linea rossa più spessa** è sempre lo scenario mediano, il tuo punto di riferimento. Osserva come, nonostante le partenze simili, le traiettorie divergono enormemente nel tempo. Questo è il motivo per cui diversificare e avere un piano a lungo termine è fondamentale.
         """)
+        
         fig_spaghetti = plot_spaghetti_chart(
-            dati_grafici['reale'], 'Traiettorie Individuali del Patrimonio Reale', 'Patrimonio Reale (€)',
-            '#FF0000', params['anni_totali'], params['anni_inizio_prelievo'],
-            eta_iniziale=params['eta_iniziale']
+            data=dati_grafici['reale'],
+            title="Percorsi Individuali delle Simulazioni (Patrimonio Reale)",
+            y_title="Patrimonio Reale (€)",
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale'],
+            anni_inizio_prelievo=params['anni_inizio_prelievo']
         )
         st.plotly_chart(fig_spaghetti, use_container_width=True)
-        st.markdown("---")
 
-        st.subheader("E in termini nominali, senza inflazione?")
-        fig_nominale = plot_percentile_chart(
-            dati_grafici['nominale'], 'Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 'Patrimonio (€)',
-            color_median='#4472C4', color_fill='#4472C4',
-            anni_totali=params['anni_totali'],
-            eta_iniziale=params['eta_iniziale']
-        )
-        fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
-        st.plotly_chart(fig_nominale, use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo grafico mostra il valore 'nominale', cioè quanti Euro vedrai scritti sul tuo estratto conto in futuro, senza considerare l'inflazione.</div>", unsafe_allow_html=True)
+        st.markdown("---")
+        # SEZIONE TABELLA DETTAGLIATA
 
     with tab_decumulo:
         eta_pensionamento = params['eta_iniziale'] + params['anni_inizio_prelievo']
