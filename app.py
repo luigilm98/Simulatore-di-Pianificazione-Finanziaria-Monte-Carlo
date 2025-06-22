@@ -75,10 +75,10 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali):
+def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali, eta_iniziale):
     """Crea un grafico a 'cono' con i percentili."""
     fig = go.Figure()
-    anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
+    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
 
     p10 = np.percentile(data, 10, axis=0)
     p25 = np.percentile(data, 25, axis=0)
@@ -110,12 +110,12 @@ def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_t
         x=anni_asse_x, y=median_data, mode='lines',
         name='Scenario Mediano (50°)',
         line={'width': 3, 'color': color_median},
-        hovertemplate='Anno %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
+        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
     fig.update_layout(
         title=title,
-        xaxis_title="Anni",
+        xaxis_title="Età",
         yaxis_title=y_title,
         yaxis_tickformat="€,d",
         hovermode="x unified",
@@ -149,10 +149,10 @@ def plot_success_probability(data, anni_totali):
     )
     return fig
 
-def plot_income_composition(data, anni_totali):
+def plot_income_composition(data, anni_totali, eta_iniziale):
     """Crea un grafico ad area della composizione del reddito annuo reale."""
     # L'asse X va da 1 ad anni_totali, perchè il reddito è un flusso annuale
-    anni_asse_x_annuale = np.arange(1, anni_totali + 1)
+    anni_asse_x_annuale = eta_iniziale + np.arange(1, anni_totali + 1)
     fig = go.Figure()
     
     # I dati partono dall'indice 1 per escludere l'anno 0 (iniziale)
@@ -174,7 +174,7 @@ def plot_income_composition(data, anni_totali):
 
     fig.update_layout(
         title='Composizione del Reddito Annuo Reale (Scenario Mediano)',
-        xaxis_title='Anni',
+        xaxis_title='Età',
         yaxis_title='Reddito Reale Annuo (€ Odierni)',
         yaxis_tickformat="€,d",
         hovermode="x unified",
@@ -182,9 +182,9 @@ def plot_income_composition(data, anni_totali):
     )
     return fig
 
-def plot_wealth_composition_over_time_nominal(data, anni_totali):
+def plot_wealth_composition_over_time_nominal(data, anni_totali, eta_iniziale):
     """Crea un grafico stacked area per la composizione del patrimonio nominale nel tempo."""
-    anni_asse_x_annuale = np.arange(anni_totali + 1)
+    anni_asse_x_annuale = eta_iniziale + np.arange(anni_totali + 1)
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
@@ -205,7 +205,7 @@ def plot_wealth_composition_over_time_nominal(data, anni_totali):
 
     fig.update_layout(
         title='Composizione del Patrimonio Nominale nel Tempo (Scenario Mediano)',
-        xaxis_title='Anni',
+        xaxis_title='Età',
         yaxis_title='Patrimonio Nominale (€)',
         yaxis_tickformat="€,d",
         hovermode="x unified",
@@ -252,7 +252,7 @@ def plot_asset_allocation(data, anni_totali):
     )
     return fig
 
-def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
+def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale):
     """Crea un grafico a 'cono' per il reddito reale annuo."""
     fig = go.Figure()
     start_index = int(anni_inizio_prelievo)
@@ -265,7 +265,7 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
         # Non c'è un periodo di decumulo da mostrare
         return fig 
 
-    anni_asse_x = np.arange(start_index, end_index) # Es: da 35 a 79 se anni_totali=80
+    anni_asse_x = eta_iniziale + np.arange(start_index, end_index) # Es: da 35 a 79 se anni_totali=80
     data_decumulo = data[:, start_index:end_index] # Seleziona le colonne corrispondenti
 
     p10 = np.percentile(data_decumulo, 10, axis=0)
@@ -296,12 +296,12 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo):
         x=anni_asse_x, y=median_data, mode='lines',
         name='Reddito Mediano (50°)',
         line={'width': 3, 'color': '#00B0F0'},
-        hovertemplate='Anno %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
+        hovertemplate='Età %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
     ))
 
     fig.update_layout(
         title="Quale Sarà il Mio Tenore di Vita? (Reddito Annuo Reale)",
-        xaxis_title="Anni",
+        xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€ di oggi)",
         yaxis_tickformat="€,d",
         hovermode="x unified",
@@ -332,14 +332,14 @@ def plot_wealth_composition_chart(initial, contributions, gains):
     )
     return fig
 
-def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
+def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali, eta_iniziale):
     """Mostra un'analisi degli scenari peggiori (es. 10% dei casi)."""
     fig = go.Figure()
     
     soglia_peggiore = np.percentile(patrimoni_finali, 10)
     indici_peggiori = np.where(patrimoni_finali <= soglia_peggiore)[0]
     
-    anni_asse_x = np.linspace(0, anni_totali, data.shape[1])
+    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
     
     if len(indici_peggiori) > 0:
         indici_da_mostrare = np.random.choice(indici_peggiori, size=min(50, len(indici_peggiori)), replace=False)
@@ -356,12 +356,12 @@ def plot_worst_scenarios_chart(data, patrimoni_finali, anni_totali):
         x=anni_asse_x, y=mediana_scenari_peggiori, mode='lines',
         name='Mediana Scenari Peggiori',
         line={'width': 2.5, 'color': '#FF5252'},
-        hovertemplate='Anno %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
+        hovertemplate='Età %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
     ))
             
     fig.update_layout(
         title="Come si Comporta il Piano negli Scenari Peggiori? (Analisi del Rischio)",
-        xaxis_title="Anni",
+        xaxis_title="Età",
         yaxis_title="Patrimonio Reale (€ di oggi)",
         yaxis_tickformat="€,d",
         hovermode="x unified",
@@ -666,18 +666,20 @@ else:
         fig_reale = plot_percentile_chart(
             dati_grafici['reale'], 'Evoluzione Patrimonio Reale (Tutti gli Scenari)', 'Patrimonio Reale (€)', 
             color_median='#C00000', color_fill='#C00000',
-            anni_totali=params['anni_totali']
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale']
         )
-        fig_reale.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        fig_reale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_reale, use_container_width=True)
         st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo è il grafico della verità. Tiene conto dell'inflazione, mostrando il vero potere d'acquisto. La linea rossa è lo scenario mediano (50° percentile), le aree colorate mostrano i range di probabilità (dal 10° al 90° percentile).</div>", unsafe_allow_html=True)
 
         fig_nominale = plot_percentile_chart(
             dati_grafici['nominale'], 'Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 'Patrimonio (€)',
             color_median='#4472C4', color_fill='#4472C4',
-            anni_totali=params['anni_totali']
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale']
         )
-        fig_nominale.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_nominale, use_container_width=True)
         st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo grafico mostra il valore 'nominale', cioè quanti Euro vedrai scritti sul tuo estratto conto in futuro, senza considerare l'inflazione.</div>", unsafe_allow_html=True)
 
@@ -714,7 +716,8 @@ else:
         fig_reddito = plot_income_cone_chart(
             dati_principali['reddito_reale_annuo'], 
             params['anni_totali'],
-            params['anni_inizio_prelievo']
+            params['anni_inizio_prelievo'],
+            params['eta_iniziale']
         )
         st.plotly_chart(fig_reddito, use_container_width=True)
         st.markdown("---")
@@ -731,9 +734,10 @@ else:
         fig_worst = plot_worst_scenarios_chart(
             dati_principali['reale'],
             st.session_state.risultati['statistiche']['patrimoni_reali_finali'],
-            params['anni_totali']
+            params['anni_totali'],
+            eta_iniziale=params['eta_iniziale']
         )
-        fig_worst.add_vline(x=params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        fig_worst.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_worst, use_container_width=True)
 
     with tab_dettaglio:
@@ -748,13 +752,13 @@ else:
         # Grafico 1: Composizione del Patrimonio Nominale
         st.markdown("##### Da cosa è composto il mio patrimonio?")
         st.markdown("Questo grafico mostra come evolvono nel tempo le tre componenti principali del tuo patrimonio: Liquidità, ETF e Fondo Pensione. I valori sono **nominali**, cioè non tengono conto dell'inflazione.")
-        fig_composizione_patrimonio = plot_wealth_composition_over_time_nominal(dati_tabella, params['anni_totali'])
+        fig_composizione_patrimonio = plot_wealth_composition_over_time_nominal(dati_tabella, params['anni_totali'], params['eta_iniziale'])
         st.plotly_chart(fig_composizione_patrimonio, use_container_width=True)
 
         # Grafico 2: Composizione del Reddito Annuo Reale
         st.markdown("##### Da dove arriveranno i miei soldi ogni anno in pensione?")
         st.markdown("Questo grafico è fondamentale: mostra, anno per anno, da quali fonti proverrà il tuo reddito per vivere. I valori sono **reali** (potere d'acquisto di oggi) per darti un'idea concreta del tuo tenore di vita. Puoi vedere come i prelievi dal patrimonio vengono progressivamente sostituiti o integrati da pensione e rendite.")
-        fig_composizione_reddito = plot_income_composition(dati_tabella, params['anni_totali'])
+        fig_composizione_reddito = plot_income_composition(dati_tabella, params['anni_totali'], params['eta_iniziale'])
         st.plotly_chart(fig_composizione_reddito, use_container_width=True)
 
         st.markdown("---")
