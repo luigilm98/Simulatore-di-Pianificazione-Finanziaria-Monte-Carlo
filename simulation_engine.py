@@ -452,15 +452,25 @@ def _calcola_prelievo_sostenibile(parametri):
         # Usiamo il rendimento reale atteso per il calcolo dell'annualità
         rend_reale_atteso = parametri['rendimento_medio'] - parametri['ter_etf'] - parametri['inflazione']
 
-        # Formula della rendita per calcolare il prelievo costante
+        # Obiettivo: non finire a zero, ma con un piccolo cuscinetto (es. 1% del capitale iniziale reale)
+        # per rendere il piano più robusto alla volatilità nello scenario mediano.
+        capitale_finale_target = patrimonio_reale_a_inizio_prelievo_mediano * 0.01
+
+        # Formula della rendita modificata per un target finale non nullo
+        numeratore = patrimonio_reale_a_inizio_prelievo_mediano - (capitale_finale_target / ((1 + rend_reale_atteso) ** anni_prelievo))
+        
+        prelievo_annuo_calcolato = 0
         if rend_reale_atteso > 1e-6: # Evitiamo divisione per zero
             try:
-                fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
-                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
+                fattore_ammortamento = (1 - (1 + rend_reale_atteso) ** -anni_prelievo) / rend_reale_atteso
+                if fattore_ammortamento > 1e-9:
+                    prelievo_annuo_calcolato = numeratore / fattore_ammortamento
+                else: # Fallback se il fattore è troppo piccolo
+                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
             except (OverflowError, ZeroDivisionError):
-                # Fallback in caso di problemi numerici con numeri molto grandi o piccoli
+                # Fallback in caso di problemi numerici
                 prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
-        else:
+        else: # Fallback per tassi nulli o negativi
              prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
              
     return prelievo_annuo_calcolato
