@@ -660,6 +660,11 @@ def run_full_simulation(parametri):
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
     patrimoni_finali_nominali = patrimoni_tutte_le_run[:, -1]
     
+    # Calcolo del patrimonio all'inizio dei prelievi
+    idx_inizio_prelievo_mesi = parametri['anni_inizio_prelievo'] * 12
+    patrimoni_inizio_prelievi_reali = patrimoni_reali_tutte_le_run[:, idx_inizio_prelievo_mesi]
+    patrimoni_inizio_prelievi_nominali = patrimoni_tutte_le_run[:, idx_inizio_prelievo_mesi]
+    
     # Filtra i drawdown e sharpe ratio degli scenari di successo per non distorcere le medie
     scenari_successo_mask = patrimoni_finali_reali > 1.0 # Considera successo se resta almeno 1€
     sharpe_ratios_successo = contatori_statistiche['sharpe_ratios'][scenari_successo_mask]
@@ -672,6 +677,9 @@ def run_full_simulation(parametri):
         'patrimonio_finale_mediano_reale': np.median(patrimoni_finali_reali),
         'patrimonio_finale_top_10_reale': np.percentile(patrimoni_finali_reali, 90),
         'patrimonio_finale_peggior_10_reale': np.percentile(patrimoni_finali_reali, 10),
+
+        'patrimonio_inizio_prelievi_mediano_nominale': np.median(patrimoni_inizio_prelievi_nominali),
+        'patrimonio_inizio_prelievi_mediano_reale': np.median(patrimoni_inizio_prelievi_reali),
 
         'probabilita_fallimento': np.mean(fallimenti),
         'drawdown_massimo_peggiore': np.min(drawdowns) if len(drawdowns) > 0 else 0,
