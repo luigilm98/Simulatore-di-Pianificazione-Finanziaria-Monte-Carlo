@@ -107,6 +107,7 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     p50 = np.median(data, axis=0)
     p75 = np.percentile(data, 75, axis=0)
     p90 = np.percentile(data, 90, axis=0)
+    p99 = np.percentile(data, 99, axis=0) # Calcoliamo il 99° percentile per il limite del grafico
 
     # Funzione helper per convertire hex in rgba per il fill
     def hex_to_rgb(hex_color):
@@ -149,7 +150,8 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         yaxis_title=y_title,
         yaxis_tickformat="€,d",
         hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis_range=[0, np.max(p99) * 1.05] # Limita l'asse y per migliorare la leggibilità
     )
 
     return fig
