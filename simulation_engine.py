@@ -602,47 +602,42 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
                     fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
                     prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
                 except (OverflowError, ZeroDivisionError):
-                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
-            else:
-                 prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
-        
-        statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
-        statistiche_prelievi['pensione_pubblica_reale_annua'] = parametri['pensione_pubblica_annua']
-        statistiche_prelievi['rendita_fp_reale_media'] = 0 # Non calcolata in questa modalità
-        statistiche_prelievi['totale_reale_medio_annuo'] = prelievo_annuo_calcolato + parametri['pensione_pubblica_annua']
+                    prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+            
+            statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
+            statistiche_prelievi['pensione_pubblica_reale_annua'] = parametri['pensione_pubblica_annua']
+            statistiche_prelievi['rendita_fp_reale_media'] = 0 # Non calcolata in questa modalità
+            statistiche_prelievi['totale_reale_medio_annuo'] = prelievo_annuo_calcolato + parametri['pensione_pubblica_annua']
     
     else:
-        # Calcolo standard basato sulle simulazioni di successo
+        # --- Logica di calcolo delle statistiche di riepilogo (robusta) ---
+        prel_medio, pens_media, rend_fp_media = 0, 0, 0
+        
+        # Procediamo con i calcoli solo se ci sono state simulazioni di successo
         if prelievi_reali_successo.shape[0] > 0:
             anno_inizio_prelievo = parametri['anni_inizio_prelievo']
             anno_inizio_pensione = parametri['inizio_pensione_anni']
             anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
 
-            # Funzione helper per calcolare la mediana solo su array non vuoti, evitando warnings.
-            def median_if_not_empty(a):
-                return np.median(a) if a.size > 0 else np.nan
+            # Funzione helper per calcolare la mediana di mediane in modo sicuro
+            def _calcola_statistica_robusta(dati_successo, anno_inizio):
+                # Filtra gli anni rilevanti per ogni simulazione e calcola la mediana
+                # solo sui valori positivi (prelievi/rendite effettive)
+                mediane_per_sim = [np.median(s[s > 1e-6]) for s in dati_successo[:, anno_inizio:] if np.any(s[s > 1e-6])]
+                
+                # Se abbiamo ottenuto delle mediane valide, calcoliamo la mediana di queste
+                if mediane_per_sim:
+                    return np.median(mediane_per_sim)
+                return 0 # Altrimenti, il valore è zero
 
-            # Calcoliamo la mediana per ogni simulazione, solo sugli anni attivi
-            with np.errstate(invalid='ignore'): # Manteniamo errstate per ulteriore sicurezza
-                prelievi_mediani_per_sim = np.array([median_if_not_empty(s[s > 1e-6]) for s in prelievi_reali_successo[:, anno_inizio_prelievo:]])
-                pensioni_mediane_per_sim = np.array([median_if_not_empty(s[s > 1e-6]) for s in pensioni_reali_successo[:, anno_inizio_pensione:]])
-                rendite_fp_mediane_per_sim = np.array([median_if_not_empty(s[s > 1e-6]) for s in rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]])
+            prel_medio = _calcola_statistica_robusta(prelievi_reali_successo, anno_inizio_prelievo)
+            pens_media = _calcola_statistica_robusta(pensioni_reali_successo, anno_inizio_pensione)
+            rend_fp_media = _calcola_statistica_robusta(rendite_fp_reali_successo, anno_inizio_rendita_fp)
 
-            # Ora calcoliamo la mediana di queste mediane
-            prel_medio = np.median(prelievi_mediani_per_sim[~np.isnan(prelievi_mediani_per_sim)]) if np.any(~np.isnan(prelievi_mediani_per_sim)) else 0
-            pens_media = np.median(pensioni_mediane_per_sim[~np.isnan(pensioni_mediane_per_sim)]) if np.any(~np.isnan(pensioni_mediane_per_sim)) else 0
-            rend_fp_media = np.median(rendite_fp_mediane_per_sim[~np.isnan(rendite_fp_mediane_per_sim)]) if np.any(~np.isnan(rendite_fp_mediane_per_sim)) else 0
-
-            statistiche_prelievi['prelievo_reale_medio'] = prel_medio
-            statistiche_prelievi['pensione_pubblica_reale_annua'] = pens_media
-            statistiche_prelievi['rendita_fp_reale_media'] = rend_fp_media
-            statistiche_prelievi['totale_reale_medio_annuo'] = prel_medio + pens_media + rend_fp_media
-        else:
-            # Fallback se non ci sono simulazioni di successo
-            statistiche_prelievi['prelievo_reale_medio'] = 0
-            statistiche_prelievi['pensione_pubblica_reale_annua'] = 0
-            statistiche_prelievi['rendita_fp_reale_media'] = 0
-            statistiche_prelievi['totale_reale_medio_annuo'] = 0
+        statistiche_prelievi['prelievo_reale_medio'] = prel_medio
+        statistiche_prelievi['pensione_pubblica_reale_annua'] = pens_media
+        statistiche_prelievi['rendita_fp_reale_media'] = rend_fp_media
+        statistiche_prelievi['totale_reale_medio_annuo'] = prel_medio + pens_media + rend_fp_media
 
     # --- Calcolo Statistiche Finali ---
     patrimoni_reali_finale_validi = patrimoni_reali_finale_validi[sim_di_successo_mask]
@@ -652,12 +647,12 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
     # 4. PREPARAZIONE OUTPUT
     statistiche_finali = {
         'patrimonio_iniziale': parametri['capitale_iniziale'] + parametri['etf_iniziale'],
-        'patrimonio_finale_mediano_nominale': np.median(patrimoni_finale_validi),
-        'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finale_validi, 90),
-        'patrimonio_finale_peggior_10_nominale': np.percentile(patrimoni_finale_validi, 10),
-        'patrimonio_finale_mediano_reale': np.median(patrimoni_reali_finale_validi),
+        'patrimonio_finale_mediano_nominale': np.median(patrimoni_finale_validi) if patrimoni_finale_validi.size > 0 else 0,
+        'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finale_validi, 90) if patrimoni_finale_validi.size > 0 else 0,
+        'patrimonio_finale_peggior_10_nominale': np.percentile(patrimoni_finale_validi, 10) if patrimoni_finale_validi.size > 0 else 0,
+        'patrimonio_finale_mediano_reale': np.median(patrimoni_reali_finale_validi) if patrimoni_reali_finale_validi.size > 0 else 0,
         'drawdown_massimo_peggiore': np.min(drawdowns_successo) if drawdowns_successo.size > 0 else 0,
-        'sharpe_ratio_medio': np.mean(sharpe_ratios[np.isfinite(sharpe_ratios)]),
+        'sharpe_ratio_medio': np.mean(sharpe_ratios[np.isfinite(sharpe_ratios)]) if np.any(np.isfinite(sharpe_ratios)) else 0,
         'probabilita_fallimento': prob_fallimento,
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
         'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
