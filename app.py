@@ -684,6 +684,10 @@ if 'risultati' in st.session_state:
     col3.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media:,.0f}")
     col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio:,.0f}")
 
+    with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
+        st.write("Array dei patrimoni finali reali (tutte le simulazioni):")
+        st.write(st.session_state.risultati['statistiche']['patrimoni_reali_finali'])
+
     with st.expander("🔍 Guida alla Lettura: Perché il mio piano ha successo (o fallisce)?"):
         st.markdown("""
         **Perché la probabilità di fallimento è spesso 0%?**
