@@ -431,6 +431,75 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
     )
     return fig
 
+# --- INIZIALIZZAZIONE ROBUSTA DELLO STATO ---
+def initialize_session_state():
+    """
+    Inizializza lo stato della sessione con tutti i parametri di default
+    per evitare KeyError al primo avvio o dopo un refresh.
+    """
+    default_params = {
+        # Impostazioni Generali
+        'eta_iniziale': 30,
+        'capitale_iniziale': 10000,
+        'etf_iniziale': 5000,
+        'contributo_mensile_banca': 200,
+        'contributo_mensile_etf': 800,
+        'anni_totali': 70,
+        'inflazione': 0.02,
+        'n_simulazioni': 1000,
+        
+        # Strategia di Prelievo
+        'strategia_prelievo': 'FISSO',
+        'prelievo_annuo': 0,
+        'percentuale_regola_4': 0.04,
+        'banda_guardrail': 0.10,
+        'anni_inizio_prelievo': 35,
+
+        # Glidepath
+        'attiva_glidepath': True,
+        'inizio_glidepath_anni': 25,
+        'fine_glidepath_anni': 35,
+        'allocazione_etf_finale': 0.20,
+
+        # Tassazione e Costi
+        'tassazione_capital_gain': 0.26,
+        'imposta_bollo_titoli': 0.002,
+        'imposta_bollo_conto': 34.20,
+        'costo_fisso_etf_mensile': 0,
+
+        # Fondo Pensione
+        'attiva_fondo_pensione': False,
+        'contributo_annuo_fp': 0,
+        'rendimento_medio_fp': 0.05,
+        'volatilita_fp': 0.08,
+        'ter_fp': 0.01,
+        'tassazione_rendimenti_fp': 0.20,
+        'aliquota_finale_fp': 0.15,
+        'eta_ritiro_fp': 67,
+        'percentuale_capitale_fp': 0.50,
+        'durata_rendita_fp_anni': 25,
+
+        # Pensione Statale
+        'pensione_pubblica_annua': 20000,
+        'inizio_pensione_anni': 30,
+    }
+
+    if 'parametri' not in st.session_state:
+        st.session_state.parametri = default_params
+
+    if 'portfolio' not in st.session_state:
+        st.session_state.portfolio = pd.DataFrame({
+            "Asset Class": ["Azionario Globale", "Obbligazionario Globale"],
+            "Allocazione (%)": [80.0, 20.0],
+            "Rendimento Atteso (%)": [8.5, 3.0],
+            "Volatilità Attesa (%)": [16.0, 6.0],
+            "TER (%)": [0.20, 0.15]
+        })
+
+# Chiamiamo la funzione di inizializzazione all'inizio
+initialize_session_state()
+
+# --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(
     page_title="Progetta il Tuo Futuro Finanziario",
     page_icon="✈️",
@@ -482,109 +551,191 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
                     st.session_state.simulazione_eseguita = True
                     st.rerun()
 
-with st.sidebar.expander("1. Parametri di Base", expanded=True):
-    p = st.session_state.get('parametri', {})
-    eta_iniziale = st.number_input("Età Iniziale", min_value=1, max_value=100, value=p.get('eta_iniziale', 27), help="La tua età attuale. È il punto di partenza per tutti i calcoli temporali.")
-    capitale_iniziale = st.number_input("Capitale Conto Corrente (€)", min_value=0, step=1000, value=p.get('capitale_iniziale', 17000), help="La liquidità che hai oggi sul conto corrente o in asset a bassissimo rischio/rendimento.")
-    etf_iniziale = st.number_input("Valore Portafoglio ETF (€)", min_value=0, step=1000, value=p.get('etf_iniziale', 600), help="Il valore di mercato attuale di tutti i tuoi investimenti in ETF/azioni.")
-    contributo_mensile_banca = st.number_input("Contributo Mensile Conto (€)", min_value=0, step=50, value=p.get('contributo_mensile_banca', 1300), help="La cifra che riesci a risparmiare e accantonare sul conto corrente ogni mese. Questi soldi verranno usati per il ribilanciamento o per le spese.")
-    contributo_mensile_etf = st.number_input("Contributo Mensile ETF (€)", min_value=0, step=50, value=p.get('contributo_mensile_etf', 300), help="La cifra che investi attivamente ogni mese nel tuo portafoglio ETF. Questo è il motore principale del tuo Piano di Accumulo (PAC).")
-    inflazione = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, p.get('inflazione', 0.03) * 100, 0.1, help="Il tasso a cui i prezzi aumentano e il denaro perde potere d'acquisto. Un'inflazione del 3% significa che tra un anno, 100€ compreranno beni per 97€.") / 100
-    anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
-    n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Più simulazioni esegui, più accurata sarà la stima delle probabilità. 250 è un buon compromesso tra velocità e precisione.")
-    anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p.get('anni_totali', 80), help="La durata totale della simulazione. Assicurati che sia abbastanza lunga da coprire tutta la tua aspettativa di vita.")
-
-with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
-    st.markdown("Modifica l'allocazione, il TER e le stime di rendimento/volatilità per ogni ETF.")
-    
-    edited_portfolio = st.data_editor(
-        st.session_state.portfolio,
-        column_config={
-            "Allocazione (%)": st.column_config.NumberColumn(format="%.2f%%", min_value=0, max_value=100),
-            "TER (%)": st.column_config.NumberColumn(format="%.2f%%", min_value=0),
-            "Rendimento Atteso (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Volatilità Attesa (%)": st.column_config.NumberColumn(format="%.2f%%"),
-        },
-        num_rows="dynamic",
-        key="portfolio_editor"
+with st.sidebar.expander("1. Impostazioni Generali", expanded=False):
+    # Usiamo .get() per sicurezza, anche se l'inizializzazione dovrebbe aver già creato la chiave
+    st.session_state.parametri['eta_iniziale'] = st.number_input(
+        "Età Iniziale", min_value=18, max_value=100, 
+        value=st.session_state.parametri.get('eta_iniziale', 30), step=1
+    )
+    st.session_state.parametri['anni_totali'] = st.number_input(
+        "Orizzonte Temporale (Anni)", min_value=1, max_value=100, 
+        value=st.session_state.parametri.get('anni_totali', 70), step=1,
+        help="L'orizzonte temporale totale della simulazione, in anni. Es. fino a 100 anni di età."
+    )
+    st.session_state.parametri['inflazione'] = st.slider(
+        "Tasso di Inflazione Medio Annuo (%)", 0.0, 10.0, st.session_state.parametri.get('inflazione', 0.02) * 100, 0.5,
+        format="%.1f%%",
+        help="L'inflazione media attesa per anno. Riduce il potere d'acquisto del tuo patrimonio nel tempo."
+    )
+    st.session_state.parametri['n_simulazioni'] = st.select_slider(
+        "Numero di Simulazioni (Precisione)",
+        options=[100, 500, 1000, 2000, 5000],
+        value=st.session_state.parametri.get('n_simulazioni', 1000),
+        help="Il numero di scenari futuri da simulare. Più alto è il numero, più accurati i risultati ma più lenta la simulazione."
     )
 
-    total_allocation = edited_portfolio["Allocazione (%)"].sum()
-    if not np.isclose(total_allocation, 100):
-        st.warning(f"L'allocazione totale è {total_allocation:.2f}%. Assicurati che sia 100%.")
-    else:
-        st.success("Allocazione totale: 100%.")
-    
-    st.session_state.portfolio = edited_portfolio
-    
-    weights = edited_portfolio["Allocazione (%)"] / 100
-    rendimento_medio_portfolio = np.sum(weights * edited_portfolio["Rendimento Atteso (%)"]) / 100
-    volatilita_portfolio = np.sum(weights * edited_portfolio["Volatilità Attesa (%)"]) / 100
-    ter_etf_portfolio = np.sum(weights * edited_portfolio["TER (%)"]) / 100
-
-    st.markdown("---")
-    st.markdown("##### Parametri Calcolati dal Portafoglio:")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Rendimento Medio", f"{rendimento_medio_portfolio:.2%}")
-    col2.metric("Volatilità Attesa", f"{volatilita_portfolio:.2%}")
-    col3.metric("TER Ponderato", f"{ter_etf_portfolio:.4%}")
-    st.caption("La volatilità aggregata è una media ponderata semplificata.")
-
-with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
-    p = st.session_state.get('parametri', {})
-    strategia_prelievo = st.selectbox(
-        "Strategia di Prelievo",
-        options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'],
-        index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
-        help="Scegli come verranno calcolati i prelievi dal tuo patrimonio una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
+# --- Sezione 3: Strategia di Prelievo ---
+with st.sidebar.expander("3. Strategia di Prelievo", expanded=False):
+    st.session_state.parametri['strategia_prelievo'] = st.selectbox(
+        "Strategia di Prelievo", 
+        options=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'], 
+        index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(st.session_state.parametri.get('strategia_prelievo', 'FISSO')),
+        help="Scegli come verranno calcolati i prelievi una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
     )
-    prelievo_annuo = st.number_input(
-        "Importo Prelievo Fisso Annuo (€)",
-        min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
+    
+    is_fisso = st.session_state.parametri['strategia_prelievo'] == 'FISSO'
+    is_regola4 = st.session_state.parametri['strategia_prelievo'] in ['REGOLA_4_PERCENTO', 'GUARDRAIL']
+
+    st.session_state.parametri['prelievo_annuo'] = st.number_input(
+        "Importo Prelievo Fisso Annuo (€)", min_value=0, step=1000, 
+        value=st.session_state.parametri.get('prelievo_annuo', 0),
+        disabled=not is_fisso,
         help="Usato SOLO con la strategia 'FISSO'. Imposta l'esatto importo lordo che vuoi prelevare ogni anno. Lascia a 0 per far calcolare al simulatore il prelievo massimo sostenibile."
     )
-    percentuale_regola_4 = st.slider(
-        "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
-        help="Il tasso di prelievo iniziale per le strategie 'REGOLA_4_PERCENTO' e 'GUARDRAIL'. Il 4% è una regola standard, ma puoi adattarla alla tua situazione."
-    ) / 100
-    banda_guardrail = st.slider(
-        "Banda Guardrail (%)", 0.0, 50.0, p.get('banda_guardrail', 0.10) * 100, 1.0,
-        help="Solo per 'GUARDRAIL'. Se il mercato va molto bene o molto male, questa banda determina se aumentare o diminuire i prelievi per proteggere il capitale o realizzare profitti. Un valore del 10-20% è tipico."
-    ) / 100
+    st.session_state.parametri['percentuale_regola_4'] = st.slider(
+        "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, 
+        st.session_state.parametri.get('percentuale_regola_4', 0.04) * 100, 0.5,
+        format="%.2f%%",
+        disabled=not is_regola4,
+        help="La percentuale del patrimonio da prelevare il primo anno (per GUARDRAIL) o ogni anno (per REGOLA 4%)."
+    )
+    st.session_state.parametri['banda_guardrail'] = st.slider(
+        "Banda Guardrail (%)", 0.0, 50.0, 
+        st.session_state.parametri.get('banda_guardrail', 0.10) * 100, 1.0,
+        format="%.1f%%",
+        disabled=st.session_state.parametri['strategia_prelievo'] != 'GUARDRAIL',
+        help="I limiti superiore e inferiore (es. +/- 10%) che attivano aggiustamenti al prelievo annuale per proteggere il capitale."
+    )
+    st.session_state.parametri['anni_inizio_prelievo'] = st.number_input(
+        "Anni all'inizio dei prelievi", 0, 
+        st.session_state.parametri['anni_totali'], 
+        st.session_state.parametri.get('anni_inizio_prelievo', 35), 1,
+        help="Tra quanti anni inizierai a prelevare dal tuo patrimonio per le spese di vita."
+    )
 
-with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)"):
-    p = st.session_state.get('parametri', {})
-    attiva_glidepath = st.checkbox("Attiva Glidepath", value=p.get('attiva_glidepath', True), help="Se attivato, il simulatore ridurrà progressivamente l'esposizione azionaria (ETF) a favore della liquidità con l'avvicinarsi e durante la pensione, per ridurre il rischio.")
-    inizio_glidepath_anni = st.number_input("Inizio Glidepath (Anni da oggi)", min_value=0, value=p.get('inizio_glidepath_anni', 20), disabled=not attiva_glidepath, help="L'anno in cui inizi a rendere il tuo portafoglio più conservativo. Spesso si imposta 10-15 anni prima della pensione.")
-    fine_glidepath_anni = st.number_input("Fine Glidepath (Anni da oggi)", min_value=0, value=p.get('fine_glidepath_anni', 40), disabled=not attiva_glidepath, help="L'anno in cui raggiungi l'allocazione finale desiderata. Solitamente coincide con l'inizio della pensione o pochi anni dopo.")
-    allocazione_etf_finale = st.slider(
-        "Allocazione ETF Finale (%)", 0.0, 100.0, p.get('allocazione_etf_finale', 0.333) * 100, 1.0,
-        help="La percentuale di patrimonio che rimarrà investita in ETF alla fine del percorso di de-risking. Il resto sarà liquidità. Un valore comune è tra il 30% e il 50%.",
-        disabled=not attiva_glidepath
-    ) / 100
+# --- Sezione 4: Glidepath ---
+with st.sidebar.expander("4. Asset Allocation Dinamica (Glidepath)", expanded=False):
+    st.session_state.parametri['attiva_glidepath'] = st.checkbox(
+        "Attiva Glidepath", 
+        value=st.session_state.parametri.get('attiva_glidepath', True),
+        help="Attiva un ribilanciamento automatico che riduce gradualmente l'esposizione azionaria con l'avvicinarsi della pensione."
+    )
+    st.session_state.parametri['inizio_glidepath_anni'] = st.number_input(
+        "Inizio Glidepath (Anni da oggi)", 0, 
+        st.session_state.parametri['anni_totali'], 
+        st.session_state.parametri.get('inizio_glidepath_anni', 25), 1,
+        disabled=not st.session_state.parametri['attiva_glidepath'],
+        help="L'anno in cui inizia la riduzione progressiva del rischio."
+    )
+    st.session_state.parametri['fine_glidepath_anni'] = st.number_input(
+        "Fine Glidepath (Anni da oggi)", 
+        st.session_state.parametri.get('inizio_glidepath_anni', 25), 
+        st.session_state.parametri['anni_totali'], 
+        st.session_state.parametri.get('fine_glidepath_anni', 35), 1,
+        disabled=not st.session_state.parametri['attiva_glidepath'],
+        help="L'anno in cui si raggiunge l'allocazione finale, più conservativa."
+    )
+    st.session_state.parametri['allocazione_etf_finale'] = st.slider(
+        "Allocazione ETF Finale (%)", 0.0, 100.0, 
+        st.session_state.parametri.get('allocazione_etf_finale', 0.20) * 100, 1.0,
+        format="%.0f%%",
+        disabled=not st.session_state.parametri['attiva_glidepath'],
+        help="La percentuale di ETF (rischiosa) che vuoi avere alla fine del Glidepath. Il resto sarà liquidità."
+    )
 
-with st.sidebar.expander("5. Tassazione e Costi (Italia)"):
-    p = st.session_state.get('parametri', {})
-    tassazione_capital_gain = st.slider("Tassazione Capital Gain (%)", 0.0, 50.0, p.get('tassazione_capital_gain', 0.26) * 100, 1.0, help="L'aliquota applicata ai profitti derivanti dalla vendita di ETF. In Italia è tipicamente il 26%.") / 100
-    imposta_bollo_titoli = st.slider("Imposta di Bollo Titoli (annua, %)", 0.0, 1.0, p.get('imposta_bollo_titoli', 0.002) * 100, 0.01, help="Tassa patrimoniale annuale sul valore totale del tuo portafoglio titoli. In Italia è lo 0,2%.") / 100
-    imposta_bollo_conto = st.number_input("Imposta di Bollo Conto (>5k€)", min_value=0, value=p.get('imposta_bollo_conto', 34), help="Imposta fissa annuale sui conti correnti con giacenza media superiore a 5.000€. In Italia è 34,20€.")
-    costo_fisso_etf_mensile = st.number_input("Costo Fisso Deposito Titoli (€/mese)", min_value=0.0, value=p.get('costo_fisso_etf_mensile', 0.0), step=0.5, help="Eventuali costi fissi mensili o annuali addebitati dal tuo broker per il mantenimento del conto titoli. Molti broker online non hanno costi fissi.")
+# --- Sezione 5: Tassazione e Costi ---
+with st.sidebar.expander("5. Tassazione e Costi (Italia)", expanded=False):
+    st.session_state.parametri['tassazione_capital_gain'] = st.slider(
+        "Tassazione Capital Gain (%)", 0.0, 50.0, 
+        st.session_state.parametri.get('tassazione_capital_gain', 0.26) * 100, 0.5,
+        format="%.1f%%",
+        help="L'aliquota applicata ai guadagni derivanti dalla vendita di ETF."
+    )
+    st.session_state.parametri['imposta_bollo_titoli'] = st.slider(
+        "Imposta di Bollo su Titoli (% Annua)", 0.0, 1.0, 
+        st.session_state.parametri.get('imposta_bollo_titoli', 0.002) * 100, 0.01,
+        format="%.2f%%",
+        help="L'imposta di bollo annuale sul valore del tuo portafoglio ETF."
+    )
+    st.session_state.parametri['imposta_bollo_conto'] = st.number_input(
+        "Imposta di Bollo su Conto Corrente (€ Annua)", min_value=0.0, 
+        value=st.session_state.parametri.get('imposta_bollo_conto', 34.20), step=1.0,
+        help="L'imposta di bollo fissa annuale per giacenze medie superiori a 5.000€."
+    )
+    st.session_state.parametri['costo_fisso_etf_mensile'] = st.number_input(
+        "Costi Fissi Mensili Conto Titoli (€)", min_value=0.0, 
+        value=st.session_state.parametri.get('costo_fisso_etf_mensile', 0.0), step=0.5,
+        help="Eventuali costi fissi mensili del tuo broker/conto titoli."
+    )
 
-with st.sidebar.expander("6. Fondo Pensione"):
-    p = st.session_state.get('parametri', {})
-    attiva_fondo_pensione = st.checkbox("Attiva Fondo Pensione", value=p.get('attiva_fondo_pensione', True))
-    contributo_annuo_fp = st.number_input("Contributo Annuo FP (€)", min_value=0, step=100, value=p.get('contributo_annuo_fp', 3000), disabled=not attiva_fondo_pensione)
-    rendimento_medio_fp = st.slider("Rendimento Medio Annuo FP (%)", 0.0, 15.0, p.get('rendimento_medio_fp', 0.04) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
-    volatilita_fp = st.slider("Volatilità Annuo FP (%)", 0.0, 30.0, p.get('volatilita_fp', 0.08) * 100, 0.5, disabled=not attiva_fondo_pensione) / 100
-    ter_fp = st.slider("Costo Annuo (TER) FP (%)", 0.0, 3.0, p.get('ter_fp', 0.01) * 100, 0.1, disabled=not attiva_fondo_pensione) / 100
-    tassazione_rendimenti_fp = st.slider("Tassazione Rendimenti FP (%)", 0.0, 30.0, p.get('tassazione_rendimenti_fp', 0.20) * 100, 1.0, disabled=not attiva_fondo_pensione) / 100
-    aliquota_finale_fp = st.slider("Aliquota Finale Ritiro FP (%)", 9.0, 23.0, p.get('aliquota_finale_fp', 0.15) * 100, 0.5, disabled=not attiva_fondo_pensione, help="La tassazione agevolata applicata al momento del ritiro del capitale o della rendita dal fondo pensione. Varia dal 15% al 9% in base agli anni di contribuzione.") / 100
-    eta_ritiro_fp = st.number_input("Età Ritiro Fondo Pensione", min_value=50, max_value=80, value=p.get('eta_ritiro_fp', 67), disabled=not attiva_fondo_pensione, help="L'età in cui maturi i requisiti per accedere al tuo fondo pensione.")
-    percentuale_capitale_fp = st.slider("% Ritiro in Capitale FP", 0.0, 100.0, p.get('percentuale_capitale_fp', 0.50) * 100, 1.0, help="La parte del montante finale che desideri ritirare subito come capitale tassato. Il resto verrà convertito in una rendita mensile.", disabled=not attiva_fondo_pensione) / 100
-    durata_rendita_fp_anni = st.number_input("Durata Rendita FP (Anni)", min_value=1, value=p.get('durata_rendita_fp_anni', 25), disabled=not attiva_fondo_pensione, help="Per quanti anni vuoi che venga erogata la rendita calcolata dal tuo fondo pensione.")
+# --- Sezione 6: Fondo Pensione ---
+with st.sidebar.expander("6. Fondo Pensione", expanded=False):
+    st.session_state.parametri['attiva_fondo_pensione'] = st.checkbox(
+        "Attiva Fondo Pensione", 
+        value=st.session_state.parametri.get('attiva_fondo_pensione', False),
+        help="Includi un fondo pensione complementare nella simulazione."
+    )
+    st.session_state.parametri['contributo_annuo_fp'] = st.number_input(
+        "Contributo Annuo al Fondo Pensione (€)", min_value=0, 
+        value=st.session_state.parametri.get('contributo_annuo_fp', 0), step=100,
+        disabled=not st.session_state.parametri['attiva_fondo_pensione']
+    )
+    st.session_state.parametri['rendimento_medio_fp'] = st.slider(
+        "Rendimento Medio Annuo Lordo FP (%)", 0.0, 15.0, 
+        st.session_state.parametri.get('rendimento_medio_fp', 0.05) * 100, 0.5,
+        format="%.1f%%",
+        disabled=not st.session_state.parametri['attiva_fondo_pensione']
+    )
+    st.session_state.parametri['volatilita_fp'] = st.slider(
+        "Volatilità Attesa FP (%)", 0.0, 30.0, 
+        st.session_state.parametri.get('volatilita_fp', 0.08) * 100, 0.5,
+        format="%.1f%%",
+        disabled=not st.session_state.parametri['attiva_fondo_pensione']
+    )
+    st.session_state.parametri['ter_fp'] = st.slider(
+        "Costo Annuo (TER) FP (%)", 0.0, 5.0, 
+        st.session_state.parametri.get('ter_fp', 0.01) * 100, 0.1,
+        format="%.2f%%",
+        disabled=not st.session_state.parametri['attiva_fondo_pensione']
+    )
+    st.session_state.parametri['tassazione_rendimenti_fp'] = st.slider(
+        "Tassazione Rendimenti FP (%)", 0.0, 30.0, 
+        st.session_state.parametri.get('tassazione_rendimenti_fp', 0.20) * 100, 0.5,
+        format="%.1f%%",
+        disabled=not st.session_state.parametri['attiva_fondo_pensione'],
+        help="La tassazione applicata annualmente sui rendimenti maturati nel fondo pensione."
+    )
+    st.session_state.parametri['aliquota_finale_fp'] = st.slider(
+        "Aliquota Fiscale Finale FP (%)", 0.0, 30.0, 
+        st.session_state.parametri.get('aliquota_finale_fp', 0.15) * 100, 0.5,
+        format="%.1f%%",
+        disabled=not st.session_state.parametri['attiva_fondo_pensione'],
+        help="L'aliquota fiscale applicata al momento della liquidazione del capitale o della rendita (tassazione agevolata dal 15% al 9%)."
+    )
+    st.session_state.parametri['eta_ritiro_fp'] = st.number_input(
+        "Età Ritiro Capitale/Rendita FP", 
+        min_value=st.session_state.parametri['eta_iniziale'], 
+        max_value=st.session_state.parametri['eta_iniziale'] + st.session_state.parametri['anni_totali'],
+        value=st.session_state.parametri.get('eta_ritiro_fp', 67),
+        disabled=not st.session_state.parametri['attiva_fondo_pensione'],
+        help="L'età in cui smetti di contribuire e inizi a ricevere le prestazioni dal fondo pensione."
+    )
+    st.session_state.parametri['percentuale_capitale_fp'] = st.slider(
+        "Percentuale Liquidazione Capitale FP (%)", 0.0, 100.0, 
+        st.session_state.parametri.get('percentuale_capitale_fp', 0.50) * 100, 5.0,
+        format="%.0f%%",
+        disabled=not st.session_state.parametri['attiva_fondo_pensione'],
+        help="La percentuale del montante che vuoi ritirare subito come capitale. Il resto verrà convertito in rendita."
+    )
+    st.session_state.parametri['durata_rendita_fp_anni'] = st.number_input(
+        "Durata Rendita FP (Anni)", min_value=1, 
+        value=st.session_state.parametri.get('durata_rendita_fp_anni', 25),
+        disabled=not st.session_state.parametri['attiva_fondo_pensione'],
+        help="Per quanti anni vuoi che venga erogata la rendita calcolata dal tuo fondo pensione."
+    )
 
-# Sezione per la pensione pubblica (ex "Altre Entrate")
-with st.sidebar.expander("7. Pensione Statale"):
+# --- Sezione 7: Pensione Statale ---
+with st.sidebar.expander("7. Pensione Statale", expanded=False):
     st.session_state.parametri['pensione_pubblica_annua'] = st.number_input(
         "Pensione Pubblica Annua Lorda Attesa (€)",
         min_value=0,
