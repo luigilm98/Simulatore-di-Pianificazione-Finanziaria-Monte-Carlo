@@ -194,7 +194,7 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
     ))
     
     # Scala dinamica robusta
-    p98 = np.percentile(data, 98)
+    p98 = np.percentile(data, 98, axis=0)
     y_max = p98 * 1.05
             
     fig.update_layout(
@@ -325,7 +325,8 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
     ))
 
     # Scala dinamica robusta basata sui dati degli scenari peggiori
-    y_max = np.percentile(worst_data, 98) * 1.05
+    p98_worst = np.percentile(worst_data, 98, axis=0)
+    y_max = np.max(p98_worst) * 1.05
 
     fig.update_layout(
         title='Il piano sopravviverà a una crisi di mercato iniziale? (Focus sul 10% degli scenari peggiori)',
