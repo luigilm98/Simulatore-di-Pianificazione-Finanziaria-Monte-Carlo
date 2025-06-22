@@ -583,51 +583,27 @@ with st.sidebar.expander("6. Fondo Pensione"):
     percentuale_capitale_fp = st.slider("% Ritiro in Capitale FP", 0.0, 100.0, p.get('percentuale_capitale_fp', 0.50) * 100, 1.0, help="La parte del montante finale che desideri ritirare subito come capitale tassato. Il resto verrà convertito in una rendita mensile.", disabled=not attiva_fondo_pensione) / 100
     durata_rendita_fp_anni = st.number_input("Durata Rendita FP (Anni)", min_value=1, value=p.get('durata_rendita_fp_anni', 25), disabled=not attiva_fondo_pensione, help="Per quanti anni vuoi che venga erogata la rendita calcolata dal tuo fondo pensione.")
 
-with st.sidebar.expander("7. Altre Entrate"):
-    p = st.session_state.get('parametri', {})
-    pensione_pubblica_annua = st.number_input("Pensione Pubblica Annua (€)", min_value=0, step=500, value=p.get('pensione_pubblica_annua', 8400), help="L'importo annuo lordo della pensione statale (es. INPS) che prevedi di ricevere.")
-    inizio_pensione_anni = st.number_input("Inizio Pensione (Anni da oggi)", min_value=0, value=p.get('inizio_pensione_anni', 40), help="Tra quanti anni inizierai a ricevere la pensione pubblica.")
+# Sezione per la pensione pubblica (ex "Altre Entrate")
+with st.sidebar.expander("7. Pensione Statale"):
+    st.session_state.parametri['pensione_pubblica_annua'] = st.number_input(
+        "Pensione Pubblica Annua Lorda Attesa (€)",
+        min_value=0,
+        value=st.session_state.parametri.get('pensione_pubblica_annua', 20000),
+        step=1000,
+        help="Inserisci l'importo annuo lordo della tua pensione pubblica (es. INPS) che ti aspetti di ricevere. Il valore verrà adeguato all'inflazione."
+    )
+    st.session_state.parametri['inizio_pensione_anni'] = st.number_input(
+        "Inizio Erogazione Pensione (Anni da oggi)",
+        min_value=0,
+        max_value=st.session_state.parametri['anni_totali'],
+        value=st.session_state.parametri.get('inizio_pensione_anni', 30),
+        step=1,
+        help="Tra quanti anni inizierai a ricevere la pensione pubblica."
+    )
 
-if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
-    if not np.isclose(st.session_state.portfolio["Allocazione (%)"].sum(), 100):
-        st.sidebar.error("L'allocazione del portafoglio deve essere esattamente 100% per eseguire la simulazione.")
-    else:
-        st.session_state.parametri = {
-            'eta_iniziale': eta_iniziale, 'capitale_iniziale': capitale_iniziale, 'etf_iniziale': etf_iniziale,
-            'contributo_mensile_banca': contributo_mensile_banca, 'contributo_mensile_etf': contributo_mensile_etf, 
-            'rendimento_medio': rendimento_medio_portfolio,
-            'volatilita': volatilita_portfolio, 
-            'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
-            'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
-            'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
-            'attiva_glidepath': attiva_glidepath, 'inizio_glidepath_anni': inizio_glidepath_anni, 'fine_glidepath_anni': fine_glidepath_anni,
-            'allocazione_etf_finale': allocazione_etf_finale,
-            'tassazione_capital_gain': tassazione_capital_gain, 'imposta_bollo_titoli': imposta_bollo_titoli, 'imposta_bollo_conto': imposta_bollo_conto,
-            'ter_etf': ter_etf_portfolio, 
-            'costo_fisso_etf_mensile': costo_fisso_etf_mensile,
-            'attiva_fondo_pensione': attiva_fondo_pensione, 'contributo_annuo_fp': contributo_annuo_fp, 'rendimento_medio_fp': rendimento_medio_fp,
-            'volatilita_fp': volatilita_fp, 'ter_fp': ter_fp, 'tassazione_rendimenti_fp': tassazione_rendimenti_fp, 'aliquota_finale_fp': aliquota_finale_fp,
-            'eta_ritiro_fp': eta_ritiro_fp, 'percentuale_capitale_fp': percentuale_capitale_fp, 'durata_rendita_fp_anni': durata_rendita_fp_anni,
-            'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni
-        }
-
-        with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
-            try:
-                # Pulisce i risultati precedenti prima di una nuova simulazione
-                if 'risultati' in st.session_state:
-                    del st.session_state.risultati
-                
-                # Esegui la simulazione. La nuova logica in `run_full_simulation`
-                # gestirà automaticamente il calcolo del prelievo sostenibile se necessario.
-                st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
-                
-                st.success('Simulazione completata con successo!')
-                # Un piccolo trucco per "pulire" i parametri ?run=... dall'URL dopo la prima esecuzione
-                st.query_params.clear()
-            except ValueError as e:
-                st.error(f"Errore nei parametri: {e}")
-            except Exception as e:
-                st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
+# Pulsante per eseguire la simulazione
+if st.sidebar.button('🚀 Esegui Simulazione', type="primary", use_container_width=True):
+    run_simulation_wrapper()
 
 # --- CONTROLLO DI COMPATIBILITÀ DEI RISULTATI ---
 # Se i risultati in sessione non sono aggiornati con le nuove chiavi (es. dopo un aggiornamento del codice),
