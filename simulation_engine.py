@@ -513,21 +513,25 @@ def run_full_simulation(parametri):
             else:
                  prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo if anni_prelievo > 0 else 0
         
-        # Sovrascriviamo il prelievo calcolato solo per le statistiche, non per i dati di dettaglio
         statistiche_prelievi['prelievo_reale_medio'] = prelievo_annuo_calcolato
         statistiche_prelievi['pensione_pubblica_reale_annua'] = parametri['pensione_pubblica_annua']
-        # In questo scenario semplificato non calcoliamo la rendita FP per la statistica
+        statistiche_prelievi['rendita_fp_reale_media'] = 0 # Non calcolata in questa modalità
         statistiche_prelievi['totale_reale_medio_annuo'] = prelievo_annuo_calcolato + parametri['pensione_pubblica_annua']
-
-    # --- Calcolo statistica corretta per la rendita FP ---
-    # La statistica deve essere calcolata sui dati reali, non su quelli nominali divisi per l'inflazione.
-    # Usiamo i dati delle simulazioni di successo.
-    if np.any(rendite_fp_reali_successo > 0):
-         # Filtra gli anni e le simulazioni dove la rendita è effettivamente pagata (non zero)
-        anni_rendita = rendite_fp_reali_successo[rendite_fp_reali_successo > 0]
-        statistiche_prelievi['rendita_fp_reale_media'] = np.median(anni_rendita)
+    
     else:
-        statistiche_prelievi['rendita_fp_reale_media'] = 0
+        # Calcolo standard basato sulle simulazioni di successo
+        prelievi_validi = prelievi_reali_successo[prelievi_reali_successo > 1e-6]
+        pensioni_valide = pensioni_reali_successo[pensioni_reali_successo > 1e-6]
+        rendite_fp_valide = rendite_fp_reali_successo[rendite_fp_reali_successo > 1e-6]
+
+        prel_medio = np.median(prelievi_validi) if prelievi_validi.size > 0 else 0
+        pens_media = np.median(pensioni_valide) if pensioni_valide.size > 0 else 0
+        rend_fp_media = np.median(rendite_fp_valide) if rendite_fp_valide.size > 0 else 0
+
+        statistiche_prelievi['prelievo_reale_medio'] = prel_medio
+        statistiche_prelievi['pensione_pubblica_reale_annua'] = pens_media
+        statistiche_prelievi['rendita_fp_reale_media'] = rend_fp_media
+        statistiche_prelievi['totale_reale_medio_annuo'] = prel_medio + pens_media + rend_fp_media
 
     # --- Calcolo Statistiche Finali ---
     patrimoni_reali_finale_validi = patrimoni_reali_finale_validi[sim_di_successo_mask]
