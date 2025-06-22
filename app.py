@@ -604,12 +604,21 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             except Exception as e:
                 st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
 
-st.markdown("---")
+# --- CONTROLLO DI COMPATIBILITÀ DEI RISULTATI ---
+# Se i risultati in sessione non sono aggiornati con le nuove chiavi (es. dopo un aggiornamento del codice),
+# li cancello per forzare l'utente a rieseguire la simulazione, evitando errori.
+if 'risultati' in st.session_state:
+    if 'statistiche' not in st.session_state.risultati or \
+       'guadagni_accumulo_mediano_nominale' not in st.session_state.risultati['statistiche']:
+        del st.session_state.risultati
+        st.warning("⚠️ La struttura dei dati è cambiata con l'ultimo aggiornamento. Per favore, clicca di nuovo su 'Avvia Simulazione' per ricalcolare i risultati con la nuova logica.")
+        st.stop()
 
-if not st.session_state.simulazione_eseguita:
-    st.header("Risultati della Simulazione")
-    st.info("I risultati appariranno qui dopo aver eseguito la simulazione.")
-else:
+# --- SEZIONE VISUALIZZAZIONE RISULTATI ---
+if 'risultati' in st.session_state:
+    st.markdown("---")
+    st.header("Destino del Tuo Patrimonio: Scenari Possibili")
+
     stats = st.session_state.risultati['statistiche']
     params = st.session_state.parametri
 
