@@ -75,7 +75,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'saldo_etf_reale': np.zeros(num_anni + 1),
         'saldo_fp_nominale': np.zeros(num_anni + 1),
         'saldo_fp_reale': np.zeros(num_anni + 1),
-        'reddito_totale_reale': np.zeros(num_anni + 1)
+        'reddito_totale_reale': np.zeros(num_anni + 1),
+        'variazione_patrimonio_percentuale': np.zeros(num_anni + 1)
     }
 
     # Stato della simulazione
@@ -389,6 +390,23 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             dati_annuali['saldo_fp_nominale'][anno_corrente] = patrimonio_fp
             dati_annuali['saldo_fp_reale'][anno_corrente] = patrimonio_fp / indice_prezzi
 
+            # Calcolo della variazione percentuale annua del patrimonio
+            patrimonio_totale_anno_corrente = patrimonio_banca + patrimonio_etf + patrimonio_fp
+            if anno_corrente == 0:
+                patrimonio_iniziale_totale = parametri['capitale_iniziale'] + parametri['etf_iniziale']
+                if patrimonio_iniziale_totale > 0:
+                    variazione = (patrimonio_totale_anno_corrente - patrimonio_iniziale_totale) / patrimonio_iniziale_totale
+                    dati_annuali['variazione_patrimonio_percentuale'][anno_corrente] = variazione
+            else:
+                patrimonio_totale_anno_precedente = (
+                    dati_annuali['saldo_banca_nominale'][anno_corrente - 1] +
+                    dati_annuali['saldo_etf_nominale'][anno_corrente - 1] +
+                    dati_annuali['saldo_fp_nominale'][anno_corrente - 1]
+                )
+                if patrimonio_totale_anno_precedente > 0:
+                    variazione = (patrimonio_totale_anno_corrente - patrimonio_totale_anno_precedente) / patrimonio_totale_anno_precedente
+                    dati_annuali['variazione_patrimonio_percentuale'][anno_corrente] = variazione
+
             if parametri['attiva_fondo_pensione']:
                 patrimonio_fp_inizio_anno = patrimonio_fp
 
@@ -602,7 +620,8 @@ def run_full_simulation(parametri):
         'saldo_etf_reale': np.zeros((n_sim, num_anni + 1)),
         'saldo_fp_nominale': np.zeros((n_sim, num_anni + 1)),
         'saldo_fp_reale': np.zeros((n_sim, num_anni + 1)),
-        'reddito_totale_reale': np.zeros((n_sim, num_anni + 1))
+        'reddito_totale_reale': np.zeros((n_sim, num_anni + 1)),
+        'variazione_patrimonio_percentuale': np.zeros((n_sim, num_anni + 1))
     }
     contributi_totali_agg = np.zeros(n_sim)
 

@@ -1109,7 +1109,8 @@ if 'risultati' in st.session_state:
             ('Patrimonio FP (Nom.)', 'saldo_fp_nominale'),
             ('Patrimonio Banca (Reale)', 'saldo_banca_reale'),
             ('Patrimonio ETF (Reale)', 'saldo_etf_reale'),
-            ('Patrimonio FP (Reale)', 'saldo_fp_reale')
+            ('Patrimonio FP (Reale)', 'saldo_fp_reale'),
+            ('Variazione Patrimonio %', 'variazione_patrimonio_percentuale')
         ]
 
         for col, key in col_keys:
@@ -1139,7 +1140,11 @@ if 'risultati' in st.session_state:
             'Patrimonio Banca (Reale)': "€ {:,.0f}",
             'Patrimonio ETF (Reale)': "€ {:,.0f}",
             'Patrimonio FP (Reale)': "€ {:,.0f}",
-        }))
+            'Variazione Patrimonio %': '{:+.2%}',
+        }).apply(
+            lambda x: ['color: red' if v < 0 else 'color: green' for v in x],
+            subset=['Variazione Patrimonio %']
+        ))
 
         with st.expander("Guida alla Lettura della Tabella"):
             st.markdown("""
