@@ -893,12 +893,14 @@ if 'risultati' in st.session_state:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Valori Nominali")
+        st.metric("Patrimonio all'Inizio Prelievi (50°)", f"€ {stats['patrimonio_inizio_prelievi_mediano_nominale']:,.0f}", help="Il valore nominale del tuo patrimonio nel momento in cui inizi a prelevare (passaggio da accumulo a decumulo).")
         st.metric("Patrimonio Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_nominale']:,.0f}", help="Il valore nominale (non aggiustato per l'inflazione) del tuo patrimonio alla fine della simulazione nello scenario mediano.")
         st.metric("Patrimonio Finale (Top 10%)", f"€ {stats['patrimonio_finale_top_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto fortunato (migliore del 90% delle simulazioni).")
         st.metric("Patrimonio Finale (Peggior 10%)", f"€ {stats['patrimonio_finale_peggior_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto sfortunato (peggiore del 90% delle simulazioni).")
 
     with col2:
         st.subheader("Valori Reali")
+        st.metric("Patrimonio all'Inizio Prelievi (50°)", f"€ {stats['patrimonio_inizio_prelievi_mediano_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio nel momento in cui inizi a prelevare. Questo è il 'tesoretto' che hai accumulato per la pensione.")
         st.metric("Patrimonio Reale Finale Mediano (50°)", f"€ {stats['patrimonio_finale_mediano_reale']:,.0f}", help="Il POTERE D'ACQUISTO reale del tuo patrimonio finale nello scenario mediano. Questo è il valore che conta davvero, perché tiene conto dell'inflazione.")
         st.metric("Patrimonio Reale Finale (Top 10%)", f"€ {stats['patrimonio_finale_top_10_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio finale in uno scenario molto fortunato.")
         st.metric("Patrimonio Reale Finale (Peggior 10%)", f"€ {stats['patrimonio_finale_peggior_10_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio finale in uno scenario molto sfortunato.")
