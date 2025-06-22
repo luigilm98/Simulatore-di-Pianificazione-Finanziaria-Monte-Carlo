@@ -197,6 +197,197 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
     return fig
 
+def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale):
+    """Crea un grafico a cono per mostrare l'evoluzione del reddito reale annuo."""
+    fig = go.Figure()
+    
+    # Calcola i percentili per il reddito
+    p10 = np.percentile(data, 10, axis=0)
+    p25 = np.percentile(data, 25, axis=0)
+    p50 = np.median(data, axis=0)
+    p75 = np.percentile(data, 75, axis=0)
+    p90 = np.percentile(data, 90, axis=0)
+    
+    # Asse x (età)
+    eta_asse_x = eta_iniziale + np.arange(data.shape[1])
+    
+    # Aree di confidenza
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([eta_asse_x, eta_asse_x[::-1]]),
+        y=np.concatenate([p90, p10[::-1]]),
+        fill='toself',
+        fillcolor='rgba(0, 123, 255, 0.2)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='10-90 Percentile',
+        hoverinfo='none'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([eta_asse_x, eta_asse_x[::-1]]),
+        y=np.concatenate([p75, p25[::-1]]),
+        fill='toself',
+        fillcolor='rgba(0, 123, 255, 0.4)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='25-75 Percentile',
+        hoverinfo='none'
+    ))
+    
+    # Linea mediana
+    fig.add_trace(go.Scatter(
+        x=eta_asse_x, y=p50, mode='lines',
+        name='Reddito Mediano',
+        line={'width': 3, 'color': '#007bff'},
+        hovertemplate='Età %{x}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title='Evoluzione del Reddito Annuo Reale in Pensione',
+        xaxis_title="Età",
+        yaxis_title="Reddito Annuo Reale (€)",
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    
+    # Aggiungi linea verticale per l'inizio dei prelievi
+    fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+    
+    return fig
+
+def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale):
+    """Crea un grafico che mostra i 10% scenari peggiori."""
+    fig = go.Figure()
+    
+    # Trova il 10% degli scenari peggiori
+    n_worst = max(1, int(data.shape[0] * 0.1))
+    worst_indices = np.argsort(patrimoni_finali)[:n_worst]
+    
+    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
+    
+    # Disegna le linee degli scenari peggiori
+    for idx in worst_indices:
+        fig.add_trace(go.Scatter(
+            x=anni_asse_x, y=data[idx, :], mode='lines',
+            line={'width': 1, 'color': '#dc3545'},
+            opacity=0.7,
+            hoverinfo='none',
+            showlegend=False,
+            name=f'Scenario Peggiore {idx}'
+        ))
+    
+    # Aggiungi la mediana per riferimento
+    median_data = np.median(data, axis=0)
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=median_data, mode='lines',
+        name='Scenario Mediano',
+        line={'width': 3, 'color': '#28a745'},
+        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title='Analisi degli Scenari Peggiori (10% più sfortunati)',
+        xaxis_title="Età",
+        yaxis_title="Patrimonio Reale (€)",
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    
+    return fig
+
+def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_iniziale):
+    """Crea un grafico che mostra la composizione del patrimonio nel tempo (valori nominali)."""
+    fig = go.Figure()
+    
+    anni_asse_x = eta_iniziale + np.arange(anni_totali + 1)
+    
+    # Estrai i dati di composizione
+    saldo_banca = dati_tabella.get('saldo_banca_nominale', np.zeros(anni_totali + 1))
+    saldo_etf = dati_tabella.get('saldo_etf_nominale', np.zeros(anni_totali + 1))
+    saldo_fp = dati_tabella.get('saldo_fp_nominale', np.zeros(anni_totali + 1))
+    
+    # Crea il grafico a area stack
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=saldo_banca, mode='lines',
+        fill='tonexty', name='Liquidità',
+        line={'color': '#28a745'},
+        hovertemplate='Età %{x}<br>Liquidità: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=saldo_etf, mode='lines',
+        fill='tonexty', name='ETF',
+        line={'color': '#007bff'},
+        hovertemplate='Età %{x}<br>ETF: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=saldo_fp, mode='lines',
+        fill='tonexty', name='Fondo Pensione',
+        line={'color': '#ffc107'},
+        hovertemplate='Età %{x}<br>Fondo Pensione: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title='Composizione del Patrimonio nel Tempo (Valori Nominali)',
+        xaxis_title="Età",
+        yaxis_title="Patrimonio Nominale (€)",
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    
+    return fig
+
+def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
+    """Crea un grafico che mostra la composizione del reddito nel tempo."""
+    fig = go.Figure()
+    
+    anni_asse_x = eta_iniziale + np.arange(1, anni_totali + 1)  # Escludiamo l'anno 0
+    
+    # Estrai i dati di reddito
+    prelievi_reali = dati_tabella.get('prelievi_effettivi_reali', np.zeros(anni_totali))
+    pensioni_pubbliche = dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(anni_totali))
+    rendite_fp = dati_tabella.get('rendite_fp_nominali', np.zeros(anni_totali))
+    
+    # Converti le pensioni e rendite in valori reali (semplificato)
+    # In un'implementazione completa, dovremmo applicare l'inflazione
+    pensioni_reali = pensioni_pubbliche
+    rendite_fp_reali = rendite_fp
+    
+    # Crea il grafico a area stack
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=prelievi_reali, mode='lines',
+        fill='tonexty', name='Prelievi dal Patrimonio',
+        line={'color': '#dc3545'},
+        hovertemplate='Età %{x}<br>Prelievi: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=pensioni_reali, mode='lines',
+        fill='tonexty', name='Pensione Pubblica',
+        line={'color': '#28a745'},
+        hovertemplate='Età %{x}<br>Pensione: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=rendite_fp_reali, mode='lines',
+        fill='tonexty', name='Rendita Fondo Pensione',
+        line={'color': '#ffc107'},
+        hovertemplate='Età %{x}<br>Rendita FP: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title='Composizione del Reddito Annuo nel Tempo (Valori Reali)',
+        xaxis_title="Età",
+        yaxis_title="Reddito Annuo Reale (€)",
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    
+    return fig
+
 if 'simulazione_eseguita' not in st.session_state:
     st.session_state['simulazione_eseguita'] = False
     st.session_state['risultati'] = {}
@@ -514,7 +705,7 @@ if 'risultati' in st.session_state:
         
         dati_grafici = st.session_state.risultati['dati_grafici_principali']
         
-        st.subheader("Come potrebbe evolvere il mio patrimonio? (Visione d'insieme)")
+        st.subheader("Evoluzione Patrimonio Reale (Tutti gli Scenari)")
         st.markdown("""
         Questo primo grafico ti dà una visione d'insieme, un "**cono di probabilità**". Non mostra una singola previsione, ma l'intera gamma di risultati possibili, tenendo conto dell'incertezza dei mercati.
         - **La linea rossa (Mediana):** È lo scenario più probabile (50° percentile). Metà delle simulazioni hanno avuto un risultato migliore, metà peggiore.
@@ -531,6 +722,29 @@ if 'risultati' in st.session_state:
         fig_reale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_reale, use_container_width=True)
         st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo è il grafico della verità. Tiene conto dell'inflazione, mostrando il vero potere d'acquisto.</div>", unsafe_allow_html=True)
+        st.markdown("---")
+
+        st.subheader("Evoluzione Patrimonio Nominale (Valori Assoluti)")
+        st.markdown("""
+        Questo grafico mostra l'evoluzione del patrimonio in **valori nominali** (senza considerare l'inflazione). È utile per vedere la crescita assoluta del capitale, ma ricorda che questi valori non riflettono il vero potere d'acquisto futuro.
+        
+        - **La linea blu (Mediana):** È lo scenario più probabile in valori nominali.
+        - **Le aree colorate:** Mostrano gli intervalli di confidenza per i valori nominali.
+        - **Confronto con il grafico reale:** La differenza tra i due grafici ti mostra l'impatto dell'inflazione sul tuo patrimonio.
+        """)
+        fig_nominale = plot_wealth_summary_chart(
+            data=dati_grafici['nominale'], 
+            title='Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 
+            y_title='Patrimonio Nominale (€)', 
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale'],
+            anni_inizio_prelievo=params['anni_inizio_prelievo'],
+            color_median='#007bff',
+            color_fill='#007bff'
+        )
+        fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
+        st.plotly_chart(fig_nominale, use_container_width=True)
+        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo grafico mostra i valori assoluti, senza considerare l'inflazione.</div>", unsafe_allow_html=True)
         st.markdown("---")
 
         st.subheader("Quali sono i percorsi possibili? (Visione di dettaglio)")
