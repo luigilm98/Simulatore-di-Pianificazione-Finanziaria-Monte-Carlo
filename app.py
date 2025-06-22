@@ -151,7 +151,8 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, np.max(p99) * 1.05] # Limita l'asse y per migliorare la leggibilità
+        # Limita l'asse y in modo robusto, ignorando picchi anomali estremi
+        yaxis_range=[0, np.percentile(p99, 98) * 1.05] 
     )
 
     return fig
