@@ -92,6 +92,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     indice_prezzi_inizio_rendita_fp = 1.0
     allocazione_etf_inizio_glidepath = -1.0
     
+    guadagni_accumulo = 0
+    guadagni_calcolati = False
+
     prelievo_annuo_corrente = 0
     indice_prezzi_ultimo_prelievo = 1.0
     
@@ -120,6 +123,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             etf_cost_basis += contrib_etf
             totale_contributi_versati_nominale += contrib_banca + contrib_etf
         
+        if mese == inizio_prelievo_mesi and not guadagni_calcolati:
+            patrimonio_a_inizio_prelievo = patrimonio_banca + patrimonio_etf + patrimonio_fp
+            patrimonio_iniziale_totale = parametri['capitale_iniziale'] + parametri['etf_iniziale']
+            guadagni_accumulo = patrimonio_a_inizio_prelievo - patrimonio_iniziale_totale - totale_contributi_versati_nominale
+            guadagni_calcolati = True
+
         if parametri['attiva_fondo_pensione'] and eta_attuale < parametri['eta_ritiro_fp']:
             contributo_mensile_fp_indicizzato = (parametri['contributo_annuo_fp'] / 12) * indice_prezzi
             patrimonio_fp += contributo_mensile_fp_indicizzato
@@ -406,12 +415,30 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         "drawdown": drawdown,
         "sharpe_ratio": sharpe_ratio,
         "fallimento": patrimonio_negativo,
-        "totale_contributi_versati_nominale": totale_contributi_versati_nominale
+        "totale_contributi_versati_nominale": totale_contributi_versati_nominale,
+        "guadagni_accumulo": guadagni_accumulo
     }
 
 def run_full_simulation(parametri):
     """
-    Esegue la simulazione completa e restituisce tutti i dati aggregati e calcolati.
+    Esegue la simulazione Monte Carlo completa, orchestrando migliaia di singole run.
+
+    Questa funzione è il cuore del simulatore. Itera per il numero di simulazioni specificato,
+    invocando `run_single_simulation` per ciascuna. Aggrega i risultati di tutte le run per
+    calcolare statistiche robuste come la probabilità di fallimento, i percentili del patrimonio
+    finale (nominale e reale) e il valore mediano dei guadagni ottenuti durante la fase di accumulo.
+
+    Inoltre, identifica lo "scenario mediano" (la simulazione il cui risultato finale è più
+    vicino alla mediana di tutte le simulazioni) e ne estrae i dati dettagliati, che verranno
+    poi utilizzati per generare i grafici di dettaglio nell'interfaccia utente.
+
+    Args:
+        parametri (dict): Il dizionario contenente tutti i parametri di input.
+
+    Returns:
+        dict: Un dizionario contenente le statistiche aggregate, i dati per i grafici principali
+              (l'evoluzione del patrimonio attraverso i percentili) e i dati annuali dettagliati
+              dello scenario mediano.
     """
     # 1. SETUP INIZIALE
     valida_parametri(parametri)
@@ -427,6 +454,8 @@ def run_full_simulation(parametri):
     fallimenti = 0
     indici_fallimenti = []
     
+    guadagni_accumulo_agg = np.zeros(n_sim)
+
     # Aggrega TUTTI i dati annuali per poter analizzare lo scenario mediano in dettaglio
     tutti_i_dati_annuali = {
         'prelievi_target_nominali': np.zeros((n_sim, num_anni + 1)),
@@ -473,6 +502,7 @@ def run_full_simulation(parametri):
                 tutti_i_dati_annuali[key][sim, :] = risultati_run['dati_annuali'][key]
 
         contributi_totali_agg[sim] = risultati_run['totale_contributi_versati_nominale']
+        guadagni_accumulo_agg[sim] = risultati_run['guadagni_accumulo']
 
     # 3. CALCOLO STATISTICHE E SCENARIO MEDIANO
     prob_fallimento = fallimenti / n_sim
@@ -577,7 +607,8 @@ def run_full_simulation(parametri):
         'probabilita_fallimento': prob_fallimento,
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
         'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
-        'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg)
+        'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg),
+        'guadagni_accumulo_mediano_nominale': np.median(guadagni_accumulo_agg)
     }
 
     return {

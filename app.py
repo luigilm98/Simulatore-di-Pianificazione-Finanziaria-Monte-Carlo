@@ -622,8 +622,7 @@ else:
 
     patrimonio_iniziale_totale = params['capitale_iniziale'] + params['etf_iniziale']
     contributi_versati = stats['contributi_totali_versati_mediano_nominale']
-    patrimonio_finale_nominale = stats['patrimonio_finale_mediano_nominale']
-    guadagni_da_investimento = patrimonio_finale_nominale - contributi_versati - patrimonio_iniziale_totale
+    guadagni_da_investimento = stats['guadagni_accumulo_mediano_nominale']
     
     reddito_annuo_reale_pensione = st.session_state.risultati['statistiche_prelievi']['totale_reale_medio_annuo']
     patrimonio_finale_reale = stats['patrimonio_finale_mediano_reale']
@@ -647,7 +646,7 @@ else:
     col3.metric(
         "Guadagni da Investimento", f"€ {guadagni_da_investimento:,.0f}",
         delta=f"{((guadagni_da_investimento / contributi_versati) * 100) if contributi_versati > 0 else 0:,.0f}% vs Contributi",
-        help="La ricchezza generata dal solo effetto dei rendimenti di mercato (interesse composto). Questa è la ricompensa per il rischio e la pazienza."
+        help="La ricchezza generata dai soli rendimenti di mercato, calcolata ESCLUSIVAMENTE durante la fase di accumulo (fino all'inizio dei prelievi). Questo valore non tiene conto dei prelievi fatti in pensione."
     )
     col4.metric(
         "Patrimonio Finale in Anni di Spesa", f"{anni_di_spesa_coperti:,.1f} Anni",
