@@ -156,7 +156,8 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         height=700, 
         yaxis=dict(
             range=[0, y_max],
-            tickformat="€,d"
+            tickprefix="€",
+            tickformat=".2s"
         )
     )
 
@@ -207,7 +208,8 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         height=700,
         yaxis=dict(
             range=[0, y_max],
-            tickformat="€,d"
+            tickprefix="€",
+            tickformat=".2s"
         )
     )
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
