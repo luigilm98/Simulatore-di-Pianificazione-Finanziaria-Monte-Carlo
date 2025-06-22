@@ -762,27 +762,41 @@ else:
         
         # Costruzione del DataFrame
         num_anni = params['anni_totali']
-        # Usiamo arange(num_anni+1) per includere l'anno 0 per il patrimonio, ma partiamo da 1 per la visualizzazione
         df_index = np.arange(1, num_anni + 1)
         
-        df = pd.DataFrame({
+        # Assicuriamoci che tutti gli array siano della lunghezza corretta (num_anni)
+        # I dati dall'engine sono indicizzati 0..N, dove l'indice 0 è l'anno 1.
+        df_data = {
             'Anno': df_index,
-            'Età': params['eta_iniziale'] + df_index,
-            # I flussi (come prelievi) hanno senso dall'anno 1 in poi
-            'Obiettivo Prelievo (Nom.)': dati_tabella.get('prelievi_target_nominali', np.zeros(num_anni + 1))[1:],
-            'Prelievo Effettivo (Nom.)': dati_tabella.get('prelievi_effettivi_nominali', np.zeros(num_anni + 1))[1:],
-            'Fonte: Conto Corrente': dati_tabella.get('prelievi_da_banca_nominali', np.zeros(num_anni + 1))[1:],
-            'Fonte: Vendita ETF': dati_tabella.get('prelievi_da_etf_nominali', np.zeros(num_anni + 1))[1:],
-            'Vendita ETF (Rebalance)': dati_tabella.get('vendite_rebalance_nominali', np.zeros(num_anni + 1))[1:],
-            'Prelievo Effettivo (Reale)': dati_tabella.get('prelievi_effettivi_reali', np.zeros(num_anni + 1))[1:],
-            'Pensione Pubblica (Nom.)': dati_tabella.get('pensioni_pubbliche_nominali', np.zeros(num_anni + 1))[1:],
-            'Rendita FP (Nom.)': dati_tabella.get('rendite_fp_nominali', np.zeros(num_anni + 1))[1:],
-            'Liquidazione FP (Nom.)': dati_tabella.get('fp_liquidato_nominale', np.zeros(num_anni + 1))[1:],
-            # I saldi (patrimonio) hanno senso a fine anno, quindi usiamo i dati dall'anno 1
-            'Patrimonio Banca (Nom.)': dati_tabella.get('saldo_banca_nominale', np.zeros(num_anni + 1))[1:],
-            'Patrimonio ETF (Nom.)': dati_tabella.get('saldo_etf_nominale', np.zeros(num_anni + 1))[1:],
-            'Patrimonio FP (Nom.)': dati_tabella.get('saldo_fp_nominale', np.zeros(num_anni + 1))[1:],
-        })
+            'Età': params['eta_iniziale'] + df_index
+        }
+        
+        col_keys = [
+            ('Obiettivo Prelievo (Nom.)', 'prelievi_target_nominali'),
+            ('Prelievo Effettivo (Nom.)', 'prelievi_effettivi_nominali'),
+            ('Fonte: Conto Corrente', 'prelievi_da_banca_nominali'),
+            ('Fonte: Vendita ETF', 'prelievi_da_etf_nominali'),
+            ('Vendita ETF (Rebalance)', 'vendite_rebalance_nominali'),
+            ('Prelievo Effettivo (Reale)', 'prelievi_effettivi_reali'),
+            ('Pensione Pubblica (Nom.)', 'pensioni_pubbliche_nominali'),
+            ('Rendita FP (Nom.)', 'rendite_fp_nominali'),
+            ('Liquidazione FP (Nom.)', 'fp_liquidato_nominale'),
+            # Per i saldi, partiamo dall'anno 1 per allinearli con gli anni del dataframe
+            ('Patrimonio Banca (Nom.)', 'saldo_banca_nominale'),
+            ('Patrimonio ETF (Nom.)', 'saldo_etf_nominale'),
+            ('Patrimonio FP (Nom.)', 'saldo_fp_nominale')
+        ]
+
+        for col, key in col_keys:
+            full_array = dati_tabella.get(key, np.zeros(num_anni + 1))
+            if 'saldo' in key:
+                 # I saldi includono l'anno 0, quindi prendiamo gli elementi da 1 a num_anni
+                df_data[col] = full_array[1:num_anni+1]
+            else:
+                # I flussi sono calcolati per gli anni 1..num_anni, quindi prendiamo i primi num_anni elementi
+                df_data[col] = full_array[:num_anni]
+        
+        df = pd.DataFrame(df_data)
         
         st.dataframe(df.style.format({
             'Obiettivo Prelievo (Nom.)': "€ {:,.0f}",
