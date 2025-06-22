@@ -421,49 +421,53 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
 def _calcola_prelievo_sostenibile(parametri):
     """
-    Esegue una pre-simulazione per calcolare il prelievo annuo sostenibile.
-    Questa funzione viene chiamata solo quando l'utente imposta il prelievo fisso a 0.
-    Simula l'evoluzione del patrimonio fino all'inizio dei prelievi per stimare
-    il capitale mediano reale disponibile e calcola la rata di un'annualità
-    che esaurirebbe quel capitale durante gli anni di pensione.
+    Calcola il prelievo annuo sostenibile utilizzando un algoritmo di ricerca binaria (goal-seeking).
+
+    L'obiettivo è trovare il tasso di prelievo che, nello scenario mediano, azzera
+    il patrimonio reale esattamente alla fine dell'orizzonte temporale. Questo approccio
+    è più lento ma molto più realistico di una formula teorica, perché tiene conto
+    della volatilità di mercato nello stress test.
     """
-    # Eseguiamo una simulazione "leggera" solo per trovare il capitale a inizio prelievo
-    parametri_pre_sim = parametri.copy()
-    # Usiamo un numero ridotto di simulazioni per la stima, è sufficiente
-    parametri_pre_sim['n_simulazioni'] = max(100, parametri['n_simulazioni'] // 10)
+    # 1. Stima del capitale iniziale per la ricerca
+    params_pre_sim = parametri.copy()
+    params_pre_sim['n_simulazioni'] = max(250, parametri['n_simulazioni'] // 5)
+    params_pre_sim['prelievo_annuo'] = 0
+    res_pre_sim = run_full_simulation(params_pre_sim, use_sustainable_withdrawal=False)
     
-    # Eseguiamo la simulazione completa ma con prelievo a zero
-    risultati_pre_sim = run_full_simulation(parametri_pre_sim, use_sustainable_withdrawal=False)
-    
-    patrimoni_reali = risultati_pre_sim['dati_grafici_principali']['reale']
-    
+    patrimoni_reali_pre_sim = res_pre_sim['dati_grafici_principali']['reale']
     anni_accumulo = parametri['anni_inizio_prelievo']
-    anni_prelievo = parametri['anni_totali'] - anni_accumulo
+    mese_inizio_prelievo = anni_accumulo * 12
+    patrimonio_reale_a_inizio_prelievo_mediano = np.median(patrimoni_reali_pre_sim[:, mese_inizio_prelievo])
     
-    # Se non ci sono anni di prelievo, non ha senso calcolare un prelievo
-    if anni_prelievo <= 0:
+    if patrimonio_reale_a_inizio_prelievo_mediano <= 0:
         return 0
 
-    mese_inizio_prelievo = anni_accumulo * 12
-    patrimonio_reale_a_inizio_prelievo_mediano = np.median(patrimoni_reali[:, mese_inizio_prelievo])
+    # 2. Algoritmo di ricerca binaria (goal-seeking)
+    low_prelievo = 0
+    high_prelievo = patrimonio_reale_a_inizio_prelievo_mediano  # Limite superiore: prelevare tutto in un anno
+    best_prelievo = 0
     
-    prelievo_annuo_calcolato = 0
-    if patrimonio_reale_a_inizio_prelievo_mediano > 0:
-        # Usiamo il rendimento reale atteso per il calcolo dell'annualità
-        rend_reale_atteso = parametri['rendimento_medio'] - parametri['ter_etf'] - parametri['inflazione']
+    params_ricerca = parametri.copy()
+    params_ricerca['n_simulazioni'] = max(250, parametri['n_simulazioni'] // 5)
 
-        # Formula della rendita per calcolare il prelievo costante
-        if rend_reale_atteso > 1e-6: # Evitiamo divisione per zero
-            try:
-                fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
-                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
-            except (OverflowError, ZeroDivisionError):
-                # Fallback in caso di problemi numerici con numeri molto grandi o piccoli
-                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+    for _ in range(8): # 8-10 iterazioni sono un buon compromesso tra precisione e velocità
+        current_prelievo = (low_prelievo + high_prelievo) / 2
+        
+        if high_prelievo - low_prelievo < 100: # Usciamo se l'intervallo di ricerca è diventato piccolo
+            break
+            
+        params_ricerca['prelievo_annuo'] = current_prelievo
+        
+        risultati_run = run_full_simulation(params_ricerca, use_sustainable_withdrawal=False)
+        patrimonio_finale_mediano_reale = risultati_run['statistiche']['patrimonio_finale_mediano_reale']
+        
+        if patrimonio_finale_mediano_reale > 1: # Lasciamo un piccolo buffer
+            low_prelievo = current_prelievo
+            best_prelievo = current_prelievo
         else:
-             prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
-             
-    return prelievo_annuo_calcolato
+            high_prelievo = current_prelievo
+            
+    return best_prelievo
 
 def run_full_simulation(parametri, use_sustainable_withdrawal=True):
     """
@@ -534,13 +538,12 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
 
     if calcolo_sostenibile_attivo:
         prelievo_annuo_da_usare = _calcola_prelievo_sostenibile(parametri)
-    else:
-        # Se non stiamo calcolando, ci assicuriamo che il valore sia 0 per non inquinar le statistiche
-        prelievo_annuo_da_usare = parametri['prelievo_annuo']
+        # Sovrascriviamo il parametro per passarlo correttamente alla singola simulazione
+        parametri['prelievo_annuo'] = prelievo_annuo_da_usare
 
     # 2. ESECUZIONE SIMULAZIONI
     for sim in range(n_sim):
-        risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare if calcolo_sostenibile_attivo else parametri['prelievo_annuo'])
+        risultati_run = _esegui_una_simulazione(parametri, parametri['prelievo_annuo'])
         
         patrimoni[sim, :] = risultati_run['patrimoni_mensili']
         patrimoni_reali[sim, :] = risultati_run['patrimoni_reali_mensili']
