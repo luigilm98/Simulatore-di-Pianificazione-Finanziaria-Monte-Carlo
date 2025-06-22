@@ -91,7 +91,7 @@ def plot_wealth_composition_chart(initial, contributions, gains):
     )
     return fig
 
-def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000', color_fill='#C00000'):
+def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000', color_fill='#C00000', is_nominal_chart=False):
     """
     Crea il grafico principale che mostra l'evoluzione del patrimonio
     con gli intervalli di confidenza (percentili).
@@ -144,22 +144,34 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
-    tick_values = [50000, 100000, 250000, 500000, 1000000, 2000000, 3500000]
-    tick_text = ["€50k", "€100k", "€250k", "€500k", "€1M", "€2M", "€3.5M"]
+    layout_options = {
+        "title": title,
+        "xaxis_title": "Età",
+        "yaxis_title": y_title,
+        "hovermode": "x unified",
+        "legend": dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        "height": 700, # Aumenta l'altezza del grafico
+    }
 
-    fig.update_layout(
-        title=title,
-        xaxis_title="Età",
-        yaxis_title=y_title,
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis=dict(
-            range=[0, 3500000],
+    if is_nominal_chart:
+        # Per i grafici nominali, usa una scala dinamica per evitare tagli
+        p99 = np.percentile(data, 99, axis=0)
+        layout_options["yaxis"] = dict(
+            range=[0, np.max(p99) * 1.05],
+            tickformat="€,d"
+        )
+    else:
+        # Per i grafici reali, usa la scala fissa personalizzata
+        tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
+        tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+        layout_options["yaxis"] = dict(
+            range=[0, 10000000],
             tickmode='array',
             tickvals=tick_values,
             ticktext=tick_text
         )
-    )
+
+    fig.update_layout(**layout_options)
 
     return fig
 
@@ -204,7 +216,7 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         hovermode="x unified",
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=600,
+        height=700, # Aumenta l'altezza del grafico
         yaxis=dict(
             range=[0, 10000000],
             tickmode='array',
@@ -262,17 +274,19 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
     tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
 
     fig.update_layout(
-        title='Evoluzione del Reddito Annuo Reale in Pensione',
+        title='Analisi degli Scenari Peggiori (10% più sfortunati)',
         xaxis_title="Età",
-        yaxis_title="Reddito Annuo Reale (€)",
-        yaxis_tickformat="€,d",
+        yaxis_title="Patrimonio Reale (€)",
         hovermode="x unified",
-        height=500,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=700, # Aumenta l'altezza del grafico
+        yaxis=dict(
+            range=[0, 10000000],
+            tickmode='array',
+            tickvals=tick_values,
+            ticktext=tick_text
+        )
     )
-    
-    # Aggiungi linea verticale per l'inizio dei prelievi
-    fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
     
     return fig
 
@@ -315,7 +329,7 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         yaxis_title="Patrimonio Reale (€)",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=600,
+        height=700, # Aumenta l'altezza del grafico
         yaxis=dict(
             range=[0, 10000000],
             tickmode='array',
@@ -359,8 +373,8 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
         hovertemplate='Età %{x}<br>Fondo Pensione: €%{y:,.0f}<extra></extra>'
     ))
     
-    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
-    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+    # Per questo grafico nominale, usiamo una scala dinamica per evitare tagli
+    y_max = np.max(saldo_banca + saldo_etf + saldo_fp) * 1.05
 
     fig.update_layout(
         title='Composizione del Patrimonio nel Tempo (Valori Nominali)',
@@ -368,12 +382,10 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
         yaxis_title="Patrimonio Nominale (€)",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=600,
+        height=700, # Aumenta l'altezza del grafico
         yaxis=dict(
-            range=[0, 10000000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
+            range=[0, y_max],
+            tickformat="€,d"
         )
     )
     
@@ -799,7 +811,8 @@ if 'risultati' in st.session_state:
             eta_iniziale=params['eta_iniziale'],
             anni_inizio_prelievo=params['anni_inizio_prelievo'],
             color_median='#007bff',
-            color_fill='#007bff'
+            color_fill='#007bff',
+            is_nominal_chart=True # Usa la scala dinamica per questo grafico
         )
         fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_nominale, use_container_width=True)
