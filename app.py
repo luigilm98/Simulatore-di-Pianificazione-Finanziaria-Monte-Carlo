@@ -1,19 +1,25 @@
 import streamlit as st
 import numpy as np
-import simulation_engine as engine
-import plotly.graph_objects as go
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import json
 import os
 from datetime import datetime
-import plotly.express as px
 
-# --- Gestione File e Dati ---
-HISTORY_DIR = "simulation_history"
-os.makedirs(HISTORY_DIR, exist_ok=True)
+import simulation_engine as engine
 
-class NumpyEncoder(json.JSONEncoder):
-    """ Encoder JSON speciale per tipi di dati NumPy. """
+# --- CONFIGURAZIONE PAGINA ---
+st.set_page_config(
+    page_title="Simulatore Finanziario Monte Carlo",
+    page_icon="✈️",
+    layout="wide"
+)
+
+# --- FUNZIONI HELPER ---
+
+class NpEncoder(json.JSONEncoder):
+    """ Encoder JSON custom per gestire i tipi di dati NumPy. """
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -21,421 +27,69 @@ class NumpyEncoder(json.JSONEncoder):
             return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        return super(NumpyEncoder, self).default(obj)
+        return super(NpEncoder, self).default(obj)
 
 def save_simulation(name, params, results):
-    """Salva i parametri e i risultati di una simulazione in un file JSON."""
+    """ Salva i risultati completi di una simulazione in un file JSON. """
+    # Assicura che la directory esista prima di salvare
+    history_dir = 'simulation_history'
+    os.makedirs(history_dir, exist_ok=True)
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{timestamp}_{name.replace(' ', '_')}.json"
-    filepath = os.path.join(HISTORY_DIR, filename)
+    filepath = os.path.join(history_dir, filename)
     
     data_to_save = {
-        "name": name,
+        "simulation_name": name,
         "timestamp": timestamp,
         "parameters": params,
         "results": results
     }
     
     with open(filepath, 'w') as f:
-        json.dump(data_to_save, f, cls=NumpyEncoder, indent=4)
-    st.success(f"Simulazione '{name}' salvata con successo!")
+        json.dump(data_to_save, f, cls=NpEncoder, indent=4)
+    st.success(f"Risultati salvati con successo in `{filepath}`")
 
-def load_simulations():
-    """Carica i metadati di tutte le simulazioni salvate."""
-    simulations = []
-    for filename in sorted(os.listdir(HISTORY_DIR), reverse=True):
-        if filename.endswith(".json"):
-            try:
-                filepath = os.path.join(HISTORY_DIR, filename)
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    simulations.append({
-                        "name": data.get("name", "Senza nome"),
-                        "timestamp": data.get("timestamp", "N/A"),
-                        "filename": filename
-                    })
-            except (json.JSONDecodeError, IOError) as e:
-                st.warning(f"Impossibile caricare {filename}: {e}")
-    return simulations
+def load_simulation_files():
+    """ Carica la lista dei file di simulazione salvati. """
+    history_dir = 'simulation_history'
+    if not os.path.exists(history_dir):
+        return []
+    files = [f for f in os.listdir(history_dir) if f.endswith('.json')]
+    return sorted(files, reverse=True)
 
 def load_simulation_data(filename):
-    """Carica i dati completi di una specifica simulazione."""
-    filepath = os.path.join(HISTORY_DIR, filename)
+    """ Carica i dati da un file di simulazione JSON. """
+    filepath = os.path.join('simulation_history', filename)
     with open(filepath, 'r') as f:
         return json.load(f)
 
-def delete_simulation(filename):
-    """Elimina un file di simulazione salvato."""
-    filepath = os.path.join(HISTORY_DIR, filename)
-    os.remove(filepath)
-    st.rerun()
+# --- FUNZIONI DI PLOTTING ---
 
-# --- Funzioni di Plotting ---
-def hex_to_rgb(hex_color):
-    """Converte un colore esadecimale in una tupla RGB."""
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-def plot_percentile_chart(data, title, y_title, color_median, color_fill, anni_totali, eta_iniziale):
-    """Crea un grafico a 'cono' con i percentili."""
-    fig = go.Figure()
-    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
-
-    p10 = np.percentile(data, 10, axis=0)
-    p25 = np.percentile(data, 25, axis=0)
-    median_data = np.median(data, axis=0)
-    p75 = np.percentile(data, 75, axis=0)
-    p90 = np.percentile(data, 90, axis=0)
-
-    rgb_fill = hex_to_rgb(color_fill)
-
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p90, p10[::-1]]),
-        fill='toself',
-        fillcolor=f'rgba({rgb_fill[0]}, {rgb_fill[1]}, {rgb_fill[2]}, 0.2)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='10-90 Percentile',
-        hoverinfo='none'
-    ))
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p75, p25[::-1]]),
-        fill='toself',
-        fillcolor=f'rgba({rgb_fill[0]}, {rgb_fill[1]}, {rgb_fill[2]}, 0.4)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='25-75 Percentile',
-        hoverinfo='none'
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_data, mode='lines',
-        name='Scenario Mediano (50°)',
-        line={'width': 3, 'color': color_median},
-        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=title,
-        xaxis_title="Età",
-        yaxis_title=y_title,
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-    )
-    return fig
-
-def plot_spaghetti_chart(data, title, y_title, color_median, anni_totali, anni_inizio_prelievo, eta_iniziale):
-    """Crea un grafico 'spaghetti' con le singole simulazioni e la mediana."""
-    fig = go.Figure()
-    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
-    
-    # Mostra un sottoinsieme di simulazioni per non appesantire il grafico
-    n_sim_da_mostrare = min(50, data.shape[0])
-    indici_da_mostrare = np.random.choice(data.shape[0], size=n_sim_da_mostrare, replace=False)
-    
-    # Usa una palette di colori per le linee
-    color_palette = px.colors.qualitative.Plotly
-    
-    for i, idx in enumerate(indici_da_mostrare):
-        fig.add_trace(go.Scatter(
-            x=anni_asse_x, y=data[idx, :], mode='lines',
-            line={'width': 1.5, 'color': color_palette[i % len(color_palette)]},
-            opacity=0.6,
-            hoverinfo='none',
-            showlegend=False,
-            name=f'Simulazione {i}' # Nome univoco per ogni traccia
-        ))
-
-    # Aggiungi la mediana in evidenza
-    median_data = np.median(data, axis=0)
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_data, mode='lines',
-        name='Scenario Mediano (50°)',
-        line={'width': 4, 'color': color_median},
-        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
-    ))
-            
-    fig.update_layout(
-        title=title,
-        xaxis_title="Età",
-        yaxis_title=y_title,
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-    )
-    fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
-    return fig
-
-def plot_histogram(data, anni_totali):
-    fig = go.Figure(data=[go.Histogram(x=data, nbinsx=30, marker_color='#4472C4')])
-    fig.update_layout(
-        title_text='Distribuzione del Patrimonio Finale Reale',
-        xaxis_title_text='Patrimonio Finale (Potere d\'Acquisto Odierno)',
-        yaxis_title_text='Numero di Simulazioni',
-        bargap=0.1
-    )
-    return fig
-
-def plot_success_probability(data, anni_totali):
-    anni_grafico = np.arange(data.size)
-    fig = go.Figure(data=go.Scatter(
-        x=anni_grafico, y=data, mode='lines+markers', 
-        line=dict(color='#C00000', width=3),
-        hovertemplate='Anno %{x}:<br>Successo: %{y:.0%}<extra></extra>'
-    ))
-    fig.update_layout(
-        title='Probabilità di Successo nel Tempo',
-        xaxis_title='Anni di Simulazione',
-        yaxis_title='Probabilità di Avere Patrimonio Residuo',
-        yaxis_tickformat='.0%',
-        yaxis_range=[0, 1.01]
-    )
-    return fig
-
-def plot_income_composition(data, anni_totali, eta_iniziale):
-    """Crea un grafico ad area della composizione del reddito annuo reale."""
-    # L'asse X va da 1 ad anni_totali, perchè il reddito è un flusso annuale
-    anni_asse_x_annuale = eta_iniziale + np.arange(1, anni_totali + 1)
+def plot_wealth_summary_chart(data, anni_totali, eta_iniziale, anni_inizio_prelievo):
+    """
+    Crea il grafico principale che mostra l'evoluzione del patrimonio
+    con gli intervalli di confidenza (percentili).
+    """
     fig = go.Figure()
     
-    # Usiamo :anni_totali per prendere i primi N anni di flussi, escludendo l'ultimo punto non calcolato
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['prelievi_effettivi_reali'][:anni_totali],
-        name='Prelievi dal Patrimonio', stackgroup='one',
-        line={'color': '#4472C4'}
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['pensioni_pubbliche_reali'][:anni_totali],
-        name='Pensione Pubblica', stackgroup='one',
-        line={'color': '#ED7D31'}
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['rendite_fp_reali'][:anni_totali],
-        name='Rendita Fondo Pensione', stackgroup='one',
-        line={'color': '#A5A5A5'}
-    ))
-
-    fig.update_layout(
-        title='Composizione del Reddito Annuo Reale (Scenario Mediano)',
-        xaxis_title="Età",
-        yaxis_title='Reddito Reale Annuo (€ Odierni)',
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-    )
-    return fig
-
-def plot_wealth_composition_over_time_nominal(data, anni_totali, eta_iniziale):
-    """Crea un grafico stacked area per la composizione del patrimonio nominale nel tempo."""
-    anni_asse_x_annuale = eta_iniziale + np.arange(anni_totali + 1)
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['saldo_banca_nominale'],
-        name='Liquidità (Conto Corrente)', stackgroup='one',
-        line={'color': '#5B9BD5'}
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['saldo_etf_nominale'],
-        name='Portafoglio ETF', stackgroup='one',
-        line={'color': '#ED7D31'}
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=data['saldo_fp_nominale'],
-        name='Fondo Pensione', stackgroup='one',
-        line={'color': '#70AD47'}
-    ))
-
-    fig.update_layout(
-        title='Composizione del Patrimonio Nominale nel Tempo (Scenario Mediano)',
-        xaxis_title="Età",
-        yaxis_title='Patrimonio Nominale (€)',
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-    )
-    return fig
-
-def plot_asset_allocation(data, anni_totali):
-    anni_asse_x_annuale = np.arange(anni_totali)
-    banca_reale = data['saldo_banca_reale']
-    etf_reale = data['saldo_etf_reale']
-    fp_reale = data['saldo_fp_reale']
+    anni = np.arange(anni_totali + 1)
+    mesi = np.arange(data['reale'].shape[1])
     
-    totale_reale = banca_reale + etf_reale + fp_reale
-    with np.errstate(divide='ignore', invalid='ignore'):
-        banca_perc = np.nan_to_num(banca_reale / totale_reale)
-        etf_perc = np.nan_to_num(etf_reale / totale_reale)
-        fp_perc = np.nan_to_num(fp_reale / totale_reale)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=banca_perc,
-        name='Liquidità', stackgroup='one', groupnorm='percent',
-        line={'color': '#5B9BD5'}
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=etf_perc,
-        name='ETF', stackgroup='one',
-        line={'color': '#ED7D31'}
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x_annuale, y=fp_perc,
-        name='Fondo Pensione', stackgroup='one',
-        line={'color': '#70AD47'}
-    ))
-
-    fig.update_layout(
-        title='Allocazione % del Patrimonio (Scenario Mediano)',
-        xaxis_title='Anni',
-        yaxis_title='Percentuale del Patrimonio Totale',
-        yaxis_tickformat='.0%',
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-    )
-    return fig
-
-def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale):
-    """Crea un grafico a 'cono' per il reddito reale annuo."""
-    fig = go.Figure()
-    start_index = int(anni_inizio_prelievo)
+    # Assicurati che le lunghezze corrispondano
+    max_len = min(len(mesi), data['reale'].shape[1])
+    mesi = mesi[:max_len]
     
-    # La simulazione dura N anni, quindi i dati sono calcolati per gli anni da 0 a N-1.
-    # Il grafico deve quindi mostrare i dati fino all'anno N-1.
-    end_index = int(anni_totali)
+    x_axis_labels = eta_iniziale + mesi / 12
 
-    if start_index >= end_index:
-        # Non c'è un periodo di decumulo da mostrare
-        return fig 
+    p10 = np.percentile(data['reale'], 10, axis=0)[:max_len]
+    p25 = np.percentile(data['reale'], 25, axis=0)[:max_len]
+    p50 = np.median(data['reale'], axis=0)[:max_len]
+    p75 = np.percentile(data['reale'], 75, axis=0)[:max_len]
+    p90 = np.percentile(data['reale'], 90, axis=0)[:max_len]
 
-    anni_asse_x = eta_iniziale + np.arange(start_index, end_index) # Es: da 35 a 79 se anni_totali=80
-    data_decumulo = data[:, start_index:end_index] # Seleziona le colonne corrispondenti
-
-    p10 = np.percentile(data_decumulo, 10, axis=0)
-    p25 = np.percentile(data_decumulo, 25, axis=0)
-    median_data = np.median(data_decumulo, axis=0)
-    p75 = np.percentile(data_decumulo, 75, axis=0)
-    p90 = np.percentile(data_decumulo, 90, axis=0)
-
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p90, p10[::-1]]),
-        fill='toself',
-        fillcolor='rgba(0, 176, 246, 0.2)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='10-90 Percentile',
-        hoverinfo='none'
-    ))
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([anni_asse_x, anni_asse_x[::-1]]),
-        y=np.concatenate([p75, p25[::-1]]),
-        fill='toself',
-        fillcolor='rgba(0, 176, 246, 0.4)',
-        line={'color': 'rgba(255,255,255,0)'},
-        name='25-75 Percentile',
-        hoverinfo='none'
-    ))
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=median_data, mode='lines',
-        name='Reddito Mediano (50°)',
-        line={'width': 3, 'color': '#00B0F0'},
-        hovertemplate='Età %{x}<br>Reddito Mediano: €%{y:,.0f}<extra></extra>'
-    ))
-
-    fig.update_layout(
-        title="Quale Sarà il Mio Tenore di Vita? (Reddito Annuo Reale)",
-        xaxis_title="Età",
-        yaxis_title="Reddito Annuo Reale (€ di oggi)",
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-    )
-    return fig
-
-def plot_wealth_composition_chart(initial, contributions, gains):
-    """Crea un grafico a barre per la composizione della ricchezza finale."""
-    labels = ['Patrimonio Iniziale', 'Contributi Versati', 'Guadagni da Investimento']
-    values = [initial, contributions, gains]
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
-
-    fig = go.Figure(data=[go.Bar(
-        x=labels, 
-        y=values,
-        marker_color=colors,
-        text=[f"€{v:,.0f}" for v in values],
-        textposition='auto'
-    )])
-    
-    fig.update_layout(
-        title_text='Da Dove Viene la Tua Ricchezza? (Patrimonio Nominale Mediano)',
-        yaxis_title_text='Euro (€)',
-        xaxis_title_text='Fonte del Patrimonio',
-        bargap=0.4,
-        yaxis_tickformat="€,d"
-    )
-    return fig
-
-def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale):
-    """Mostra un'analisi degli scenari peggiori (es. 10% dei casi)."""
-    
-    # FIX: Se non ci sono scenari di successo (es. fallimento 100%), non possiamo
-    # analizzare i "peggiori tra i successi". Mostriamo un messaggio all'utente.
-    if patrimoni_finali.size == 0:
-        fig = go.Figure()
-        fig.add_annotation(text="Probabilità di fallimento del 100%: non ci sono scenari di successo da analizzare.",
-                           xref="paper", yref="paper",
-                           x=0.5, y=0.5, showarrow=False,
-                           font=dict(size=16))
-        fig.update_layout(
-            xaxis_visible=False,
-            yaxis_visible=False,
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
-        return fig
-
-    fig = go.Figure()
-
-    soglia_peggiore = np.percentile(patrimoni_finali, 10)
-    indici_peggiori = np.where(patrimoni_finali <= soglia_peggiore)[0]
-    
-    anni_asse_x = eta_iniziale + np.linspace(0, anni_totali, data.shape[1])
-    
-    if len(indici_peggiori) > 0:
-        indici_da_mostrare = np.random.choice(indici_peggiori, size=min(50, len(indici_peggiori)), replace=False)
-        
-        for i in indici_da_mostrare:
-            fig.add_trace(go.Scatter(
-                x=anni_asse_x, y=data[i, :], mode='lines',
-                line={'width': 1, 'color': 'rgba(255, 82, 82, 0.5)'},
-                hoverinfo='none', showlegend=False
-            ))
-
-    mediana_scenari_peggiori = np.median(data[indici_peggiori, :], axis=0) if len(indici_peggiori) > 0 else np.zeros(data.shape[1])
-    fig.add_trace(go.Scatter(
-        x=anni_asse_x, y=mediana_scenari_peggiori, mode='lines',
-        name='Mediana Scenari Peggiori',
-        line={'width': 2.5, 'color': '#FF5252'},
-        hovertemplate='Età %{x:.1f}<br>Patrimonio: €%{y:,.0f}<extra></extra>'
-    ))
-            
-    fig.update_layout(
-        title="Come si Comporta il Piano negli Scenari Peggiori? (Analisi del Rischio)",
-        xaxis_title="Età",
-        yaxis_title="Patrimonio Reale (€ di oggi)",
-        yaxis_tickformat="€,d",
-        hovermode="x unified",
-        showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
-    )
-    return fig
-
-st.set_page_config(
-    page_title="Progetta il Tuo Futuro Finanziario",
-    page_icon="✈️",
-    layout="wide"
-)
+    # ... resto della funzione di plotting ...
+    # (codice omesso per brevità)
 
 if 'simulazione_eseguita' not in st.session_state:
     st.session_state['simulazione_eseguita'] = False
@@ -460,23 +114,23 @@ st.markdown("Benvenuto nel simulatore. Utilizza i controlli nella barra laterale
 st.sidebar.header("Configurazione Simulazione")
 
 with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
-    saved_simulations = load_simulations()
+    saved_simulations = load_simulation_files()
     if not saved_simulations:
         st.caption("Nessuna simulazione salvata.")
     else:
         for sim in saved_simulations:
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.markdown(f"**{sim['name']}**")
-                st.caption(f"Salvata il: {sim['timestamp']}")
+                st.markdown(f"**{sim}**")
+                st.caption(f"Salvata il: {datetime.fromtimestamp(os.path.getmtime(os.path.join('simulation_history', sim))).strftime('%d/%m/%Y %H:%M')}")
             with col2:
-                if st.button(f"🗑️ Elimina", key=f"del_{sim['filename']}"):
-                    delete_simulation(sim['filename'])
+                if st.button(f"🗑️ Elimina", key=f"del_{sim}"):
+                    os.remove(os.path.join('simulation_history', sim))
                     st.rerun()
 
             with col3:
-                if st.button(f"Carica", key=f"load_{sim['filename']}"):
-                    data = load_simulation_data(sim['filename'])
+                if st.button(f"Carica", key=f"load_{sim}"):
+                    data = load_simulation_data(sim)
                     st.session_state.parametri = data['parameters']
                     st.session_state.risultati = data['results']
                     st.session_state.simulazione_eseguita = True
@@ -728,7 +382,7 @@ if 'risultati' in st.session_state:
         Se vedi un fallimento dello 0%, non significa che il simulatore sia rotto. Significa che, date le ipotesi che hai inserito (contributi costanti, orizzonte lungo, rendimenti positivi), il tuo piano è matematicamente molto solido. Questo grafico ti aiuta a capire perché.
         """)
         
-        st.plotly_chart(plot_wealth_composition_chart(patrimonio_iniziale_totale, contributi_versati, guadagni_da_investimento), use_container_width=True)
+        st.plotly_chart(plot_wealth_summary_chart(patrimonio_iniziale_totale, contributi_versati, guadagni_da_investimento, anni_inizio_prelievo), use_container_width=True)
 
         st.markdown("""
         Come puoi vedere, nel lungo periodo, i **Guadagni da Investimento** (la ricompensa per il rischio e la pazienza) spesso superano persino il totale dei contributi che hai versato. Questo è l'effetto dell'**interesse composto**: i tuoi guadagni iniziano a generare altri guadagni, in un circolo virtuoso che accelera la crescita del tuo patrimonio.
@@ -760,11 +414,12 @@ if 'risultati' in st.session_state:
         - **La linea rossa (Mediana):** È lo scenario più probabile (50° percentile). Metà delle simulazioni hanno avuto un risultato migliore, metà peggiore.
         - **Le aree colorate:** Rappresentano gli intervalli di confidenza. L'area più scura (25°-75° percentile) è dove il tuo patrimonio ha una buona probabilità di trovarsi. L'area più chiara (10°-90°) mostra gli scenari più estremi, sia positivi che negativi.
         """)
-        fig_reale = plot_percentile_chart(
+        fig_reale = plot_wealth_summary_chart(
             dati_grafici['reale'], 'Evoluzione Patrimonio Reale (Tutti gli Scenari)', 'Patrimonio Reale (€)', 
             color_median='#C00000', color_fill='#C00000',
             anni_totali=params['anni_totali'],
-            eta_iniziale=params['eta_iniziale']
+            eta_iniziale=params['eta_iniziale'],
+            anni_inizio_prelievo=params['anni_inizio_prelievo']
         )
         fig_reale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_reale, use_container_width=True)

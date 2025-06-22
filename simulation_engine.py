@@ -435,33 +435,23 @@ def _calcola_prelievo_sostenibile(parametri):
     # Eseguiamo la simulazione completa ma con prelievo a zero
     risultati_pre_sim = run_full_simulation(parametri_pre_sim, use_sustainable_withdrawal=False)
     
-    patrimoni_reali = risultati_pre_sim['dati_grafici_principali']['reale']
+    # Estraiamo i dati annuali di tutte le pre-simulazioni
+    tutti_i_dati_annuali_reali = risultati_pre_sim['dati_annuali_reali']
     
     anni_accumulo = parametri['anni_inizio_prelievo']
     anni_prelievo = parametri['anni_totali'] - anni_accumulo
     
-    # Se non ci sono anni di prelievo, non ha senso calcolare un prelievo
+    # Se non ci sono anni di prelievo, il prelievo è zero.
     if anni_prelievo <= 0:
         return 0
 
-    mese_inizio_prelievo = anni_accumulo * 12
-    patrimonio_reale_a_inizio_prelievo_mediano = np.median(patrimoni_reali[:, mese_inizio_prelievo])
+    # Troviamo il saldo mediano del *solo conto corrente* all'inizio dei prelievi.
+    # Usiamo i valori reali per calcolare un prelievo che mantenga il potere d'acquisto.
+    saldo_reale_banca_inizio_prelievo = tutti_i_dati_annuali_reali['saldo_banca_reale'][:, anni_accumulo]
+    saldo_reale_banca_mediano = np.median(saldo_reale_banca_inizio_prelievo)
     
-    prelievo_annuo_calcolato = 0
-    if patrimonio_reale_a_inizio_prelievo_mediano > 0:
-        # Usiamo il rendimento reale atteso per il calcolo dell'annualità
-        rend_reale_atteso = parametri['rendimento_medio'] - parametri['ter_etf'] - parametri['inflazione']
-
-        # Formula della rendita per calcolare il prelievo costante
-        if rend_reale_atteso > 1e-6: # Evitiamo divisione per zero
-            try:
-                fattore_rendita = rend_reale_atteso / (1 - (1 + rend_reale_atteso) ** -anni_prelievo)
-                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano * fattore_rendita
-            except (OverflowError, ZeroDivisionError):
-                # Fallback in caso di problemi numerici con numeri molto grandi o piccoli
-                prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
-        else:
-             prelievo_annuo_calcolato = patrimonio_reale_a_inizio_prelievo_mediano / anni_prelievo
+    # Calcoliamo il prelievo annuo come richiesto: divisione semplice del capitale liquido.
+    prelievo_annuo_calcolato = saldo_reale_banca_mediano / anni_prelievo if anni_prelievo > 0 else 0
              
     return prelievo_annuo_calcolato
 
@@ -664,6 +654,10 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
         'prelievo_sostenibile_calcolato': prelievo_annuo_da_usare if calcolo_sostenibile_attivo else None
     }
 
+    # Separiamo i dati annuali reali e nominali per chiarezza
+    dati_annuali_reali = {k: v for k, v in tutti_i_dati_annuali.items() if 'reale' in k}
+    dati_annuali_nominali = {k: v for k, v in tutti_i_dati_annuali.items() if 'nominale' in k}
+
     return {
         "statistiche": statistiche_finali,
         "statistiche_prelievi": statistiche_prelievi,
@@ -674,5 +668,7 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
         },
         "dati_grafici_avanzati": {
             "dati_mediana": dati_mediana_run
-        }
+        },
+        "dati_annuali_reali": dati_annuali_reali,
+        "dati_annuali_nominali": dati_annuali_nominali
     } 
