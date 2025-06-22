@@ -246,3 +246,10 @@ La situazione finale del patrimonio è:
 - **NUOVO PATRIMONIO TOTALE:** `177.500 + 450.000 + 0 = 627.500 €`
 
 Sei passato da 800.000 € a 627.500 €. Il "crollo" nel grafico rappresenta la parte di ricchezza che hai scambiato per ottenere un reddito futuro sicuro.
+
+## Perché il mio patrimonio si esaurisce prima della fine se imposto un prelievo "sostenibile"?
+Questa è una delle intuizioni più importanti che il simulatore può offrire e non è un bug. Quando imposti un prelievo fisso a 0, il simulatore:
+1.  **Calcola un prelievo teorico:** Usa una formula finanziaria standard per determinare il massimo importo annuo che potresti prelevare se i rendimenti fossero costanti e prevedibili.
+2.  **Sottopone il piano a uno stress test:** Applica questo prelievo teorico alle migliaia di simulazioni Monte Carlo, che includono la volatilità del mercato (anni positivi e anni negativi).
+
+Il risultato che vedi nel grafico è l'esito dello stress test. Se il patrimonio mediano si esaurisce prima della fine dell'orizzonte temporale, il simulatore ti sta lanciando un avvertimento cruciale: il **rischio di sequenza dei rendimenti** (avere rendimenti scarsi nei primi anni di pensione) rende il tuo prelievo teorico troppo rischioso nella pratica per il 50% degli scenari possibili. Questa non è una visione pessimistica, ma una valutazione realistica del rischio del tuo piano.
