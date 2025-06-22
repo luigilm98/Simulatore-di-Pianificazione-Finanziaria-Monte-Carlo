@@ -90,30 +90,68 @@ def plot_wealth_composition_chart(initial, contributions, gains):
     )
     return fig
 
-def plot_wealth_summary_chart(data, anni_totali, eta_iniziale, anni_inizio_prelievo):
+def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000', color_fill='#C00000'):
     """
     Crea il grafico principale che mostra l'evoluzione del patrimonio
     con gli intervalli di confidenza (percentili).
     """
     fig = go.Figure()
     
-    anni = np.arange(anni_totali + 1)
-    mesi = np.arange(data['reale'].shape[1])
-    
-    # Assicurati che le lunghezze corrispondano
-    max_len = min(len(mesi), data['reale'].shape[1])
-    mesi = mesi[:max_len]
-    
+    # L'asse x (mesi) deve avere la stessa lunghezza dei dati
+    mesi = np.arange(data.shape[1])
     x_axis_labels = eta_iniziale + mesi / 12
 
-    p10 = np.percentile(data['reale'], 10, axis=0)[:max_len]
-    p25 = np.percentile(data['reale'], 25, axis=0)[:max_len]
-    p50 = np.median(data['reale'], axis=0)[:max_len]
-    p75 = np.percentile(data['reale'], 75, axis=0)[:max_len]
-    p90 = np.percentile(data['reale'], 90, axis=0)[:max_len]
+    p10 = np.percentile(data, 10, axis=0)
+    p25 = np.percentile(data, 25, axis=0)
+    p50 = np.median(data, axis=0)
+    p75 = np.percentile(data, 75, axis=0)
+    p90 = np.percentile(data, 90, axis=0)
 
-    # ... resto della funzione di plotting ...
-    # (codice omesso per brevità)
+    # Funzione helper per convertire hex in rgba per il fill
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+    rgb_fill = hex_to_rgb(color_fill)
+
+    # Aree di confidenza
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([x_axis_labels, x_axis_labels[::-1]]),
+        y=np.concatenate([p90, p10[::-1]]),
+        fill='toself',
+        fillcolor=f'rgba({rgb_fill[0]}, {rgb_fill[1]}, {rgb_fill[2]}, 0.2)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='10-90 Percentile',
+        hoverinfo='none'
+    ))
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([x_axis_labels, x_axis_labels[::-1]]),
+        y=np.concatenate([p75, p25[::-1]]),
+        fill='toself',
+        fillcolor=f'rgba({rgb_fill[0]}, {rgb_fill[1]}, {rgb_fill[2]}, 0.4)',
+        line={'color': 'rgba(255,255,255,0)'},
+        name='25-75 Percentile',
+        hoverinfo='none'
+    ))
+
+    # Linea mediana
+    fig.add_trace(go.Scatter(
+        x=x_axis_labels, y=p50, mode='lines',
+        name='Scenario Mediano (50°)',
+        line={'width': 3, 'color': color_median},
+        hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title="Età",
+        yaxis_title=y_title,
+        yaxis_tickformat="€,d",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+
+    return fig
 
 if 'simulazione_eseguita' not in st.session_state:
     st.session_state['simulazione_eseguita'] = False
@@ -434,13 +472,14 @@ if 'risultati' in st.session_state:
         
         st.subheader("Come potrebbe evolvere il mio patrimonio? (Visione d'insieme)")
         st.markdown("""
-        Questo primo grafico ti dà una visione d'insieme, un **"cono di probabilità"**. Non mostra una singola previsione, ma l'intera gamma di risultati possibili, tenendo conto dell'incertezza dei mercati.
+        Questo primo grafico ti dà una visione d'insieme, un "**cono di probabilità**". Non mostra una singola previsione, ma l'intera gamma di risultati possibili, tenendo conto dell'incertezza dei mercati.
         - **La linea rossa (Mediana):** È lo scenario più probabile (50° percentile). Metà delle simulazioni hanno avuto un risultato migliore, metà peggiore.
         - **Le aree colorate:** Rappresentano gli intervalli di confidenza. L'area più scura (25°-75° percentile) è dove il tuo patrimonio ha una buona probabilità di trovarsi. L'area più chiara (10°-90°) mostra gli scenari più estremi, sia positivi che negativi.
         """)
         fig_reale = plot_wealth_summary_chart(
-            dati_grafici['reale'], 'Evoluzione Patrimonio Reale (Tutti gli Scenari)', 'Patrimonio Reale (€)', 
-            color_median='#C00000', color_fill='#C00000',
+            data=dati_grafici['reale'], 
+            title='Evoluzione Patrimonio Reale (Tutti gli Scenari)', 
+            y_title='Patrimonio Reale (€)', 
             anni_totali=params['anni_totali'],
             eta_iniziale=params['eta_iniziale'],
             anni_inizio_prelievo=params['anni_inizio_prelievo']
