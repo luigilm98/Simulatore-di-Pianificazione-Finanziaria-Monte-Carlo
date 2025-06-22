@@ -832,6 +832,35 @@ if 'risultati' in st.session_state:
         help=f"Il tuo patrimonio finale reale mediano, tradotto in quanti anni del tuo tenore di vita pensionistico (€{reddito_annuo_reale_pensione:,.0f}/anno) può coprire. Un valore alto indica una maggiore sicurezza."
     )
 
+    # --- Performance Media per Fase ---
+    st.subheader("Performance Media per Fase (Scenario Mediano)")
+    dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+    variazioni_annue = np.array(dati_mediana.get('variazione_patrimonio_percentuale', [0]))
+    idx_inizio_prelievo = params['anni_inizio_prelievo']
+    variazioni_valide = variazioni_annue[:params['anni_totali']]
+    variazioni_accumulo = variazioni_valide[:idx_inizio_prelievo]
+    variazioni_prelievo = variazioni_valide[idx_inizio_prelievo:]
+    media_accumulo = np.mean(variazioni_accumulo) if variazioni_accumulo.size > 0 else 0
+    media_prelievo = np.mean(variazioni_prelievo) if variazioni_prelievo.size > 0 else 0
+    anni_prelievo = params['anni_totali'] - idx_inizio_prelievo
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(
+            label="Crescita Media (Accumulo)", 
+            value=f"{media_accumulo:+.2%}",
+            delta_color="normal",
+            help=f"La crescita percentuale media annua del patrimonio durante i primi {idx_inizio_prelievo} anni (fase di accumulo)."
+        )
+    with col2:
+        st.metric(
+            label="Crescita Media (Prelievo)", 
+            value=f"{media_prelievo:+.2%}",
+            delta_color="normal",
+            help=f"La variazione percentuale media annua del patrimonio durante gli ultimi {anni_prelievo} anni (fase di prelievo). È normale che sia negativa, poiché i prelievi superano i rendimenti."
+        )
+
+
     # --- Messaggio speciale per il calcolo del prelievo sostenibile ---
     prelievo_sostenibile_calcolato = stats.get('prelievo_sostenibile_calcolato')
     if prelievo_sostenibile_calcolato is not None:
