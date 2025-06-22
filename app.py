@@ -154,10 +154,10 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     }
 
     if is_nominal_chart:
-        # Per i grafici nominali, usa una scala dinamica per evitare tagli
-        p99 = np.percentile(data, 99, axis=0)
+        # Per i grafici nominali, usa una scala dinamica robusta che ignora gli outlier più estremi
+        p98 = np.percentile(data, 98, axis=0)
         layout_options["yaxis"] = dict(
-            range=[0, np.max(p99) * 1.05],
+            range=[0, np.max(p98) * 1.05], # Limita la scala al 98° percentile per leggibilità
             tickformat="€,d"
         )
     else:
