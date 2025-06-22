@@ -506,23 +506,6 @@ st.set_page_config(
     layout="wide"
 )
 
-if 'simulazione_eseguita' not in st.session_state:
-    st.session_state['simulazione_eseguita'] = False
-    st.session_state['risultati'] = {}
-    st.session_state['parametri'] = {}
-
-def get_default_portfolio():
-    return pd.DataFrame([
-        {"Fondo": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating", "Ticker": "VWCE", "Allocazione (%)": 90.0, "TER (%)": 0.22, "Rendimento Atteso (%)": 8.0, "Volatilità Attesa (%)": 15.0},
-        {"Fondo": "Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture", "Ticker": "CRB", "Allocazione (%)": 3.0, "TER (%)": 0.30, "Rendimento Atteso (%)": 5.0, "Volatilità Attesa (%)": 18.0},
-        {"Fondo": "iShares MSCI EM UCITS ETF (Acc)", "Ticker": "EIMI", "Allocazione (%)": 3.0, "TER (%)": 0.18, "Rendimento Atteso (%)": 9.0, "Volatilità Attesa (%)": 22.0},
-        {"Fondo": "Amundi MSCI Japan UCITS ETF Acc", "Ticker": "SJP", "Allocazione (%)": 3.0, "TER (%)": 0.12, "Rendimento Atteso (%)": 7.0, "Volatilità Attesa (%)": 16.0},
-        {"Fondo": "iShares Automation & Robotics UCITS ETF", "Ticker": "RBOT", "Allocazione (%)": 1.0, "TER (%)": 0.40, "Rendimento Atteso (%)": 12.0, "Volatilità Attesa (%)": 25.0},
-    ])
-
-if 'portfolio' not in st.session_state:
-    st.session_state.portfolio = get_default_portfolio()
-
 st.title("✈️ Progetta la Tua Indipendenza Finanziaria")
 st.markdown("Benvenuto nel simulatore. Utilizza i controlli nella barra laterale per configurare e lanciare la tua simulazione finanziaria e scoprire come raggiungere i tuoi obiettivi.")
 
