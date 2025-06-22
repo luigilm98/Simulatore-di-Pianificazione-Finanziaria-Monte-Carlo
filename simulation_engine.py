@@ -409,8 +409,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             sharpe_ratio = (np.mean(finite_returns) - risk_free_month) * np.sqrt(12) / np.std(finite_returns)
             
     return {
-        "patrimoni_mensili": patrimoni_run,
-        "patrimoni_reali_mensili": patrimoni_reali_run,
+        "patrimoni_run": patrimoni_run,
+        "patrimoni_reali_run": patrimoni_reali_run,
         "dati_annuali": dati_annuali,
         "drawdown": drawdown,
         "sharpe_ratio": sharpe_ratio,
@@ -477,6 +477,48 @@ def _calcola_prelievo_sostenibile(parametri):
             
     return prelievo_ottimale
 
+def _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare):
+    """
+    Funzione core che esegue N simulazioni e restituisce i risultati grezzi.
+    """
+    n_simulazioni = parametri['n_simulazioni']
+    mesi_totali = parametri['anni_totali'] * 12
+
+    # Inizializzazione degli array aggregati
+    patrimoni_tutte_le_run = np.zeros((n_simulazioni, mesi_totali + 1))
+    patrimoni_reali_tutte_le_run = np.zeros((n_simulazioni, mesi_totali + 1))
+    reddito_reale_annuo_tutte_le_run = np.zeros((n_simulazioni, parametri['anni_totali']))
+    
+    # Dati dettagliati solo per la simulazione mediana
+    dati_mediana_dettagliati = {}
+    
+    # Contatori per statistiche
+    totale_contributi_versati_nominale = np.zeros(n_simulazioni)
+    guadagni_accumulo_nominale = np.zeros(n_simulazioni)
+
+    for i in range(n_simulazioni):
+        risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
+        
+        patrimoni_tutte_le_run[i, :] = risultati_run['patrimoni_run']
+        patrimoni_reali_tutte_le_run[i, :] = risultati_run['patrimoni_reali_run']
+        reddito_reale_annuo_tutte_le_run[i, :] = risultati_run['reddito_annuo_reale']
+        totale_contributi_versati_nominale[i] = risultati_run['totale_contributi_versati_nominale']
+        guadagni_accumulo_nominale[i] = risultati_run['guadagni_accumulo']
+
+        if i == n_simulazioni // 2: # Salva i dati dettagliati per la run mediana
+            dati_mediana_dettagliati = risultati_run['dati_annuali']
+            
+    return (
+        patrimoni_tutte_le_run,
+        patrimoni_reali_tutte_le_run,
+        reddito_reale_annuo_tutte_le_run,
+        dati_mediana_dettagliati,
+        {
+            'totale_contributi_versati_nominale': totale_contributi_versati_nominale,
+            'guadagni_accumulo_nominale': guadagni_accumulo_nominale
+        }
+    )
+
 def run_full_simulation(parametri):
     """
     Esegue la simulazione Monte Carlo completa, orchestrando migliaia di singole run.
@@ -542,32 +584,23 @@ def run_full_simulation(parametri):
         parametri['strategia_prelievo'] == 'FISSO' and 
         parametri['prelievo_annuo'] == 0
     )
-
+    prelievo_sostenibile_calcolato = None
     if calcolo_sostenibile_attivo:
-        prelievo_annuo_da_usare = _calcola_prelievo_sostenibile(parametri)
-    else:
-        # Se non stiamo calcolando, ci assicuriamo che il valore sia 0 per non inquinar le statistiche
-        prelievo_annuo_da_usare = parametri['prelievo_annuo']
+        prelievo_sostenibile_calcolato = _calcola_prelievo_sostenibile(parametri)
+        prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
 
-    # 2. ESECUZIONE SIMULAZIONI
-    for sim in range(n_sim):
-        risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare if calcolo_sostenibile_attivo else parametri['prelievo_annuo'])
-        
-        patrimoni[sim, :] = risultati_run['patrimoni_mensili']
-        patrimoni_reali[sim, :] = risultati_run['patrimoni_reali_mensili']
-        drawdowns[sim] = risultati_run['drawdown']
-        sharpe_ratios[sim] = risultati_run['sharpe_ratio']
-        if risultati_run['fallimento']:
-            fallimenti += 1
-            indici_fallimenti.append(sim)
-        
-        for key in tutti_i_dati_annuali.keys():
-            if key in risultati_run['dati_annuali']:
-                tutti_i_dati_annuali[key][sim, :] = risultati_run['dati_annuali'][key]
+    # --- ESECUZIONE SIMULAZIONI PRINCIPALI ---
+    (
+        patrimoni_tutte_le_run,
+        patrimoni_reali_tutte_le_run,
+        reddito_reale_annuo_tutte_le_run,
+        dati_mediana_dettagliati,
+        contatori_statistiche
+    ) = _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare)
 
-        contributi_totali_agg[sim] = risultati_run['totale_contributi_versati_nominale']
-        guadagni_accumulo_agg[sim] = risultati_run['guadagni_accumulo']
-
+    # --- CALCOLO STATISTICHE FINALI ---
+    statistiche = {}
+    
     # 3. CALCOLO STATISTICHE E SCENARIO MEDIANO
     prob_fallimento = fallimenti / n_sim
     patrimoni_finale_validi = patrimoni[:, -1]
@@ -672,7 +705,7 @@ def run_full_simulation(parametri):
         'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
         'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg),
         'guadagni_accumulo_mediano_nominale': np.median(guadagni_accumulo_agg),
-        'prelievo_sostenibile_calcolato': prelievo_annuo_da_usare if calcolo_sostenibile_attivo else None
+        'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato if calcolo_sostenibile_attivo else None
     }
 
     # Separiamo i dati annuali reali e nominali per chiarezza
