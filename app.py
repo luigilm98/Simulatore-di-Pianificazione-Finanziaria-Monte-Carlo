@@ -601,6 +601,45 @@ with st.sidebar.expander("7. Pensione Statale"):
         help="Tra quanti anni inizierai a ricevere la pensione pubblica."
     )
 
+def run_simulation_wrapper():
+    """
+    Raccoglie tutti i parametri dalla sidebar, li valida (se necessario)
+    e lancia la simulazione completa.
+    """
+    p = st.session_state.get('parametri', {})
+    
+    # Validazione del portfolio prima di procedere
+    if not np.isclose(st.session_state.get('portfolio', {}).get("Allocazione (%)", 0).sum(), 100):
+        st.sidebar.error("L'allocazione del portafoglio deve essere esattamente 100% per eseguire la simulazione.")
+        st.stop()
+        
+    # Calcolo dei parametri derivati dal portfolio
+    rendimento_medio_portfolio, volatilita_portfolio, ter_etf_portfolio = get_portfolio_summary()
+
+    # Aggiorna il dizionario dei parametri con tutti i valori correnti
+    st.session_state.parametri.update({
+        'rendimento_medio': rendimento_medio_portfolio,
+        'volatilita': volatilita_portfolio,
+        'ter_etf': ter_etf_portfolio
+        # Gli altri parametri sono già aggiornati nel session_state tramite i loro widget
+    })
+
+    with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
+        try:
+            # Pulisce i risultati precedenti prima di una nuova simulazione
+            if 'risultati' in st.session_state:
+                del st.session_state.risultati
+            
+            # Esegui la simulazione.
+            st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
+            
+            st.success('Simulazione completata con successo!')
+            st.query_params.clear()
+        except ValueError as e:
+            st.error(f"Errore nei parametri: {e}")
+        except Exception as e:
+            st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
+
 # Pulsante per eseguire la simulazione
 if st.sidebar.button('🚀 Esegui Simulazione', type="primary", use_container_width=True):
     run_simulation_wrapper()
