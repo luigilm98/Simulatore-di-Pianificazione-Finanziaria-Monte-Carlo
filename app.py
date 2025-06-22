@@ -91,7 +91,7 @@ def plot_wealth_composition_chart(initial, contributions, gains):
     )
     return fig
 
-def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000', color_fill='#C00000', is_nominal_chart=False):
+def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000', color_fill='#C00000'):
     """
     Crea il grafico principale che mostra l'evoluzione del patrimonio
     con gli intervalli di confidenza (percentili).
@@ -107,7 +107,6 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     p50 = np.median(data, axis=0)
     p75 = np.percentile(data, 75, axis=0)
     p90 = np.percentile(data, 90, axis=0)
-    p99 = np.percentile(data, 99, axis=0) # Calcoliamo il 99° percentile per il limite del grafico
 
     # Funzione helper per convertire hex in rgba per il fill
     def hex_to_rgb(hex_color):
@@ -144,34 +143,22 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
-    layout_options = {
-        "title": title,
-        "xaxis_title": "Età",
-        "yaxis_title": y_title,
-        "hovermode": "x unified",
-        "legend": dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        "height": 700, # Aumenta l'altezza del grafico
-    }
-
-    if is_nominal_chart:
-        # Per i grafici nominali, usa una scala dinamica robusta che ignora gli outlier più estremi
-        p98 = np.percentile(data, 98, axis=0)
-        layout_options["yaxis"] = dict(
-            range=[0, np.max(p98) * 1.05], # Limita la scala al 98° percentile per leggibilità
+    # Scala dinamica robusta: si adatta ai dati ma taglia gli outlier più estremi
+    p98 = np.percentile(data, 98, axis=0)
+    y_max = np.max(p98) * 1.05
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title="Età",
+        yaxis_title=y_title,
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=700, 
+        yaxis=dict(
+            range=[0, y_max],
             tickformat="€,d"
         )
-    else:
-        # Per i grafici reali, usa la scala fissa personalizzata
-        tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
-        tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
-        layout_options["yaxis"] = dict(
-            range=[0, 10000000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
-        )
-
-    fig.update_layout(**layout_options)
+    )
 
     return fig
 
@@ -205,10 +192,11 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         line={'width': 4, 'color': color_median},
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
+    
+    # Scala dinamica robusta
+    p98 = np.percentile(data, 98)
+    y_max = p98 * 1.05
             
-    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
-    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
-
     fig.update_layout(
         title=title,
         xaxis_title="Età",
@@ -216,12 +204,10 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
         hovermode="x unified",
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=700, # Aumenta l'altezza del grafico
+        height=700,
         yaxis=dict(
-            range=[0, 10000000],
-            tickmode='array',
-            tickvals=tick_values,
-            ticktext=tick_text
+            range=[0, y_max],
+            tickformat="€,d"
         )
     )
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
@@ -236,8 +222,7 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
     p50 = np.median(data, axis=0)
     p75 = np.percentile(data, 75, axis=0)
     p90 = np.percentile(data, 90, axis=0)
-    p95 = np.percentile(data, 95, axis=0) # Usiamo p95 per la scala
-
+    
     eta_asse_x = eta_iniziale + np.arange(data.shape[1])
 
     # Aree di confidenza
@@ -269,6 +254,10 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
         hovertemplate='Età %{x}<br>Reddito Annuo: €%{y:,.0f}<extra></extra>'
     ))
 
+    # Scala dinamica robusta
+    p98 = np.percentile(data, 98, axis=0)
+    y_max = np.max(p98) * 1.05
+
     fig.update_layout(
         title='Quale sarà il mio tenore di vita in pensione?',
         xaxis_title="Età",
@@ -277,7 +266,7 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
         hovermode="x unified",
         height=600,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, np.max(p95) * 1.05] # Scala dinamica
+        yaxis_range=[0, y_max]
     )
 
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
@@ -335,8 +324,8 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano (Peggiori): €%{y:,.0f}<extra></extra>'
     ))
 
-    # Imposta il limite superiore dell'asse Y in base al 99° percentile dei dati peggiori
-    y_max = np.percentile(worst_data, 99) * 1.10
+    # Scala dinamica robusta basata sui dati degli scenari peggiori
+    y_max = np.percentile(worst_data, 98) * 1.05
 
     fig.update_layout(
         title='Il piano sopravviverà a una crisi di mercato iniziale? (Focus sul 10% degli scenari peggiori)',
@@ -345,8 +334,8 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        height=600,
-        yaxis_range=[0, y_max] # Scala dinamica
+        height=700,
+        yaxis_range=[0, y_max]
     )
 
     return fig
@@ -825,8 +814,7 @@ if 'risultati' in st.session_state:
             eta_iniziale=params['eta_iniziale'],
             anni_inizio_prelievo=params['anni_inizio_prelievo'],
             color_median='#007bff',
-            color_fill='#007bff',
-            is_nominal_chart=True # Usa la scala dinamica per questo grafico
+            color_fill='#007bff'
         )
         fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_nominale, use_container_width=True)
