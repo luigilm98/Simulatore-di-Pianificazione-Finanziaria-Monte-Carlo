@@ -497,6 +497,9 @@ def _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare):
     # Contatori per statistiche
     totale_contributi_versati_nominale = np.zeros(n_simulazioni)
     guadagni_accumulo_nominale = np.zeros(n_simulazioni)
+    drawdowns = np.zeros(n_simulazioni)
+    sharpe_ratios = np.zeros(n_simulazioni)
+    fallimenti = 0
 
     for i in range(n_simulazioni):
         risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
@@ -506,6 +509,10 @@ def _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare):
         reddito_reale_annuo_tutte_le_run[i, :] = risultati_run['reddito_annuo_reale']
         totale_contributi_versati_nominale[i] = risultati_run['totale_contributi_versati_nominale']
         guadagni_accumulo_nominale[i] = risultati_run['guadagni_accumulo']
+        drawdowns[i] = risultati_run['drawdown']
+        sharpe_ratios[i] = risultati_run['sharpe_ratio']
+        if risultati_run['fallimento']:
+            fallimenti += 1
 
         if i == n_simulazioni // 2: # Salva i dati dettagliati per la run mediana
             dati_mediana_dettagliati = risultati_run['dati_annuali']
@@ -517,7 +524,10 @@ def _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare):
         dati_mediana_dettagliati,
         {
             'totale_contributi_versati_nominale': totale_contributi_versati_nominale,
-            'guadagni_accumulo_nominale': guadagni_accumulo_nominale
+            'guadagni_accumulo_nominale': guadagni_accumulo_nominale,
+            'drawdowns': drawdowns,
+            'sharpe_ratios': sharpe_ratios,
+            'fallimenti': fallimenti
         }
     )
 
@@ -705,9 +715,9 @@ def run_full_simulation(parametri):
         'probabilita_fallimento': prob_fallimento,
         'patrimoni_reali_finali': patrimoni_reali_finale_validi,
         'successo_per_anno': np.sum(patrimoni_reali[:, ::12] > 1, axis=0) / n_sim if n_sim > 0 else np.zeros(parametri['anni_totali'] + 1),
-        'contributi_totali_versati_mediano_nominale': np.median(contributi_totali_agg),
-        'guadagni_accumulo_mediano_nominale': np.median(guadagni_accumulo_agg),
-        'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato if calcolo_sostenibile_attivo else None
+        'contributi_totali_versati_mediano_nominale': np.median(contatori_statistiche['totale_contributi_versati_nominale']),
+        'guadagni_accumulo_mediano_nominale': np.median(contatori_statistiche['guadagni_accumulo_nominale']),
+        'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato
     }
 
     # Separiamo i dati annuali reali e nominali per chiarezza
