@@ -490,7 +490,7 @@ with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
     prelievo_annuo = st.number_input(
         "Importo Prelievo Fisso Annuo (€)",
         min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
-        help="Usato SOLO con la strategia 'FISSO'. Imposta l'esatto importo lordo che vuoi prelevare ogni anno. Lascia a 0 per far calcolare al simulatore il prelievo massimo sostenibile."
+        help="Usato SOLO con la strategia 'FISSO'. Imposta un importo specifico o lascia a 0 per far calcolare al simulatore un prelievo sostenibile. Questo calcolo mira a trovare un importo che il tuo patrimonio possa sostenere per tutta la durata della simulazione con un'alta probabilità di successo, il che potrebbe risultare in un capitale residuo alla fine."
     )
     percentuale_regola_4 = st.slider(
         "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,

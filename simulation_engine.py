@@ -421,45 +421,63 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
 def _calcola_prelievo_sostenibile(parametri):
     """
-    Calcola il prelievo annuo sostenibile costante che porta la mediana del patrimonio (banca+etf)
-    a zero esattamente nell'ultimo anno di simulazione.
+    Trova il prelievo annuo reale massimo sostenibile che porta il patrimonio
+    reale finale mediano il più vicino possibile a zero, senza diventare negativo.
+    Utilizza un approccio di ricerca binaria.
     """
-    prelievo_min = 0.0
-    prelievo_max = 200000.0
-    tolleranza = 1.0
-    max_iterazioni = 40
+    
+    # Esegui una simulazione senza prelievi per stimare il capitale al momento del ritiro
+    params_test = parametri.copy()
+    params_test['prelievo_annuo'] = 0
+    params_test['n_simulazioni'] = max(100, params_test['n_simulazioni'] // 4) # Riduci le simulazioni per velocità
+    
+    # Usa una versione "light" della simulazione per la stima iniziale
+    _, patrimoni_reali, _, _, _ = _esegui_simulazioni_principali(params_test, 0)
+    
+    # Stima del capitale reale mediano all'inizio dei prelievi
+    idx_inizio_prelievo = parametri['anni_inizio_prelievo'] * 12
+    capitale_reale_mediano_a_prelievo = np.median(patrimoni_reali[:, idx_inizio_prelievo])
 
+    if capitale_reale_mediano_a_prelievo <= 0:
+        return 0
+
+    # Definisci i limiti della ricerca binaria
+    anni_di_prelievo = parametri['anni_totali'] - parametri['anni_inizio_prelievo']
+    if anni_di_prelievo <= 0:
+        return 0
+        
+    limite_inferiore = 0
+    # Un limite superiore "aggressivo": consumare tutto il capitale in modo lineare
+    limite_superiore = capitale_reale_mediano_a_prelievo / anni_di_prelievo 
+
+    prelievo_ottimale = 0
+    
+    # Wrapper per la funzione obiettivo
     def mediana_finale(prelievo_test):
-        parametri_test = parametri.copy()
-        parametri_test['prelievo_annuo'] = prelievo_test
-        parametri_test['strategia_prelievo'] = 'FISSO'
-        parametri_test['n_simulazioni'] = max(500, parametri['n_simulazioni'])
-        risultati_test = run_full_simulation(parametri_test, use_sustainable_withdrawal=False)
-        dati = risultati_test['dati_annuali_reali']
-        saldo_banca = dati['saldo_banca_reale']
-        saldo_etf = dati['saldo_etf_reale']
-        patrimonio = saldo_banca + saldo_etf  # shape: (n_sim, n_anni)
-        mediana_per_anno = np.median(patrimonio, axis=0)
-        return mediana_per_anno[-1]
+        """Esegue la simulazione e restituisce il patrimonio reale finale mediano."""
+        _, patrimoni_reali_test, _, _, _ = _esegui_simulazioni_principali(params_test, prelievo_test)
+        patrimonio_finale_mediano = np.median(patrimoni_reali_test[:, -1])
+        return patrimonio_finale_mediano
 
-    prelievo_ottimale = 0.0
-    for _ in range(max_iterazioni):
-        prelievo_test = (prelievo_min + prelievo_max) / 2
-        mediana_ultimo_anno = mediana_finale(prelievo_test)
-        if abs(mediana_ultimo_anno) < tolleranza:
-            prelievo_ottimale = prelievo_test
+    # Ciclo di ricerca binaria per trovare il prelievo ottimale
+    for _ in range(15): # 15 iterazioni sono sufficienti per una buona convergenza
+        prelievo_corrente = (limite_inferiore + limite_superiore) / 2
+        if prelievo_corrente < 1: # Evita loop con valori troppo piccoli
             break
-        elif mediana_ultimo_anno > 0:
-            prelievo_ottimale = prelievo_test
-            prelievo_min = prelievo_test
+
+        patrimonio_risultante = mediana_finale(prelievo_corrente)
+
+        if patrimonio_risultante > 0:
+            # Possiamo permetterci di prelevare di più
+            prelievo_ottimale = prelievo_corrente
+            limite_inferiore = prelievo_corrente
         else:
-            prelievo_max = prelievo_test
-        if (prelievo_max - prelievo_min) / 2 < tolleranza:
-            prelievo_ottimale = prelievo_test
-            break
-    return max(0, prelievo_ottimale)
+            # Dobbiamo prelevare di meno
+            limite_superiore = prelievo_corrente
+            
+    return prelievo_ottimale
 
-def run_full_simulation(parametri, use_sustainable_withdrawal=True):
+def run_full_simulation(parametri):
     """
     Esegue la simulazione Monte Carlo completa, orchestrando migliaia di singole run.
 
@@ -521,7 +539,6 @@ def run_full_simulation(parametri, use_sustainable_withdrawal=True):
 
     prelievo_annuo_da_usare = parametri['prelievo_annuo']
     calcolo_sostenibile_attivo = (
-        use_sustainable_withdrawal and 
         parametri['strategia_prelievo'] == 'FISSO' and 
         parametri['prelievo_annuo'] == 0
     )
