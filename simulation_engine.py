@@ -424,16 +424,16 @@ def _calcola_prelievo_sostenibile(parametri):
     Calcola il prelievo annuo sostenibile costante che porta la mediana del patrimonio finale (banca+etf)
     a zero (o il più vicino possibile a zero, ma non negativo) nell'ultimo anno di simulazione.
     """
-    prelievo_min = 0
-    prelievo_max = 150000
-    tolleranza = 100
-    max_iterazioni = 25
+    prelievo_min = 0.0
+    prelievo_max = 200000.0
+    tolleranza = 1.0
+    max_iterazioni = 40
 
     def testa_prelievo(prelievo_test):
         parametri_test = parametri.copy()
         parametri_test['prelievo_annuo'] = prelievo_test
         parametri_test['strategia_prelievo'] = 'FISSO'
-        parametri_test['n_simulazioni'] = max(200, parametri['n_simulazioni'] // 5)
+        parametri_test['n_simulazioni'] = max(500, parametri['n_simulazioni'])
         risultati_test = run_full_simulation(parametri_test, use_sustainable_withdrawal=False)
         tutti_i_dati_annuali_reali = risultati_test['dati_annuali_reali']
         patrimonio_finale_banca = tutti_i_dati_annuali_reali['saldo_banca_reale'][:, -1]
@@ -441,7 +441,7 @@ def _calcola_prelievo_sostenibile(parametri):
         patrimonio_finale_totale = patrimonio_finale_banca + patrimonio_finale_etf
         return np.median(patrimonio_finale_totale)
 
-    prelievo_ottimale = 0
+    prelievo_ottimale = 0.0
     for _ in range(max_iterazioni):
         prelievo_test = (prelievo_min + prelievo_max) / 2
         patrimonio_mediano = testa_prelievo(prelievo_test)
@@ -454,8 +454,9 @@ def _calcola_prelievo_sostenibile(parametri):
         else:
             prelievo_max = prelievo_test
         if (prelievo_max - prelievo_min) / 2 < tolleranza:
+            prelievo_ottimale = prelievo_test
             break
-    return max(0, round(prelievo_ottimale, -2))
+    return max(0, prelievo_ottimale)
 
 def run_full_simulation(parametri, use_sustainable_withdrawal=True):
     """
