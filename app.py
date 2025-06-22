@@ -404,6 +404,47 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
     
     return fig
 
+def plot_individual_asset_chart(real_data, nominal_data, title, anni_totali, eta_iniziale):
+    """
+    Crea un grafico per una singola classe di asset, mostrando sia i valori
+    reali che nominali.
+    """
+    fig = go.Figure()
+    anni_asse_x = eta_iniziale + np.arange(anni_totali + 1)
+    
+    # Linea Nominale
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=nominal_data, mode='lines',
+        name='Valore Nominale',
+        line={'width': 2.5, 'color': '#007bff'},
+        hovertemplate='Età %{x}<br>Nominale: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    # Linea Reale
+    fig.add_trace(go.Scatter(
+        x=anni_asse_x, y=real_data, mode='lines',
+        name='Valore Reale (potere d\'acquisto di oggi)',
+        line={'width': 2.5, 'color': '#dc3545', 'dash': 'dash'},
+        hovertemplate='Età %{x}<br>Reale: €%{y:,.0f}<extra></extra>'
+    ))
+    
+    y_max = np.max(nominal_data) * 1.05
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Età",
+        yaxis_title="Valore (€)",
+        hovermode="x unified",
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=500,
+        yaxis=dict(
+            range=[0, y_max],
+            tickprefix="€",
+            tickformat=".2s"
+        )
+    )
+    return fig
+
 def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
     """Crea un grafico che mostra la composizione del reddito nel tempo."""
     fig = go.Figure()
@@ -782,24 +823,25 @@ if 'risultati' in st.session_state:
         """)
 
     st.header("Analisi Dettagliata per Fasi")
-    tab_accumulo, tab_decumulo, tab_dettaglio = st.tabs(["📊 Fase di Accumulo", "🏖️ Fase di Decumulo (Pensione)", "🧾 Dettaglio Flussi di Cassa (Mediano)"])
+    tabs = st.tabs([
+        "📊 Patrimonio Totale (Reale)", 
+        "📈 Composizione del Patrimonio", 
+        "🏖️ Analisi dei Redditi", 
+        "🔥 Analisi del Rischio", 
+        "🧾 Dettaglio Flussi (Mediano)"
+    ])
 
-    with tab_accumulo:
-        eta_pensionamento = params['eta_iniziale'] + params['anni_inizio_prelievo']
-        st.subheader(f"Dall'età attuale ({params['eta_iniziale']} anni) fino alla pensione (a {eta_pensionamento} anni)")
-        st.markdown("In questa fase, i tuoi sforzi si concentrano sulla **costruzione del patrimonio**. I tuoi contributi mensili e annuali, uniti ai rendimenti composti degli investimenti, lavorano insieme per far crescere il capitale che ti sosterrà in futuro.")
-        st.markdown("---")
-        
-        dati_grafici = st.session_state.risultati['dati_grafici_principali']
-        
-        st.subheader("Evoluzione Patrimonio Reale (Tutti gli Scenari)")
+    with tabs[0]: # Patrimonio Totale
+        st.subheader("Evoluzione del Potere d'Acquisto (Patrimonio Reale)")
         st.markdown("""
-        Questo primo grafico ti dà una visione d'insieme, un "**cono di probabilità**". Non mostra una singola previsione, ma l'intera gamma di risultati possibili, tenendo conto dell'incertezza dei mercati.
-        - **La linea rossa (Mediana):** È lo scenario più probabile (50° percentile). Metà delle simulazioni hanno avuto un risultato migliore, metà peggiore.
-        - **Le aree colorate:** Rappresentano gli intervalli di confidenza. L'area più scura (25°-75° percentile) è dove il tuo patrimonio ha una buona probabilità di trovarsi. L'area più chiara (10°-90°) mostra gli scenari più estremi, sia positivi che negativi.
+        Questo primo grafico ti dà una visione d'insieme, un "**cono di probabilità**" del tuo **patrimonio reale**. Mostra l'intera gamma di risultati possibili, al netto dell'inflazione.
+        - **La linea rossa (Mediana):** È lo scenario più probabile.
+        - **Le aree colorate:** Rappresentano gli intervalli di confidenza. L'area più scura (25°-75°) è la fascia più probabile.
+        
+        **Nota:** Se vedi un calo di questo grafico in concomitanza con il ritiro dal Fondo Pensione, non spaventarti! Vai nella tab "Composizione del Patrimonio" per capire perché: il capitale si è solo trasformato in liquidità e reddito.
         """)
         fig_reale = plot_wealth_summary_chart(
-            data=dati_grafici['reale'], 
+            data=st.session_state.risultati['dati_grafici_principali']['reale'], 
             title='Evoluzione Patrimonio Reale (Tutti gli Scenari)', 
             y_title='Patrimonio Reale (€)', 
             anni_totali=params['anni_totali'],
@@ -808,114 +850,53 @@ if 'risultati' in st.session_state:
         )
         fig_reale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
         st.plotly_chart(fig_reale, use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo è il grafico della verità. Tiene conto dell'inflazione, mostrando il vero potere d'acquisto.</div>", unsafe_allow_html=True)
-        st.markdown("---")
 
-        st.subheader("Evoluzione Patrimonio Nominale (Valori Assoluti)")
+    with tabs[1]: # Composizione del Patrimonio
+        dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+        
+        st.subheader("Analisi Dettagliata per Classe di Asset (Scenario Mediano)")
         st.markdown("""
-        Questo grafico mostra l'evoluzione del patrimonio in **valori nominali** (senza considerare l'inflazione). È utile per vedere la crescita assoluta del capitale, ma ricorda che questi valori non riflettono il vero potere d'acquisto futuro.
-        
-        - **La linea blu (Mediana):** È lo scenario più probabile in valori nominali.
-        - **Le aree colorate:** Mostrano gli intervalli di confidenza per i valori nominali.
-        - **Confronto con il grafico reale:** La differenza tra i due grafici ti mostra l'impatto dell'inflazione sul tuo patrimonio.
+        Qui analizziamo separatamente le tre componenti principali del tuo patrimonio. Ogni grafico mostra sia il **valore nominale** (la cifra assoluta) sia il **valore reale** (il potere d'acquisto odierno, tenendo conto dell'inflazione). Questo ti permette di vedere la crescita di ogni asset e l'impatto di eventi come la liquidazione del fondo pensione sulla liquidità.
         """)
-        fig_nominale = plot_wealth_summary_chart(
-            data=dati_grafici['nominale'], 
-            title='Evoluzione Patrimonio Nominale (Tutti gli Scenari)', 
-            y_title='Patrimonio Nominale (€)', 
+
+        # Grafico 1: Liquidità
+        fig_banca = plot_individual_asset_chart(
+            real_data=dati_tabella.get('saldo_banca_reale', np.zeros(params['anni_totali'] + 1)),
+            nominal_data=dati_tabella.get('saldo_banca_nominale', np.zeros(params['anni_totali'] + 1)),
+            title="Evoluzione della Liquidità (Conto Corrente)",
             anni_totali=params['anni_totali'],
-            eta_iniziale=params['eta_iniziale'],
-            anni_inizio_prelievo=params['anni_inizio_prelievo'],
-            color_median='#007bff',
-            color_fill='#007bff'
+            eta_iniziale=params['eta_iniziale']
         )
-        fig_nominale.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
-        st.plotly_chart(fig_nominale, use_container_width=True)
-        st.markdown("<div style='text-align: center; font-size: 0.9em; font-style: italic;'>Questo grafico mostra i valori assoluti, senza considerare l'inflazione.</div>", unsafe_allow_html=True)
-        st.markdown("---")
+        st.plotly_chart(fig_banca, use_container_width=True)
 
-        st.subheader("Quali sono i percorsi possibili? (Visione di dettaglio)")
-        st.markdown("""
-        Se il grafico precedente era una "mappa meteorologica", questo è come guardare le traiettorie di 50 aerei diversi che volano nella stessa tempesta. Ogni linea colorata è una delle possibili vite del tuo portafoglio tra le migliaia simulate. 
-        
-        Questo grafico ti aiuta a capire la natura caotica dei mercati: alcuni percorsi sono fortunati (linee che finiscono in alto), altri meno. La **linea rossa più spessa** è sempre lo scenario mediano, il tuo punto di riferimento. Osserva come, nonostante le partenze simili, le traiettorie divergono enormemente nel tempo. Questo è il motivo per cui diversificare e avere un piano a lungo termine è fondamentale.
-        """)
-        
-        fig_spaghetti = plot_spaghetti_chart(
-            data=dati_grafici['reale'],
-            title="Percorsi Individuali delle Simulazioni (Patrimonio Reale)",
-            y_title="Patrimonio Reale (€)",
+        # Grafico 2: ETF
+        fig_etf = plot_individual_asset_chart(
+            real_data=dati_tabella.get('saldo_etf_reale', np.zeros(params['anni_totali'] + 1)),
+            nominal_data=dati_tabella.get('saldo_etf_nominale', np.zeros(params['anni_totali'] + 1)),
+            title="Evoluzione del Portafoglio ETF",
             anni_totali=params['anni_totali'],
-            eta_iniziale=params['eta_iniziale'],
-            anni_inizio_prelievo=params['anni_inizio_prelievo']
+            eta_iniziale=params['eta_iniziale']
         )
-        st.plotly_chart(fig_spaghetti, use_container_width=True)
-
-        st.markdown("---")
-        # SEZIONE TABELLA DETTAGLIATA
-
-    with tab_decumulo:
-        eta_pensionamento = params['eta_iniziale'] + params['anni_inizio_prelievo']
-        eta_pensione_pubblica = params['eta_iniziale'] + params['inizio_pensione_anni']
-        eta_ritiro_fp = params['eta_ritiro_fp']
-
-        st.subheader(f"Dalla pensione (a {eta_pensionamento} anni) in poi")
+        st.plotly_chart(fig_etf, use_container_width=True)
         
-        testo_decumulo = f"""
-        A partire da **{eta_pensionamento} anni**, smetti di versare e inizi a **prelevare dal tuo patrimonio** per sostenere il tuo tenore di vita. 
-        A questo si aggiungeranno le altre fonti di reddito che hai configurato:
-        - La **pensione pubblica** a partire da **{eta_pensione_pubblica} anni**.
-        """
-        if params['attiva_fondo_pensione']:
-            testo_decumulo += f"\n- L'eventuale **rendita del fondo pensione** a partire da **{eta_ritiro_fp} anni**."
-        
-        testo_decumulo += "\n\nL'obiettivo è far sì che il patrimonio duri per tutto l'orizzonte temporale desiderato."
-        st.markdown(testo_decumulo)
-        st.markdown("---")
+        # Grafico 3: Fondo Pensione
+        if params.get('attiva_fondo_pensione', False):
+            fig_fp = plot_individual_asset_chart(
+                real_data=dati_tabella.get('saldo_fp_reale', np.zeros(params['anni_totali'] + 1)),
+                nominal_data=dati_tabella.get('saldo_fp_nominale', np.zeros(params['anni_totali'] + 1)),
+                title="Evoluzione del Fondo Pensione",
+                anni_totali=params['anni_totali'],
+                eta_iniziale=params['eta_iniziale']
+            )
+            st.plotly_chart(fig_fp, use_container_width=True)
 
+
+    with tabs[2]: # Analisi dei Redditi
         dati_principali = st.session_state.risultati['dati_grafici_principali']
-
-        # --- Grafico 1: Cono del Reddito ---
-        st.subheader("📊 Quale sarà il mio tenore di vita in pensione?")
-        st.markdown("""
-        Questo grafico è forse il più importante per la tua pianificazione. Non ti mostra solo un numero, ma **l'intera gamma dei possibili redditi annuali reali** (cioè, il potere d'acquisto di oggi) che potrai avere durante la pensione.
-
-        - **La linea blu centrale (Mediana):** È lo scenario più probabile, il tuo obiettivo realistico.
-        - **L'area azzurra (25°-75° percentile):** È l'intervallo di reddito 'plausibile'. C'è una buona probabilità che il tuo tenore di vita rientri in questa fascia.
-        - **L'area più chiara (10°-90° percentile):** Rappresenta gli estremi. La parte alta è lo scenario da sogno, la parte bassa è lo scenario più pessimistico ma comunque possibile. Usala per capire quale potrebbe essere il tuo reddito minimo in caso di andamenti di mercato molto sfortunati.
-        """)
-        fig_reddito = plot_income_cone_chart(
-            dati_principali['reddito_reale_annuo'], 
-            params['anni_totali'],
-            params['anni_inizio_prelievo'],
-            eta_iniziale=params['eta_iniziale']
-        )
-        st.plotly_chart(fig_reddito, use_container_width=True)
-        st.markdown("---")
-
-        # --- Grafico 2: Analisi Scenari Peggiori ---
-        st.subheader("🔥 Il piano sopravviverà a una crisi di mercato iniziale?")
-        st.markdown("""
-        Questo grafico è il *crash test* del tuo piano pensionistico. Affronta la paura più grande di ogni pensionato: il **Rischio da Sequenza dei Rendimenti**. In parole semplici, una forte crisi di mercato **proprio all'inizio della pensione** è molto più dannosa di una che avviene 20 anni dopo, perché erode il capitale da cui stai iniziando a prelevare, dandogli meno tempo per recuperare.
-
-        Qui isoliamo il **10% degli scenari più sfortunati** della simulazione. Ogni linea rossa sottile rappresenta l'evoluzione del patrimonio in uno di questi futuri avversi.
+        dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
         
-        - **Cosa osservare:** Il tuo piano è robusto se, anche in questi scenari, il patrimonio non si azzera troppo in fretta. Se vedi che molte linee crollano a zero rapidamente, potrebbe essere un segnale che il tuo piano è troppo aggressivo o la tua percentuale di prelievo troppo alta per resistere a una "tempesta perfetta" iniziale.
-        """)
-        fig_worst = plot_worst_scenarios_chart(
-            st.session_state.risultati['statistiche']['patrimoni_reali_finali'],
-            dati_principali['reale'],
-            params['anni_totali'],
-            eta_iniziale=params['eta_iniziale']
-        )
-        fig_worst.add_vline(x=params['eta_iniziale'] + params['anni_inizio_prelievo'], line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
-        st.plotly_chart(fig_worst, use_container_width=True)
-
-    with tab_dettaglio:
         st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")
         st.markdown("Questa sezione è la 'radiografia' dello scenario mediano (il più probabile). I grafici e la tabella mostrano, anno per anno, tutti i flussi finanziari e l'evoluzione del patrimonio.")
-        
-        dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
         
         st.markdown("---")
         st.subheader("Grafici di Dettaglio (Scenario Mediano)")
