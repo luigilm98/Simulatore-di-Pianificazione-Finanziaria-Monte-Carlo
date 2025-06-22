@@ -280,11 +280,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                  dati_annuali['rendite_fp_reali'][anno_corrente] = rendita_annua_reale_fp
                  dati_annuali['rendite_fp_nominali'][anno_corrente] = rendita_annua_reale_fp * indice_prezzi
 
-            dati_annuali['reddito_totale_reale'][anno_corrente] = (
+            reddito_reale_anno = (
                 dati_annuali['prelievi_effettivi_reali'][anno_corrente] +
                 dati_annuali['pensioni_pubbliche_reali'][anno_corrente] +
                 dati_annuali['rendite_fp_reali'][anno_corrente]
             )
+            dati_annuali['reddito_totale_reale'][anno_corrente] = reddito_reale_anno
 
             if patrimonio_banca > 5000: patrimonio_banca -= parametri['imposta_bollo_conto']
             
@@ -411,6 +412,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     return {
         "patrimoni_run": patrimoni_run,
         "patrimoni_reali_run": patrimoni_reali_run,
+        "reddito_annuo_reale": dati_annuali['reddito_totale_reale'][:parametri['anni_totali']],
         "dati_annuali": dati_annuali,
         "drawdown": drawdown,
         "sharpe_ratio": sharpe_ratio,
