@@ -351,25 +351,28 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
     saldo_etf = dati_tabella.get('saldo_etf_nominale', np.zeros(anni_totali + 1))
     saldo_fp = dati_tabella.get('saldo_fp_nominale', np.zeros(anni_totali + 1))
     
-    # Crea il grafico a area stack
+    # Crea il grafico a area stack con stackgroup per una logica corretta e colori migliorati
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=saldo_banca, mode='lines',
-        fill='tonexty', name='Liquidità',
-        line={'color': '#28a745'},
+        stackgroup='one', # Imposta lo stack group
+        name='Liquidità',
+        line={'color': '#63bdeb'}, # Azzurro
         hovertemplate='Età %{x}<br>Liquidità: €%{y:,.0f}<extra></extra>'
     ))
     
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=saldo_etf, mode='lines',
-        fill='tonexty', name='ETF',
-        line={'color': '#007bff'},
+        stackgroup='one',
+        name='ETF',
+        line={'color': '#ff9933'}, # Arancione
         hovertemplate='Età %{x}<br>ETF: €%{y:,.0f}<extra></extra>'
     ))
     
     fig.add_trace(go.Scatter(
         x=anni_asse_x, y=saldo_fp, mode='lines',
-        fill='tonexty', name='Fondo Pensione',
-        line={'color': '#ffc107'},
+        stackgroup='one',
+        name='Fondo Pensione',
+        line={'color': '#8fbc8f'}, # Verde
         hovertemplate='Età %{x}<br>Fondo Pensione: €%{y:,.0f}<extra></extra>'
     ))
     
