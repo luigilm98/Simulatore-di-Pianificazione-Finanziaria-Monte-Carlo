@@ -256,6 +256,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # Calcolo rendimento e applicazione costi
         rendimento_mensile = np.random.normal(parametri['rendimento_medio']/12, parametri['volatilita']/np.sqrt(12))
         
+        # Applica evento di mercato estremo se abilitato
+        evento_moltiplicatore = _genera_evento_mercato_estremo(parametri.get('eventi_mercato_estremi', 'DISABILITATI'))
+        rendimento_mensile = (1 + rendimento_mensile) * evento_moltiplicatore - 1
+        
         # 1. Applica il rendimento lordo
         patrimonio_etf *= (1 + rendimento_mensile)
         
@@ -697,3 +701,35 @@ def run_full_simulation(parametri):
         "dati_grafici_principali": dati_grafici_principali,
         "dati_grafici_avanzati": dati_grafici_avanzati
     } 
+
+def _genera_evento_mercato_estremo(eventi_mercato_estremi):
+    """
+    Genera un evento di mercato estremo basato sulla configurazione.
+    Restituisce un moltiplicatore del rendimento (es. 0.8 per -20%, 1.3 per +30%).
+    """
+    if eventi_mercato_estremi == 'DISABILITATI':
+        return 1.0
+    
+    # Probabilità di evento estremo per mese
+    prob_mensili = {
+        'REALISTICI': 0.0017,      # ~2% annuo
+        'FREQUENTI': 0.0042,       # ~5% annuo  
+        'MOLTO_FREQUENTI': 0.0083  # ~10% annuo
+    }
+    
+    prob = prob_mensili.get(eventi_mercato_estremi, 0.0)
+    
+    if np.random.random() < prob:
+        # Genera un evento estremo
+        tipo_evento = np.random.choice(['CRASH', 'BOOM'], p=[0.7, 0.3])  # 70% crash, 30% boom
+        
+        if tipo_evento == 'CRASH':
+            # Crollo tra -15% e -35%
+            crash_magnitude = np.random.uniform(0.15, 0.35)
+            return 1.0 - crash_magnitude
+        else:
+            # Boom tra +20% e +50%
+            boom_magnitude = np.random.uniform(0.20, 0.50)
+            return 1.0 + boom_magnitude
+    
+    return 1.0 

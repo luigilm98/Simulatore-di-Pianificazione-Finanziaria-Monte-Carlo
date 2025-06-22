@@ -568,6 +568,14 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
         help="📈 Scegli quanto estremi possono essere i movimenti di mercato. 'STANDARD' usa la volatilità che hai definito. 'CONSERVATIVO' la riduce del 30% (movimenti più stabili). 'AGGRESSIVO' la aumenta del 50% (più variabilità). 'CATASTROFICO' la raddoppia (simula crisi estreme come 2008 o 2020)."
     )
     
+    # Nuovo parametro: Eventi di Mercato Estremi
+    eventi_mercato_estremi = st.selectbox(
+        "⚡ Eventi di Mercato Estremi",
+        options=['DISABILITATI', 'REALISTICI', 'FREQUENTI', 'MOLTO_FREQUENTI'],
+        index=['DISABILITATI', 'REALISTICI', 'FREQUENTI', 'MOLTO_FREQUENTI'].index(p.get('eventi_mercato_estremi', 'DISABILITATI')),
+        help="⚡ Simula eventi di mercato estremi come crolli improvvisi o boom. 'DISABILITATI' usa solo la volatilità normale. 'REALISTICI' aggiunge crolli del -20%/+30% con probabilità del 2% annuo. 'FREQUENTI' aumenta la probabilità al 5%. 'MOLTO_FREQUENTI' al 10%. Simula eventi come 2008, 2020, dot-com bubble, etc."
+    )
+    
     anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
     n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Più simulazioni esegui, più accurata sarà la stima delle probabilità. 250 è un buon compromesso tra velocità e precisione.")
     anni_totali_input = st.number_input("Orizzonte Temporale (Anni)", min_value=1, max_value=100, value=p.get('anni_totali', 80), help="La durata totale della simulazione. Assicurati che sia abbastanza lunga da coprire tutta la tua aspettativa di vita.")
@@ -718,7 +726,7 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'volatilita_fp': volatilita_fp, 'ter_fp': ter_fp, 'tassazione_rendimenti_fp': tassazione_rendimenti_fp, 'aliquota_finale_fp': aliquota_finale_fp,
             'eta_ritiro_fp': eta_ritiro_fp, 'percentuale_capitale_fp': percentuale_capitale_fp, 'durata_rendita_fp_anni': durata_rendita_fp_anni,
             'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni,
-            'tendenza_mercato': tendenza_mercato, 'range_volatilita': range_volatilita
+            'tendenza_mercato': tendenza_mercato, 'range_volatilita': range_volatilita, 'eventi_mercato_estremi': eventi_mercato_estremi
         }
 
         with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
@@ -810,7 +818,7 @@ if 'risultati' in st.session_state:
         """)
 
     # --- Messaggio informativo sulla tendenza di mercato ---
-    if params.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA' or params.get('range_volatilita', 'STANDARD') != 'STANDARD':
+    if params.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA' or params.get('range_volatilita', 'STANDARD') != 'STANDARD' or params.get('eventi_mercato_estremi', 'DISABILITATI') != 'DISABILITATI':
         trend_descriptions = {
             'PESSIMISTICA': 'ridotti del 20%',
             'MOLTO_PESSIMISTICA': 'ridotti del 40%',
@@ -822,15 +830,23 @@ if 'risultati' in st.session_state:
             'AGGRESSIVO': 'aumentata del 50%',
             'CATASTROFICO': 'raddoppiata'
         }
+        event_descriptions = {
+            'REALISTICI': 'abilitati (2% probabilità annua)',
+            'FREQUENTI': 'abilitati (5% probabilità annua)',
+            'MOLTO_FREQUENTI': 'abilitati (10% probabilità annua)'
+        }
         
         trend_desc = trend_descriptions.get(params.get('tendenza_mercato', 'REALISTICA'), '')
         volatility_desc = volatility_descriptions.get(params.get('range_volatilita', 'STANDARD'), '')
+        event_desc = event_descriptions.get(params.get('eventi_mercato_estremi', 'DISABILITATI'), '')
         
         message_parts = []
         if params.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA':
             message_parts.append(f"**Tendenza di Mercato: {params['tendenza_mercato'].replace('_', ' ').title()}** - I rendimenti sono stati {trend_desc}")
         if params.get('range_volatilita', 'STANDARD') != 'STANDARD':
             message_parts.append(f"**Range di Volatilità: {params['range_volatilita'].title()}** - La volatilità è stata {volatility_desc}")
+        if params.get('eventi_mercato_estremi', 'DISABILITATI') != 'DISABILITATI':
+            message_parts.append(f"**Eventi Estremi: {params['eventi_mercato_estremi'].replace('_', ' ').title()}** - {event_desc}")
         
         st.info(f"""
         🎯 **Scenario di Mercato Modificato**
@@ -839,7 +855,7 @@ if 'risultati' in st.session_state:
         
         Questo ti permette di testare la robustezza del tuo piano in condizioni di mercato diverse.
         
-        **Ricorda:** I risultati mostrati riflettono questo scenario specifico. Per un'analisi completa, confronta i risultati con diverse combinazioni di tendenza e volatilità.
+        **Ricorda:** I risultati mostrati riflettono questo scenario specifico. Per un'analisi completa, confronta i risultati con diverse combinazioni di parametri.
         """)
 
     st.markdown("---")
