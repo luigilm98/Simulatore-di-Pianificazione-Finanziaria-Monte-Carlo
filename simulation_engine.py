@@ -448,10 +448,13 @@ def _calcola_prelievo_sostenibile(parametri):
     # Troviamo il saldo mediano del *solo conto corrente* all'inizio dei prelievi.
     # Usiamo i valori reali per calcolare un prelievo che mantenga il potere d'acquisto.
     saldo_reale_banca_inizio_prelievo = tutti_i_dati_annuali_reali['saldo_banca_reale'][:, anni_accumulo]
-    saldo_reale_banca_mediano = np.median(saldo_reale_banca_inizio_prelievo)
+    saldo_reale_etf_inizio_prelievo = tutti_i_dati_annuali_reali['saldo_etf_reale'][:, anni_accumulo]
+
+    # Sommiamo il capitale liquido e quello investito per una stima più realistica
+    patrimonio_totale_reale_mediano = np.median(saldo_reale_banca_inizio_prelievo + saldo_reale_etf_inizio_prelievo)
     
-    # Calcoliamo il prelievo annuo come richiesto: divisione semplice del capitale liquido.
-    prelievo_annuo_calcolato = saldo_reale_banca_mediano / anni_prelievo if anni_prelievo > 0 else 0
+    # Calcoliamo il prelievo annuo sulla base del patrimonio totale (banca + etf)
+    prelievo_annuo_calcolato = patrimonio_totale_reale_mediano / anni_prelievo if anni_prelievo > 0 else 0
              
     return prelievo_annuo_calcolato
 

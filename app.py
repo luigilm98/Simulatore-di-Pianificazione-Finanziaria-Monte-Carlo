@@ -663,13 +663,26 @@ if 'risultati' in st.session_state:
     col2.metric("Drawdown Massimo Peggiore", f"{stats['drawdown_massimo_peggiore']:.2%}", delta=f"{stats['drawdown_massimo_peggiore']:.2%}", delta_color="inverse")
     col3.metric("Sharpe Ratio Medio", f"{stats['sharpe_ratio_medio']:.2f}")
 
-    st.header("Riepilogo Entrate in Pensione (Valori Reali Medi)")
-    stats_prelievi = st.session_state.risultati['statistiche_prelievi']
+    st.header("Riepilogo Entrate in Pensione (Valori Reali, Scenario Mediano)")
+    dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+    
+    # Calcoliamo le medie direttamente dai dati dello scenario mediano per coerenza
+    anni_prelievo_effettivi = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
+    prelievo_medio = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi]) if anni_prelievo_effettivi.size > 0 else 0
+
+    anni_pensione_effettivi = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
+    pensione_media = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi]) if anni_pensione_effettivi.size > 0 else 0
+
+    anni_rendita_fp_effettivi = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
+    rendita_fp_media = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_effettivi]) if anni_rendita_fp_effettivi.size > 0 else 0
+    
+    totale_medio = prelievo_medio + pensione_media + rendita_fp_media
+
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Prelievo Medio dal Patrimonio", f"€ {stats_prelievi['prelievo_reale_medio']:,.0f}")
-    col2.metric("Pensione Pubblica Annua", f"€ {stats_prelievi['pensione_pubblica_reale_annua']:,.0f}")
-    col3.metric("Rendita Media da Fondo Pensione", f"€ {stats_prelievi['rendita_fp_reale_media']:,.0f}")
-    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {stats_prelievi['totale_reale_medio_annuo']:,.0f}")
+    col1.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio:,.0f}")
+    col2.metric("Pensione Pubblica Annua", f"€ {pensione_media:,.0f}")
+    col3.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media:,.0f}")
+    col4.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio:,.0f}")
 
     with st.expander("🔍 Guida alla Lettura: Perché il mio piano ha successo (o fallisce)?"):
         st.markdown("""
