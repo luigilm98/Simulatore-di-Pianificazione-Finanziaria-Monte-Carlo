@@ -374,23 +374,27 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     dati_annuali['fp_liquidato_nominale'][anno_corrente] = capitale_ritirato
                     patrimonio_banca += capitale_ritirato * (1 - parametri['aliquota_finale_fp'])
                     
-                    capitale_per_rendita = patrimonio_fp * (1 - parametri['percentuale_capitale_fp'])
-                    if parametri['durata_rendita_fp_anni'] > 0 and capitale_per_rendita > 0:
+                    capitale_fp_per_rendita = patrimonio_fp * (1 - parametri['percentuale_capitale_fp'])
+                    if parametri['durata_rendita_fp_anni'] > 0 and capitale_fp_per_rendita > 0:
                         tasso_interesse_annuo_fp = parametri['rendimento_medio_fp'] - parametri['ter_fp']
                         n_anni_rendita = parametri['durata_rendita_fp_anni']
                         
                         rendita_annua_nominale_iniziale = 0
                         if tasso_interesse_annuo_fp > 0:
                             fattore_rendita = tasso_interesse_annuo_fp / (1 - (1 + tasso_interesse_annuo_fp) ** -n_anni_rendita)
-                            rendita_annua_nominale_iniziale = capitale_per_rendita * fattore_rendita
+                            rendita_annua_nominale_iniziale = capitale_fp_per_rendita * fattore_rendita
                         else:
-                            rendita_annua_nominale_iniziale = capitale_per_rendita / n_anni_rendita
+                            rendita_annua_nominale_iniziale = capitale_fp_per_rendita / n_anni_rendita
+
+                        # Salva la rendita lorda per l'erosione del capitale
+                        rendita_annua_nominale_lorda_fp = rendita_annua_nominale_iniziale
 
                         rendita_annua_reale_fp = rendita_annua_nominale_iniziale / indice_prezzi
                         rendita_mensile_nominale_tassata_fp = (rendita_annua_nominale_iniziale / 12) * (1 - parametri['aliquota_finale_fp'])
                         indice_prezzi_inizio_rendita_fp = indice_prezzi
                     
-                    patrimonio_fp = 0
+                    # ERRORE CORRETTO: il patrimonio FP non si azzera, ma diventa il capitale per la rendita.
+                    patrimonio_fp = capitale_fp_per_rendita
                     fp_convertito_in_rendita = True
 
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
