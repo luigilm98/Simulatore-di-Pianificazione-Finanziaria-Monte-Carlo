@@ -720,21 +720,49 @@ def run_full_simulation(parametri):
         'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato
     }
 
-    # Separiamo i dati annuali reali e nominali per chiarezza
-    dati_annuali_reali = {k: v for k, v in tutti_i_dati_annuali.items() if 'reale' in k}
-    dati_annuali_nominali = {k: v for k, v in tutti_i_dati_annuali.items() if 'nominale' in k}
+    # --- CALCOLO STATISTICHE PRELIEVI ---
+    # Calcola il reddito reale annuo medio solo sugli anni di prelievo e sugli scenari di successo
+    anni_di_prelievo = parametri['anni_totali'] - parametri['anni_inizio_prelievo']
+    if anni_di_prelievo > 0:
+        idx_inizio_prelievo_anni = parametri['anni_inizio_prelievo']
+        
+        # Filtra gli scenari di successo (patrimonio finale > 0)
+        scenari_successo_mask = patrimoni_reali_finale_validi > 0
+        redditi_scenari_successo = reddito_reale_annuo_tutte_le_run[scenari_successo_mask]
+        
+        # Considera solo gli anni di prelievo
+        if redditi_scenari_successo.size > 0:
+            redditi_fase_prelievo = redditi_scenari_successo[:, idx_inizio_prelievo_anni:]
+            
+            # Calcola la media solo dove il reddito è positivo, per ogni anno
+            medie_annue = np.true_divide(redditi_fase_prelievo.sum(axis=0), (redditi_fase_prelievo > 0).sum(axis=0))
+            medie_annue[np.isnan(medie_annue)] = 0 # Gestisci divisione per zero
+            
+            # La statistica finale è la media delle medie annuali
+            totale_reale_medio_annuo = np.mean(medie_annue[medie_annue > 0]) if np.any(medie_annue > 0) else 0
+        else:
+            totale_reale_medio_annuo = 0
+    else:
+        totale_reale_medio_annuo = 0
+        
+    statistiche_prelievi = {
+        'totale_reale_medio_annuo': totale_reale_medio_annuo
+    }
+    
+    # --- PREPARAZIONE DATI PER I GRAFICI ---
+    dati_grafici_principali = {
+        "nominale": patrimoni_tutte_le_run,
+        "reale": patrimoni_reali_tutte_le_run,
+        "reddito_reale_annuo": reddito_reale_annuo_tutte_le_run
+    }
+    
+    dati_grafici_avanzati = {
+        "dati_mediana": dati_mediana_dettagliati
+    }
 
     return {
         "statistiche": statistiche_finali,
         "statistiche_prelievi": statistiche_prelievi,
-        "dati_grafici_principali": {
-            "nominale": patrimoni,
-            "reale": patrimoni_reali,
-            "reddito_reale_annuo": tutti_i_dati_annuali['reddito_totale_reale']
-        },
-        "dati_grafici_avanzati": {
-            "dati_mediana": dati_mediana_run
-        },
-        "dati_annuali_reali": dati_annuali_reali,
-        "dati_annuali_nominali": dati_annuali_nominali
+        "dati_grafici_principali": dati_grafici_principali,
+        "dati_grafici_avanzati": dati_grafici_avanzati
     } 
