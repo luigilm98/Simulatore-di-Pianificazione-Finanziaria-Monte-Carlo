@@ -914,33 +914,82 @@ if 'risultati' in st.session_state:
         dati_principali = st.session_state.risultati['dati_grafici_principali']
         dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
         
-        st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")
-        st.markdown("Questa sezione è la 'radiografia' dello scenario mediano (il più probabile). I grafici e la tabella mostrano, anno per anno, tutti i flussi finanziari e l'evoluzione del patrimonio.")
+        st.subheader("Come si comporrà il tuo reddito in pensione? (Scenario Mediano)")
+        st.markdown("""
+        Questa sezione analizza le tue fonti di reddito durante la fase di prelievo. I valori sono **reali** (potere d'acquisto di oggi) per darti un'idea concreta del tuo tenore di vita.
+        Puoi vedere come i prelievi dal patrimonio vengono progressivamente sostituiti o integrati da pensione e rendite.
+        """)
         
-        st.markdown("---")
-        st.subheader("Grafici di Dettaglio (Scenario Mediano)")
-
-        # Grafico 1: Composizione del Patrimonio Nominale
-        st.markdown("##### Da cosa è composto il mio patrimonio?")
-        st.markdown("Questo grafico mostra come evolvono nel tempo le tre componenti principali del tuo patrimonio: Liquidità, ETF e Fondo Pensione. I valori sono **nominali**, cioè non tengono conto dell'inflazione.")
-        fig_composizione_patrimonio = plot_wealth_composition_over_time_nominal(dati_tabella, params['anni_totali'], eta_iniziale=params['eta_iniziale'])
-        st.plotly_chart(fig_composizione_patrimonio, use_container_width=True)
-
-        # Grafico 2: Composizione del Reddito Annuo Reale
-        st.markdown("##### Da dove arriveranno i miei soldi ogni anno in pensione?")
-        st.markdown("Questo grafico è fondamentale: mostra, anno per anno, da quali fonti proverrà il tuo reddito per vivere. I valori sono **reali** (potere d'acquisto di oggi) per darti un'idea concreta del tuo tenore di vita. Puoi vedere come i prelievi dal patrimonio vengono progressivamente sostituiti o integrati da pensione e rendite.")
-        fig_composizione_reddito = plot_income_composition(dati_tabella, params['anni_totali'], eta_iniziale=params['eta_iniziale'])
+        # Grafico 1: Composizione del Reddito Annuo Reale
+        fig_composizione_reddito = plot_income_composition(
+            dati_tabella, 
+            params['anni_totali'], 
+            eta_iniziale=params['eta_iniziale']
+        )
         st.plotly_chart(fig_composizione_reddito, use_container_width=True)
 
         st.markdown("---")
-        st.subheader("Tabella Dettagliata Anno per Anno")
+        
+        # Grafico 2: Cono di probabilità sul reddito
+        st.subheader("Quale sarà il range probabile del tuo reddito?")
+        st.markdown("""
+        Mentre il grafico precedente mostrava solo lo scenario mediano, questo grafico a "cono" mostra l'intera gamma di possibili livelli di reddito annuo reale.
+        Ti aiuta a capire l'incertezza: potresti avere anni più ricchi (parte alta del cono) o più magri (parte bassa).
+        """)
+        fig_income_cone = plot_income_cone_chart(
+            data=st.session_state.risultati['dati_grafici_principali']['reddito_reale_annuo'],
+            anni_totali=params['anni_totali'],
+            anni_inizio_prelievo=params['anni_inizio_prelievo'],
+            eta_iniziale=params['eta_iniziale']
+        )
+        st.plotly_chart(fig_income_cone, use_container_width=True)
+
+
+    with tabs[3]: # Analisi del Rischio
+        dati_principali = st.session_state.risultati['dati_grafici_principali']
+        stats = st.session_state.risultati['statistiche']
+
+        st.subheader("La Variabilità dei Risultati: il Grafico 'Spaghetti'")
+        st.markdown("""
+        Ogni linea in questo grafico rappresenta una delle migliaia di simulazioni eseguite. Questo ti dà una percezione visiva immediata dell'incertezza e della gamma di possibili risultati.
+        La linea rossa, più spessa, rappresenta lo scenario mediano (il più probabile), che abbiamo già visto nei grafici a cono.
+        """)
+        fig_spaghetti = plot_spaghetti_chart(
+            data=st.session_state.risultati['dati_grafici_principali']['reale'], 
+            title='Traiettorie Individuali del Patrimonio Reale', 
+            y_title='Patrimonio Reale (€)', 
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale'],
+            anni_inizio_prelievo=params['anni_inizio_prelievo']
+        )
+        st.plotly_chart(fig_spaghetti, use_container_width=True)
+
+        st.markdown("---")
+        
+        st.subheader("Stress Test: Come si comporta il piano negli scenari peggiori?")
+        st.markdown("""
+        Questo grafico è un "focus" sul **10% degli scenari più sfortunati**. Isola le simulazioni peggiori e ne mostra la distribuzione.
+        È uno stress test fondamentale: se anche in questi scenari il tuo patrimonio non si azzera troppo in fretta, significa che il tuo piano è molto robusto.
+        Se invece qui vedi un crollo rapido verso lo zero, potresti voler considerare strategie più conservative o un tasso di prelievo più basso.
+        """)
+        fig_worst = plot_worst_scenarios_chart(
+            patrimoni_finali=stats['patrimoni_reali_finali'],
+            data=dati_principali['reale'],
+            anni_totali=params['anni_totali'],
+            eta_iniziale=params['eta_iniziale']
+        )
+        st.plotly_chart(fig_worst, use_container_width=True)
+
+    with tabs[4]: # Dettaglio Flussi (Mediano)
+        dati_tabella = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+
+        st.subheader("Analisi Finanziaria Annuale Dettagliata (Simulazione Mediana)")
+        st.markdown("Questa sezione è la 'radiografia' dello scenario mediano (il più probabile). La tabella mostra, anno per anno, tutti i flussi finanziari e l'evoluzione del patrimonio, permettendoti di seguire ogni calcolo.")
         
         # Costruzione del DataFrame
         num_anni = params['anni_totali']
         df_index = np.arange(1, num_anni + 1)
         
-        # Assicuriamoci che tutti gli array siano della lunghezza corretta (num_anni)
-        # I dati dall'engine sono indicizzati 0..N, dove l'indice 0 è l'anno 1.
         df_data = {
             'Anno': df_index,
             'Età': params['eta_iniziale'] + df_index
@@ -1001,4 +1050,4 @@ if 'risultati' in st.session_state:
             - **Vendita ETF (Rebalance)**: NON sono soldi spesi. Sono vendite fatte per ridurre il rischio (seguendo il Glidepath). I soldi vengono spostati da ETF a liquidità.
             - **Liquidazione Capitale FP**: Somma che ricevi tutta in una volta dal fondo pensione all'età scelta. Aumenta di molto la tua liquidità in quell'anno.
             - **Entrate Anno (Reali)**: La somma di tutte le tue entrate (prelievi, pensioni) in potere d'acquisto di oggi. Questa cifra misura il tuo vero tenore di vita annuale.
-            """) 
+            """)
