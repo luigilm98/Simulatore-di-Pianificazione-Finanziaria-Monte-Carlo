@@ -143,10 +143,10 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
         hovertemplate='Età %{x:.1f}<br>Patrimonio Mediano: €%{y:,.0f}<extra></extra>'
     ))
     
-    # Scala dinamica robusta: si adatta ai dati ma taglia gli outlier più estremi
+    # Scala Y: robusta per 'reale', fissa per 'nominale' per leggibilità
     p98 = np.percentile(data, 98, axis=0)
     y_max = np.max(p98) * 1.05
-    
+        
     fig.update_layout(
         title=title,
         xaxis_title="Età",
@@ -196,7 +196,7 @@ def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_i
     
     # Scala dinamica robusta
     p98 = np.percentile(data, 98, axis=0)
-    y_max = p98 * 1.05
+    y_max = np.max(p98) * 1.05
             
     fig.update_layout(
         title=title,
@@ -264,11 +264,14 @@ def plot_income_cone_chart(data, anni_totali, anni_inizio_prelievo, eta_iniziale
         title='Quale sarà il mio tenore di vita in pensione?',
         xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
         height=600,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        yaxis_range=[0, y_max]
+        yaxis=dict(
+            range=[0, y_max],
+            tickprefix="€",
+            tickformat=".2s"
+        )
     )
 
     fig.add_vline(x=eta_iniziale + anni_inizio_prelievo, line_width=2, line_dash="dash", line_color="grey", annotation_text="Inizio Prelievi")
@@ -334,11 +337,14 @@ def plot_worst_scenarios_chart(patrimoni_finali, data, anni_totali, eta_iniziale
         title='Il piano sopravviverà a una crisi di mercato iniziale? (Focus sul 10% degli scenari peggiori)',
         xaxis_title="Età",
         yaxis_title="Patrimonio Reale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
         height=700,
-        yaxis_range=[0, y_max]
+        yaxis=dict(
+            range=[0, y_max],
+            tickprefix="€",
+            tickformat=".2s"
+        )
     )
 
     return fig
@@ -391,7 +397,8 @@ def plot_wealth_composition_over_time_nominal(dati_tabella, anni_totali, eta_ini
         height=700, # Aumenta l'altezza del grafico
         yaxis=dict(
             range=[0, y_max],
-            tickformat="€,d"
+            tickprefix="€",
+            tickformat=".2s"
         )
     )
     
@@ -433,17 +440,20 @@ def plot_income_composition(dati_tabella, anni_totali, eta_iniziale):
         hovertemplate='Età %{x}<br>Rendita FP: €%{y:,.0f}<extra></extra>'
     ))
     
-    tick_values = [100000, 250000, 500000, 1000000, 2000000, 5000000, 10000000]
-    tick_text = ["€100k", "€250k", "€500k", "€1M", "€2M", "€5M", "€10M"]
+    y_max = np.max(prelievi_reali + pensioni_reali + rendite_fp_reali) * 1.05
 
     fig.update_layout(
         title='Composizione del Reddito Annuo nel Tempo (Valori Reali)',
         xaxis_title="Età",
         yaxis_title="Reddito Annuo Reale (€)",
-        yaxis_tickformat="€,d",
         hovermode="x unified",
         height=500,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        yaxis=dict(
+            range=[0, y_max],
+            tickprefix="€",
+            tickformat=".2s"
+        )
     )
     
     return fig
