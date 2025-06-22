@@ -228,7 +228,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             if quota_da_banca > 0:
                 dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += quota_da_banca
 
-        dati_annuali['prelievi_effettivi_reali'][anno_corrente] = dati_annuali['prelievi_effettivi_nominali'][anno_corrente] / indice_prezzi
+        # Il calcolo del valore reale viene spostato a fine anno per coerenza
+        # dati_annuali['prelievi_effettivi_reali'][anno_corrente] = dati_annuali['prelievi_effettivi_nominali'][anno_corrente] / indice_prezzi
 
         # Calcolo dei costi mensili da applicare
         costo_ter_mensile = parametri['ter_etf'] / 12
@@ -259,6 +260,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         indice_prezzi *= (1 + tasso_inflazione_mensile)
 
         if mese % 12 == 0:
+            # Calcolo dei valori reali a fine anno
+            dati_annuali['prelievi_effettivi_reali'][anno_corrente] = dati_annuali['prelievi_effettivi_nominali'][anno_corrente] / indice_prezzi
+
             if anno_corrente >= parametri['inizio_pensione_anni']:
                 dati_annuali['pensioni_pubbliche_reali'][anno_corrente] = parametri['pensione_pubblica_annua']
                 dati_annuali['pensioni_pubbliche_nominali'][anno_corrente] = parametri['pensione_pubblica_annua'] * (indice_prezzi / indice_prezzi_inizio_pensione)
@@ -520,18 +524,32 @@ def run_full_simulation(parametri):
     
     else:
         # Calcolo standard basato sulle simulazioni di successo
-        prelievi_validi = prelievi_reali_successo[prelievi_reali_successo > 1e-6]
-        pensioni_valide = pensioni_reali_successo[pensioni_reali_successo > 1e-6]
-        rendite_fp_valide = rendite_fp_reali_successo[rendite_fp_reali_successo > 1e-6]
+        if prelievi_reali_successo.shape[0] > 0:
+            anno_inizio_prelievo = parametri['anni_inizio_prelievo']
+            anno_inizio_pensione = parametri['inizio_pensione_anni']
+            anno_inizio_rendita_fp = parametri['eta_ritiro_fp'] - parametri['eta_iniziale']
 
-        prel_medio = np.median(prelievi_validi) if prelievi_validi.size > 0 else 0
-        pens_media = np.median(pensioni_valide) if pensioni_valide.size > 0 else 0
-        rend_fp_media = np.median(rendite_fp_valide) if rendite_fp_valide.size > 0 else 0
+            # Calcoliamo la mediana per ogni simulazione, solo sugli anni attivi
+            with np.errstate(invalid='ignore'): # Ignora warning per mediana di slice vuote
+                prelievi_mediani_per_sim = np.array([np.median(s[s > 1e-6]) for s in prelievi_reali_successo[:, anno_inizio_prelievo:]])
+                pensioni_mediane_per_sim = np.array([np.median(s[s > 1e-6]) for s in pensioni_reali_successo[:, anno_inizio_pensione:]])
+                rendite_fp_mediane_per_sim = np.array([np.median(s[s > 1e-6]) for s in rendite_fp_reali_successo[:, anno_inizio_rendita_fp:]])
 
-        statistiche_prelievi['prelievo_reale_medio'] = prel_medio
-        statistiche_prelievi['pensione_pubblica_reale_annua'] = pens_media
-        statistiche_prelievi['rendita_fp_reale_media'] = rend_fp_media
-        statistiche_prelievi['totale_reale_medio_annuo'] = prel_medio + pens_media + rend_fp_media
+            # Ora calcoliamo la mediana di queste mediane
+            prel_medio = np.median(prelievi_mediani_per_sim[~np.isnan(prelievi_mediani_per_sim)]) if np.any(~np.isnan(prelievi_mediani_per_sim)) else 0
+            pens_media = np.median(pensioni_mediane_per_sim[~np.isnan(pensioni_mediane_per_sim)]) if np.any(~np.isnan(pensioni_mediane_per_sim)) else 0
+            rend_fp_media = np.median(rendite_fp_mediane_per_sim[~np.isnan(rendite_fp_mediane_per_sim)]) if np.any(~np.isnan(rendite_fp_mediane_per_sim)) else 0
+
+            statistiche_prelievi['prelievo_reale_medio'] = prel_medio
+            statistiche_prelievi['pensione_pubblica_reale_annua'] = pens_media
+            statistiche_prelievi['rendita_fp_reale_media'] = rend_fp_media
+            statistiche_prelievi['totale_reale_medio_annuo'] = prel_medio + pens_media + rend_fp_media
+        else:
+            # Fallback se non ci sono simulazioni di successo
+            statistiche_prelievi['prelievo_reale_medio'] = 0
+            statistiche_prelievi['pensione_pubblica_reale_annua'] = 0
+            statistiche_prelievi['rendita_fp_reale_media'] = 0
+            statistiche_prelievi['totale_reale_medio_annuo'] = 0
 
     # --- Calcolo Statistiche Finali ---
     patrimoni_reali_finale_validi = patrimoni_reali_finale_validi[sim_di_successo_mask]
