@@ -20,7 +20,7 @@ creando cicli economici più realistici e correlati nel tempo.
 import numpy as np
 import json
 
-# ==============================================================================
+# ============================================================================
 # DEFINIZIONE DEI MODELLI ECONOMICI A REGIMI
 # ==============================================================================
 ECONOMIC_MODELS = {
@@ -399,8 +399,21 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # --- F. OPERAZIONI DI FINE ANNO (ESEGUITE SOLO A DICEMBRE) ---
         if mese % 12 == 0:
             # FIX: Calcola il patrimonio totale all'inizio dell'anno PRIMA di ogni altra operazione
-            patrimonio_totale_inizio_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
+            patrimonio_totale_fine_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
+            
+            # FIX: Calcola il patrimonio di inizio anno usando i dati salvati l'anno precedente
+            # per avere un confronto corretto prima dei prelievi/costi.
+            if anno_corrente > 0:
+                patrimonio_totale_inizio_anno = (dati_annuali['saldo_banca_nominale'][anno_corrente - 1] +
+                                               dati_annuali['saldo_etf_nominale'][anno_corrente - 1] +
+                                               dati_annuali['saldo_fp_nominale'][anno_corrente - 1])
+            else:
+                patrimonio_totale_inizio_anno = parametri['capitale_iniziale'] + parametri['etf_iniziale']
 
+            patrimonio_investito_inizio_anno = 0
+            if anno_corrente == 0:
+                 patrimonio_investito_inizio_anno = parametri['etf_iniziale']
+            
             # Salva l'indice prezzi di fine anno
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             
@@ -493,9 +506,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             patrimonio_investito_inizio_anno = 0
             if anno_corrente == 0:
                  patrimonio_investito_inizio_anno = parametri['etf_iniziale']
-            else:
-                 patrimonio_investito_inizio_anno = (dati_annuali['saldo_etf_nominale'][anno_corrente - 1] + 
-                                                    dati_annuali['saldo_fp_nominale'][anno_corrente - 1])
             
             # Calcolo Variazione Netta e Rendimento Puro
             if patrimonio_totale_inizio_anno > 0:
