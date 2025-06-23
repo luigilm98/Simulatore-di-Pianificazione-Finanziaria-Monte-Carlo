@@ -119,6 +119,51 @@ def _choose_next_regime(current_regime, regime_definitions):
     regimes, probs = zip(*transitions.items())
     return np.random.choice(regimes, p=probs)
 
+def _calcola_sharpe_ratio_medio(tutti_i_dati_annuali):
+    """
+    Calcola lo Sharpe Ratio medio basato sulle variazioni percentuali annuali
+    del patrimonio di tutte le simulazioni.
+    
+    Lo Sharpe Ratio è definito come: (Rendimento Medio - Tasso Risk-Free) / Deviazione Standard
+    
+    Args:
+        tutti_i_dati_annuali (list): Lista di dizionari contenenti i dati annuali di ogni simulazione.
+        
+    Returns:
+        float: Lo Sharpe Ratio medio calcolato.
+    """
+    if not tutti_i_dati_annuali:
+        return 0.0
+    
+    # Raccogli tutte le variazioni percentuali annuali da tutte le simulazioni
+    tutte_le_variazioni = []
+    for dati_simulazione in tutti_i_dati_annuali:
+        variazioni = dati_simulazione.get('variazione_patrimonio_percentuale', [])
+        # Filtra valori validi (escludi NaN e infiniti)
+        variazioni_valide = [v for v in variazioni if np.isfinite(v)]
+        tutte_le_variazioni.extend(variazioni_valide)
+    
+    if not tutte_le_variazioni:
+        return 0.0
+    
+    # Converti in array numpy
+    variazioni_array = np.array(tutte_le_variazioni)
+    
+    # Calcola rendimento medio e deviazione standard
+    rendimento_medio = np.mean(variazioni_array)
+    deviazione_standard = np.std(variazioni_array)
+    
+    # Tasso risk-free (assumiamo 0% per semplicità, ma potrebbe essere parametrizzato)
+    tasso_risk_free = 0.0
+    
+    # Calcola Sharpe Ratio
+    if deviazione_standard > 0:
+        sharpe_ratio = (rendimento_medio - tasso_risk_free) / deviazione_standard
+    else:
+        sharpe_ratio = 0.0
+    
+    return sharpe_ratio
+
 # ==============================================================================
 # FUNZIONI CORE DELLA SIMULAZIONE
 # ==============================================================================
@@ -336,6 +381,14 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             dati_annuali['saldo_etf_reale'][anno_corrente] = patrimonio_etf / indice_prezzi
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             dati_annuali['contributi_totali_versati'][anno_corrente] = contributi_totali_accumulati
+            
+            # Calcolo rendimento puro degli investimenti (escludendo contributi e prelievi)
+            patrimonio_investimenti_inizio = dati_annuali['saldo_etf_nominale'][anno_corrente-1]
+            patrimonio_investimenti_fine = patrimonio_etf
+            if patrimonio_investimenti_inizio > 0:
+                dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = (patrimonio_investimenti_fine - patrimonio_investimenti_inizio) / patrimonio_investimenti_inizio
+            else:
+                dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = 0.0
 
     # --- 3. OUTPUT FINALE ---
     patrimonio_storico = dati_annuali['saldo_banca_nominale'] + dati_annuali['saldo_etf_nominale']
@@ -498,8 +551,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         'patrimonio_inizio_prelievi_mediano_reale': np.median(patrimoni_reali_tutte_le_run[:, idx_inizio_prelievo]),
         'probabilita_fallimento': fallimenti / n_sim if n_sim > 0 else 0,
         'drawdown_massimo_peggiore': np.min(tutti_i_drawdown) if len(tutti_i_drawdown) > 0 else 0,
-        # Sharpe Ratio non più calcolato per semplicità nel nuovo modello
-        'sharpe_ratio_medio': 0.0,
+        'sharpe_ratio_medio': _calcola_sharpe_ratio_medio(tutti_i_dati_annuali),
         'patrimoni_reali_finali': patrimoni_finali_reali,
         'guadagni_accumulo_mediano_nominale': np.median(tutti_i_guadagni),
         'contributi_totali_versati_mediano_nominale': np.median(tutti_i_contributi),
@@ -508,8 +560,10 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
 
     # Estrazione redditi per analisi
     reddito_reale_annuo_tutte_le_run = np.array([run['reddito_totale_reale'] for run in tutti_i_dati_annuali])
-    # ... (logica calcolo statistiche prelievi omessa per brevità) ...
-    statistiche_prelievi = {'totale_reale_medio_annuo': 0.0}
+    # Calcolo statistiche prelievi
+    statistiche_prelievi = {
+        'totale_reale_medio_annuo': np.mean(reddito_reale_annuo_tutte_le_run) if reddito_reale_annuo_tutte_le_run.size > 0 else 0.0
+    }
     
     return {
         "statistiche": statistiche,
