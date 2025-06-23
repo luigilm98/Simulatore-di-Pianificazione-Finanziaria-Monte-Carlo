@@ -1300,12 +1300,10 @@ with tabs[2]: # Analisi dei Redditi
 
         for col, key in col_keys:
             full_array = dati_tabella.get(key, np.zeros(num_anni + 1))
-            if 'saldo' in key:
-                 # I saldi includono l'anno 0, quindi prendiamo gli elementi da 1 a num_anni
-                df_data[col] = full_array[1:num_anni+1]
-            else:
-                # I flussi sono calcolati per gli anni 1..num_anni, quindi prendiamo i primi num_anni elementi
-                df_data[col] = full_array[:num_anni]
+            # I dati annuali (sia flussi che saldi) sono memorizzati negli indici da 1 a num_anni.
+            # L'indice 0 è usato solo per i saldi iniziali.
+            # Quindi, per la tabella che mostra gli anni da 1 in poi, peschiamo sempre da quell'intervallo.
+            df_data[col] = full_array[1:num_anni+1]
         
         df = pd.DataFrame(df_data)
         

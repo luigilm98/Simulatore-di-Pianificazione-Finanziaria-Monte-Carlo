@@ -240,6 +240,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     patrimonio_etf = parametri['etf_iniziale']
     etf_cost_basis = patrimonio_etf
     patrimonio_fp = 0
+    etf_cashflow_anno = 0.0
     
     dati_annuali['saldo_banca_nominale'][0] = patrimonio_banca
     dati_annuali['saldo_etf_nominale'][0] = patrimonio_etf
@@ -284,6 +285,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # Aggiornamento contabile delle entrate
         patrimonio_banca += pensione_pubblica_mese # La pensione viene accreditata in banca
         dati_annuali['pensioni_pubbliche_nominali'][anno_corrente] += pensione_pubblica_mese
+        dati_annuali['pensioni_pubbliche_reali'][anno_corrente] += pensione_pubblica_mese / indice_prezzi
         dati_annuali['rendite_fp_nominali'][anno_corrente] += rendita_fp_mese
         
         # Calcolo del reddito reale da pensioni/rendite
@@ -302,6 +304,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 patrimonio_etf += investimento_etf
                 etf_cost_basis += investimento_etf
                 contributi_totali_accumulati += investimento_etf
+                etf_cashflow_anno += investimento_etf
 
         # B. FASE DI PRELIEVO (prima dei rendimenti)
         if mese >= inizio_prelievo_mesi:
@@ -336,6 +339,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     tasse_implicite = (1 - cost_basis_ratio) * parametri['tassazione_capital_gain']
                     importo_lordo_da_vendere = fabbisogno_da_etf / (1 - tasse_implicite) if (1 - tasse_implicite) > 0 else float('inf')
                     importo_venduto = min(importo_lordo_da_vendere, patrimonio_etf)
+                    etf_cashflow_anno -= importo_venduto # Traccia il flusso in uscita
                     
                     if importo_venduto > 0:
                         costo_proporzionale = (importo_venduto / patrimonio_etf) * etf_cost_basis
@@ -382,13 +386,22 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             dati_annuali['contributi_totali_versati'][anno_corrente] = contributi_totali_accumulati
             
-            # Calcolo rendimento puro degli investimenti (escludendo contributi e prelievi)
+            # Calcolo rendimento puro degli investimenti con metodo Simple Dietz approssimato
             patrimonio_investimenti_inizio = dati_annuali['saldo_etf_nominale'][anno_corrente-1]
             patrimonio_investimenti_fine = patrimonio_etf
-            if patrimonio_investimenti_inizio > 0:
-                dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = (patrimonio_investimenti_fine - patrimonio_investimenti_inizio) / patrimonio_investimenti_inizio
+            
+            # Denominatore: capitale iniziale + metà dei flussi di cassa netti dell'anno
+            denominatore = patrimonio_investimenti_inizio + (etf_cashflow_anno / 2)
+            
+            if denominatore != 0:
+                # Numeratore: guadagno/perdita netta (variazione di valore - flussi di cassa)
+                guadagno_netto = patrimonio_investimenti_fine - patrimonio_investimenti_inizio - etf_cashflow_anno
+                dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = guadagno_netto / denominatore
             else:
                 dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = 0.0
+            
+            # Resetta il contatore dei flussi per l'anno successivo
+            etf_cashflow_anno = 0.0
 
     # --- 3. OUTPUT FINALE ---
     patrimonio_storico = dati_annuali['saldo_banca_nominale'] + dati_annuali['saldo_etf_nominale']
