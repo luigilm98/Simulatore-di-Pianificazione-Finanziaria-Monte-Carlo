@@ -227,7 +227,7 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
 
     return fig
 
-def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, color_median='#C00000'):
+def plot_spaghetti_chart(data, title, y_title, anni_totali, eta_iniziale, anni_inizio_prelievo, num_scenarios=50, color_median='#C00000'):
     """
     Crea un grafico "spaghetti", mostrando un sottoinsieme di traiettorie 
     individuali delle simulazioni per dare un'idea della variabilità dei percorsi.
@@ -1075,13 +1075,15 @@ with col1:
     st.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che preleverai dal tuo patrimonio per sostenere il tuo tenore di vita.")
     st.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua, al netto dell'inflazione.")
     st.metric("Rendita Media da FP", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che riceverai dal tuo fondo pensione.")
-    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {reddito_annuo_reale_pensione:,.0f}", help="La somma di tutte le tue entrate annue medie, al netto dell'inflazione. Questo è il tuo potere d'acquisto reale in pensione.")
+    st.metric("Liquidazione Fondo Pensione (una tantum)", f"€ {fp_liquidato_reale:,.0f}", help="La quota del fondo pensione liquidata in capitale all'inizio della pensione, in potere d'acquisto di oggi.")
+    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="La somma di tutte le tue entrate annue medie, al netto dell'inflazione. Questo è il tuo potere d'acquisto reale in pensione.")
 
 with col2:
     st.subheader("Valori Nominali")
     st.metric("Prelievo Medio dal Patrimonio (Nominale)", f"€ {prelievo_medio_nominale:,.0f}", help="La cifra media annua nominale che preleverai dal tuo patrimonio. Questo valore non tiene conto dell'inflazione.")
     st.metric("Pensione Pubblica Annua (Nominale)", f"€ {pensione_media_nominale:,.0f}", help="La stima della tua pensione statale annua nominale. Questo valore non tiene conto dell'inflazione.")
     st.metric("Rendita Media da FP (Nominale)", f"€ {rendita_fp_media_nominale:,.0f}", help="La cifra media annua nominale che riceverai dal tuo fondo pensione. Questo valore non tiene conto dell'inflazione.")
+    st.metric("Liquidazione Fondo Pensione (una tantum, Nom.)", f"€ {fp_liquidato_nominale:,.0f}", help="La quota del fondo pensione liquidata in capitale all'inizio della pensione, in valore nominale.")
     st.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
 
 with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
@@ -1191,7 +1193,7 @@ with tabs[1]: # Composizione del Patrimonio
         fig_fp = plot_individual_asset_chart(
             real_data=dati_tabella.get('saldo_fp_reale', np.zeros(st.session_state.parametri['anni_totali'] + 1)),
             nominal_data=dati_tabella.get('saldo_fp_nominale', np.zeros(st.session_state.parametri['anni_totali'] + 1)),
-            title="Evoluzione del Fondo Pensione",
+            title="Evoluzione del Fondo Pensione (Quota residua dopo liquidazione e sua erosione per la rendita)",
             anni_totali=st.session_state.parametri['anni_totali'],
             eta_iniziale=st.session_state.parametri['eta_iniziale']
         )

@@ -231,6 +231,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'prelievi_da_banca_nominali', 'prelievi_da_etf_nominali',
         'pensioni_pubbliche_nominali', 'pensioni_pubbliche_reali',
         'rendite_fp_nominali', 'rendite_fp_reali',
+        'fp_liquidato_nominale', 'fp_liquidato_reale',
         'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
         'contributi_totali_versati', 'indice_prezzi', 'reddito_totale_reale'
     ]}
@@ -288,6 +289,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     importo_per_rendita = patrimonio_fp_netto - capitale_liquidato
                     
                     patrimonio_banca += capitale_liquidato
+                    
+                    # Salva la liquidazione FP nell'anno corrente (sia nominale che reale)
+                    dati_annuali['fp_liquidato_nominale'][anno_corrente] += capitale_liquidato
+                    dati_annuali['fp_liquidato_reale'][anno_corrente] += capitale_liquidato / indice_prezzi
                     
                     durata_rendita_anni = parametri.get('durata_rendita_fp_anni', 25)
                     if durata_rendita_anni > 0:
@@ -350,7 +355,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 elif parametri['strategia_prelievo'] == 'REGOLA_4_PERCENTO':
                     if mese == inizio_prelievo_mesi:
                         patrimonio_a_prelievo = patrimonio_banca + patrimonio_etf
-                        prelievo_annuo_nominale_iniziale = patrimonio_a_prelievo * (parametri['percentuale_regola_4'] / 100)
+                        prelievo_annuo_nominale_iniziale = patrimonio_a_prelievo * parametri['percentuale_regola_4']
                         indice_prezzi_inizio_pensione = indice_prezzi
                         prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale
                     else:
