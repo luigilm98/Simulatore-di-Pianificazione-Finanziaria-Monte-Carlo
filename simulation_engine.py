@@ -327,43 +327,38 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                         prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
 
             # Il prelievo mensile è semplicemente 1/12 dell'obiettivo annuale
-            prelievo_mensile_target = prelievo_annuo_nominale_corrente / 12
+            prelievo_mensile_target = prelievo_annuo_nominale_corrente / 12 if prelievo_annuo_nominale_corrente > 0 else 0
             
-            # Esegui il prelievo effettivo
-            prelievo_effettivo = min(prelievo_mensile_target, patrimonio_banca + patrimonio_etf)
-            dati_annuali['prelievi_target_nominali'][anno_corrente] += prelievo_mensile_target
-            dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_effettivo
-            dati_annuali['prelievi_effettivi_reali'][anno_corrente] += prelievo_effettivo / indice_prezzi
-            
-            # Se necessario, vende ETF per coprire il prelievo mensile, calcolando le tasse
-            ricavo_netto_vendita_etf = 0
-            if prelievo_effettivo > 0:
-                fabbisogno_liquidita = max(0, prelievo_effettivo - patrimonio_banca)
-                if fabbisogno_liquidita > 0 and patrimonio_etf > 0:
-                    cost_basis_ratio = etf_cost_basis / patrimonio_etf if patrimonio_etf > 0 else 1
-                    tasse_implicite = (1 - cost_basis_ratio) * parametri['tassazione_capital_gain']
-                    importo_lordo_da_vendere = fabbisogno_liquidita / (1 - tasse_implicite) if (1 - tasse_implicite) > 0 else float('inf')
-                    importo_venduto = min(importo_lordo_da_vendere, patrimonio_etf)
+            # Esegui il prelievo effettivo, prelevando prima dalla banca e poi dagli ETF
+            if prelievo_mensile_target > 0:
+                prelievo_da_banca = min(prelievo_mensile_target, patrimonio_banca)
+                patrimonio_banca -= prelievo_da_banca
+                flussi_netti_investimento_anno -= prelievo_da_banca
+                dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += prelievo_da_banca
+                
+                fabbisogno_da_etf = prelievo_mensile_target - prelievo_da_banca
+                prelievo_da_etf = 0
 
-                    if importo_venduto > 0:
-                        costo_proporzionale = (importo_venduto / patrimonio_etf) * etf_cost_basis
-                        plusvalenza = importo_venduto - costo_proporzionale
-                        tasse_pagate = plusvalenza * parametri['tassazione_capital_gain']
-                        ricavo_netto_vendita_etf = importo_venduto - tasse_pagate
-
-                        patrimonio_banca += ricavo_netto_vendita_etf
-                        patrimonio_etf -= importo_venduto
-                        flussi_netti_investimento_anno -= importo_venduto
-                        etf_cost_basis -= costo_proporzionale
-
-            # Esegue il prelievo effettivo dalla liquidità
-            prelievo_effettivo_mensile = min(patrimonio_banca, prelievo_effettivo) if prelievo_effettivo > 0 else 0
-            if prelievo_effettivo_mensile > 0:
-                patrimonio_banca -= prelievo_effettivo_mensile
-                dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_effettivo_mensile
-                quota_da_etf = min(prelievo_effettivo_mensile, ricavo_netto_vendita_etf)
-                dati_annuali['prelievi_da_etf_nominali'][anno_corrente] += quota_da_etf
-                dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += prelievo_effettivo_mensile - quota_da_etf
+                if fabbisogno_da_etf > 0 and patrimonio_etf > 0:
+                    importo_da_vendere = min(fabbisogno_da_etf, patrimonio_etf)
+                    
+                    costo_proporzionale = (importo_da_vendere / patrimonio_etf) * etf_cost_basis if patrimonio_etf > 0 else 0
+                    plusvalenza = importo_da_vendere - costo_proporzionale
+                    tasse_da_pagare = max(0, plusvalenza * parametri['tassazione_capital_gain'])
+                    
+                    # Riduci il patrimonio ETF dell'importo lordo venduto
+                    patrimonio_etf -= importo_da_vendere
+                    etf_cost_basis -= costo_proporzionale
+                    flussi_netti_investimento_anno -= importo_da_vendere
+                    
+                    # Il prelievo effettivo da ETF è il netto dopo le tasse
+                    prelievo_da_etf = importo_da_vendere - tasse_da_pagare
+                    dati_annuali['prelievi_da_etf_nominali'][anno_corrente] += prelievo_da_etf
+                
+                prelievo_totale_effettivo = prelievo_da_banca + prelievo_da_etf
+                dati_annuali['prelievi_target_nominali'][anno_corrente] += prelievo_mensile_target
+                dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_totale_effettivo
+                dati_annuali['prelievi_effettivi_reali'][anno_corrente] += prelievo_totale_effettivo / indice_prezzi
 
         # --- D. GESTIONE ENTRATE PASSIVE (PENSIONI E RENDITE) ---
         if anno_corrente >= parametri['inizio_pensione_anni']:
