@@ -611,6 +611,8 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
     tutti_i_drawdown = np.zeros(n_sim)
     tutti_i_guadagni = np.zeros(n_sim)
     fallimenti = 0
+    num_anni = parametri['anni_totali']
+    matrice_indici_prezzi = np.zeros((n_sim, num_anni + 1))
 
     # Esecuzione delle N simulazioni
     for i in range(n_sim):
