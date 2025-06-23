@@ -398,6 +398,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
         # --- F. OPERAZIONI DI FINE ANNO (ESEGUITE SOLO A DICEMBRE) ---
         if mese % 12 == 0:
+            # FIX: Calcola il patrimonio totale all'inizio dell'anno PRIMA di ogni altra operazione
+            patrimonio_totale_inizio_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
+
             # Salva l'indice prezzi di fine anno
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             
@@ -487,7 +490,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
             patrimonio_totale_fine_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
             
-            patrimonio_totale_inizio_anno = (patrimonio_banca + patrimonio_etf + patrimonio_fp)
             patrimonio_investito_inizio_anno = 0
             if anno_corrente == 0:
                  patrimonio_investito_inizio_anno = parametri['etf_iniziale']

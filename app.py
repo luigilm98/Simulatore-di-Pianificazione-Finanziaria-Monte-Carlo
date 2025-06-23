@@ -1041,40 +1041,22 @@ st.markdown("---")
 dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
     
 st.header("Riepilogo Entrate in Pensione (Scenario Mediano)")
-    
-# Calcoli Reali
-anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
-prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi_reali]) if anni_prelievo_effettivi_reali.size > 0 else 0
-anni_pensione_effettivi_reali = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
-pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi_reali]) if anni_pensione_effettivi_reali.size > 0 else 0
-anni_rendita_fp_effettivi_reali = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
-rendita_fp_media_reale = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_effettivi_reali]) if anni_rendita_fp_effettivi_reali.size > 0 else 0
-totale_medio_reale = prelievo_medio_reale + pensione_media_reale + rendita_fp_media_reale
 
-# Calcoli Nominali
-anni_prelievo_effettivi_nominali = np.where(dati_mediana['prelievi_effettivi_nominali'] > 0)[0]
-prelievo_medio_nominale = np.mean(dati_mediana['prelievi_effettivi_nominali'][anni_prelievo_effettivi_nominali]) if anni_prelievo_effettivi_nominali.size > 0 else 0
-anni_pensione_effettivi_nominali = np.where(dati_mediana['pensioni_pubbliche_nominali'] > 0)[0]
-pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_effettivi_nominali]) if anni_pensione_effettivi_nominali.size > 0 else 0
-anni_rendita_fp_effettivi_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
-rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_effettivi_nominali]) if anni_rendita_fp_effettivi_nominali.size > 0 else 0
-totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale
-    
 col1, col2 = st.columns(2)
+
 with col1:
     st.subheader("Valori Reali")
-    st.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che preleverai dal tuo patrimonio.")
-    st.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua (es. INPS) in potere d'acquisto di oggi.")
-    st.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che riceverai dal tuo fondo pensione.")
-    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="Il tuo tenore di vita totale! La somma di tutte le tue entrate annue medie (in potere d'acquisto di oggi).")
-    
+    st.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che preleverai dal tuo patrimonio per sostenere il tuo tenore di vita.")
+    st.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua, al netto dell'inflazione.")
+    st.metric("Rendita Media da FP", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che riceverai dal tuo fondo pensione.")
+    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="La somma di tutte le tue entrate annue medie, al netto dell'inflazione. Questo è il tuo potere d'acquisto reale in pensione.")
+
 with col2:
     st.subheader("Valori Nominali")
     st.metric("Prelievo Medio dal Patrimonio (Nominale)", f"€ {prelievo_medio_nominale:,.0f}", help="La cifra media annua nominale che preleverai dal tuo patrimonio. Questo valore non tiene conto dell'inflazione.")
     st.metric("Pensione Pubblica Annua (Nominale)", f"€ {pensione_media_nominale:,.0f}", help="La stima della tua pensione statale annua nominale. Questo valore non tiene conto dell'inflazione.")
     st.metric("Rendita Media da FP (Nominale)", f"€ {rendita_fp_media_nominale:,.0f}", help="La cifra media annua nominale che riceverai dal tuo fondo pensione. Questo valore non tiene conto dell'inflazione.")
     st.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
-
 
 with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
     st.write("Array dei patrimoni finali reali (tutte le simulazioni):")
