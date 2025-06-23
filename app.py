@@ -733,42 +733,11 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
     volatilita_portfolio = np.sum(weights * edited_portfolio["Volatilità Attesa (%)"]) / 100
     ter_etf_portfolio = np.sum(weights * edited_portfolio["TER (%)"]) / 100
 
-    # Applica la tendenza di mercato ai rendimenti
-    def adjust_returns_for_market_trend(base_return, trend):
-        if trend == 'REALISTICA':
-            return base_return
-        elif trend == 'PESSIMISTICA':
-            return base_return * 0.8  # Riduce del 20%
-        elif trend == 'MOLTO_PESSIMISTICA':
-            return base_return * 0.6  # Riduce del 40%
-        elif trend == 'OTTIMISTICA':
-            return base_return * 1.2  # Aumenta del 20%
-        elif trend == 'MOLTO_OTTIMISTICA':
-            return base_return * 1.4  # Aumenta del 40%
-        else:
-            return base_return
-
-    # Applica il range di volatilità
-    def adjust_volatility_for_range(base_volatility, range_type):
-        if range_type == 'STANDARD':
-            return base_volatility
-        elif range_type == 'CONSERVATIVO':
-            return base_volatility * 0.7  # Riduce del 30%
-        elif range_type == 'AGGRESSIVO':
-            return base_volatility * 1.5  # Aumenta del 50%
-        elif range_type == 'CATASTROFICO':
-            return base_volatility * 2.0  # Raddoppia
-        else:
-            return base_volatility
-
-    rendimento_medio_portfolio_adjusted = adjust_returns_for_market_trend(rendimento_medio_portfolio, tendenza_mercato)
-    volatilita_portfolio_adjusted = adjust_volatility_for_range(volatilita_portfolio, range_volatilita)
-
     st.markdown("---")
     st.markdown("##### Parametri Calcolati dal Portafoglio:")
     col1, col2, col3 = st.columns(3)
-    col1.metric("Rendimento Medio", f"{rendimento_medio_portfolio:.2%}", delta=f"{rendimento_medio_portfolio_adjusted - rendimento_medio_portfolio:+.2%}", help="Il rendimento medio ponderato del tuo portafoglio ETF. La variazione (delta) mostra l'effetto della tendenza di mercato selezionata.")
-    col2.metric("Volatilità Attesa", f"{volatilita_portfolio:.2%}", delta=f"{volatilita_portfolio_adjusted - volatilita_portfolio:+.2%}", help="La volatilità media ponderata del tuo portafoglio ETF. La variazione (delta) mostra l'effetto del range di volatilità selezionato. Misura quanto i rendimenti possono variare nel tempo.")
+    col1.metric("Rendimento Medio", f"{rendimento_medio_portfolio:.2%}", help="Il rendimento medio ponderato del tuo portafoglio ETF.")
+    col2.metric("Volatilità Attesa", f"{volatilita_portfolio:.2%}", help="La volatilità media ponderata del tuo portafoglio ETF. Misura quanto i rendimenti possono variare nel tempo.")
     col3.metric("TER Ponderato", f"{ter_etf_portfolio:.4%}", help="Il costo totale annuo ponderato del tuo portafoglio ETF. Include tutte le commissioni e spese di gestione.")
     st.caption("La volatilità aggregata è una media ponderata semplificata.")
 
@@ -927,6 +896,22 @@ with st.expander("💾 Salva Risultati Simulazione"):
 # --- Sezione Riepilogo Statistico Chiave (KPI) ---
 st.header("Riepilogo Statistico Chiave")
 
+# Controllo se la simulazione è stata eseguita
+if not st.session_state.get('simulazione_eseguita', False) or 'risultati' not in st.session_state:
+    st.info("🚀 **Esegui una simulazione dalla sidebar per vedere i risultati!**")
+    st.markdown("""
+    Configura i tuoi parametri nella sidebar a sinistra e clicca su **"Esegui Simulazione"** per iniziare.
+    
+    Il simulatore ti mostrerà:
+    - 📊 L'evoluzione del tuo patrimonio nel tempo
+    - 📈 La composizione del portafoglio
+    - 🏖️ Le tue entrate in pensione
+    - 🔥 L'analisi del rischio
+    - 🧾 Il dettaglio dei flussi finanziari
+    """)
+    st.stop()
+
+# Se arriviamo qui, la simulazione è stata eseguita
 patrimonio_iniziale_totale = st.session_state.parametri['capitale_iniziale'] + st.session_state.parametri['etf_iniziale']
 contributi_versati = st.session_state.risultati['statistiche']['contributi_totali_versati_mediano_nominale']
 guadagni_da_investimento = st.session_state.risultati['statistiche']['guadagni_accumulo_mediano_nominale']
@@ -1001,46 +986,6 @@ if prelievo_sostenibile_calcolato is not None:
     Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
     """)
 
-# --- Messaggio informativo sulla tendenza di mercato ---
-if st.session_state.parametri.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA' or st.session_state.parametri.get('range_volatilita', 'STANDARD') != 'STANDARD' or st.session_state.parametri.get('eventi_mercato_estremi', 'DISABILITATI') != 'DISABILITATI':
-    trend_descriptions = {
-        'PESSIMISTICA': 'ridotti del 20%',
-        'MOLTO_PESSIMISTICA': 'ridotti del 40%',
-        'OTTIMISTICA': 'aumentati del 20%',
-        'MOLTO_OTTIMISTICA': 'aumentati del 40%'
-    }
-    volatility_descriptions = {
-        'CONSERVATIVO': 'ridotta del 30%',
-        'AGGRESSIVO': 'aumentata del 50%',
-        'CATASTROFICO': 'raddoppiata'
-    }
-    event_descriptions = {
-        'REALISTICI': 'abilitati (2% probabilità annua)',
-        'FREQUENTI': 'abilitati (5% probabilità annua)',
-        'MOLTO_FREQUENTI': 'abilitati (10% probabilità annua)'
-    }
-    
-    trend_desc = trend_descriptions.get(st.session_state.parametri.get('tendenza_mercato', 'REALISTICA'), '')
-    volatility_desc = volatility_descriptions.get(st.session_state.parametri.get('range_volatilita', 'STANDARD'), '')
-    event_desc = event_descriptions.get(st.session_state.parametri.get('eventi_mercato_estremi', 'DISABILITATI'), '')
-    
-    message_parts = []
-    if st.session_state.parametri.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA':
-        message_parts.append(f"**Tendenza di Mercato: {st.session_state.parametri['tendenza_mercato'].replace('_', ' ').title()}** - I rendimenti sono stati {trend_desc}")
-    if st.session_state.parametri.get('range_volatilita', 'STANDARD') != 'STANDARD':
-        message_parts.append(f"**Range di Volatilità: {st.session_state.parametri['range_volatilita'].title()}** - La volatilità è stata {volatility_desc}")
-    if st.session_state.parametri.get('eventi_mercato_estremi', 'DISABILITATI') != 'DISABILITATI':
-        message_parts.append(f"**Eventi Estremi: {st.session_state.parametri['eventi_mercato_estremi'].replace('_', ' ').title()}** - {event_desc}")
-    
-    st.info(f"""
-    🎯 **Scenario di Mercato Modificato**
-    
-    {' | '.join(message_parts)}
-    
-    Questo ti permette di testare la robustezza del tuo piano in condizioni di mercato diverse.
-    
-    **Ricorda:** I risultati mostrati riflettono questo scenario specifico. Per un'analisi completa, confronta i risultati con diverse combinazioni di parametri.
-    """)
 
 # --- Messaggio informativo sul modello economico ---
 if st.session_state.parametri.get('economic_model', "VOLATILE (CICLI BOOM-BUST)") != "VOLATILE (CICLI BOOM-BUST)":
