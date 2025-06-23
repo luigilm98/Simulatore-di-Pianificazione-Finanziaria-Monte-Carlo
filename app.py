@@ -7,6 +7,7 @@ import json
 import os
 from datetime import datetime
 import plotly.express as px
+import time
 
 import simulation_engine as engine
 
@@ -857,23 +858,16 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'economic_model': economic_model
         }
 
-        with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
-            try:
-                # Pulisce i risultati precedenti prima di una nuova simulazione
-                if 'risultati' in st.session_state:
-                    del st.session_state.risultati
-                
-                # Esegui la simulazione. La nuova logica in `run_full_simulation`
-                # gestirà automaticamente il calcolo del prelievo sostenibile se necessario.
-                st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
-                
-                st.success('Simulazione completata con successo!')
-                # Un piccolo trucco per "pulire" i parametri ?run=... dall'URL dopo la prima esecuzione
-                st.query_params.clear()
-            except ValueError as e:
-                st.error(f"Errore nei parametri: {e}")
-            except Exception as e:
-                st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
+        try:
+            with st.spinner("🧠 Calcolo in corso... Il modello economico sta simulando migliaia di futuri possibili..."):
+                risultati = engine.run_full_simulation(st.session_state.parametri)
+                st.session_state.risultati = risultati
+                st.session_state.simulazione_eseguita = True  # <--- AGGIUNTO: Imposta lo stato a True
+                st.success("Simulazione completata con successo!")
+                st.balloons()
+                time.sleep(2) # Pausa per apprezzare i palloncini
+        except Exception as e:
+            st.error(f"Si è verificato un errore durante la simulazione: {e}")
 
 # ==============================================================================
 # SEZIONE DI VISUALIZZAZIONE DEI RISULTATI
