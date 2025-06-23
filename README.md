@@ -1,7 +1,10 @@
-# 📈 Simulatore di Pianificazione Finanziaria Monte Carlo
+# 📈 Simulatore di Pianificazione Finanziaria con Modello Economico a Regimi
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://simulatore-di-pianificazione-finanziaria-monte-carlo-amaeuqvh8.streamlit.app/)
 
+Questo non è il solito simulatore Monte Carlo. Invece di usare un modello statistico semplicistico, questo strumento integra un **Modello Economico a Regimi Commutabili (Regime-Switching Model)** per generare scenari futuri molto più realistici, simulando veri e propri cicli economici completi di crash, recessioni e riprese.
+
+---
 
 ## 🚀 Prova l'Applicazione Online
 
@@ -23,86 +26,67 @@ Non sono un programmatore né un esperto di finanza, ho solo un diploma professi
 
 ## 🎯 A Chi Serve Questo Strumento?
 
-Questo simulatore è perfetto se ti sei mai chiesto:
+Questo simulatore è perfetto se vuoi andare oltre le proiezioni lineari e ti sei mai chiesto:
 
-*   "Quanto patrimonio avrò realisticamente quando smetterò di lavorare?"
-*   "Qual è l'importo massimo che posso prelevare ogni anno in pensione senza finire i soldi troppo presto?"
-*   "Voglio lasciare un'eredità o posso spendere tutto? E se sì, quanto?"
-*   "L'impatto di tasse, bolli e costi sta frenando la mia crescita?"
-*   "Il mio Fondo Pensione sta performando come dovrebbe? Che rendita posso aspettarmi?"
+*   "Il mio piano di accumulo sopravviverebbe a una crisi come quella del 2008 seguita da anni di stagnazione?"
+*   "Cosa succederebbe al mio patrimonio se affrontassimo un decennio di alta inflazione e bassi rendimenti come negli anni '70?"
+*   "Qual è l'impatto reale di tasse, bolli e costi sul mio patrimonio finale in diversi scenari economici?"
+*   "Qual è il tasso di prelievo *veramente* sicuro per la mia pensione, considerando la possibilità di crisi prolungate?"
 
 ---
 
-## 🔬 Come Funziona il Simulatore
+## 🔬 Come Funziona il Simulatore: Il Vantaggio del Modello a Regimi
 
-### Il Motore Monte Carlo
+La maggior parte dei simulatori finanziari usa un modello "random walk", dove ogni anno è un evento casuale indipendente. Il mondo reale non funziona così. Le crisi non sono eventi isolati, ma fasi di un ciclo.
 
-Il cuore del simulatore è una **simulazione Monte Carlo** che esegue centinaia di "partite" del tuo futuro finanziario. Invece di darti una singola, ingannevole previsione, il software:
+Questo simulatore supera questo limite implementando un **Modello Economico a Regimi Commutabili**.
 
-1. **Genera scenari multipli**: Per ogni simulazione, genera rendimenti e tassi di inflazione casuali basati su distribuzioni statistiche realistiche
-2. **Simula l'intero percorso**: Calcola anno per anno l'evoluzione del tuo patrimonio, considerando tutti i fattori (investimenti, prelievi, tasse, costi)
-3. **Analizza i risultati**: Dopo centinaia di simulazioni, ti mostra un ventaglio di possibilità, dal più sfortunato al più ottimistico
+### 1. Definizione dei Regimi Economici
+Invece di un singolo set di parametri (rendimento medio, volatilità), il simulatore definisce diversi **stati economici** (o "regimi"), ciascuno con le proprie caratteristiche:
 
-**Vantaggi rispetto alle previsioni lineari:**
-- ✅ Mostra il **rischio reale** delle tue scelte
-- ✅ Ti prepara agli **scenari peggiori**
-- ✅ Ti permette di **ottimizzare** la strategia
-- ✅ È **scientificamente fondato** su dati storici
+*   **Regimi di Mercato**:
+    *   `Normal`: Crescita stabile, bassa volatilità.
+    *   `Crash`: Crollo improvviso, altissima volatilità.
+    *   `Recession`: Rendimenti negativi o piatti, alta volatilità.
+    *   `Recovery`: Forte ripresa dopo una crisi, alta volatilità.
+*   **Regimi di Inflazione**:
+    *   `Normal`: Inflazione controllata intorno al 2-3%.
+    *   `High`: Inflazione elevata e volatile.
+    *   `Deflation`: Inflazione negativa.
 
-### Modello Finanziario Italiano
+### 2. Matrice di Transizione
+Il cuore del modello è una **matrice di probabilità di transizione**. Questa matrice definisce la probabilità che, dato lo stato economico di quest'anno, si passi a un altro stato l'anno successivo.
 
-Il simulatore è specificamente progettato per il contesto italiano:
+*Esempio*:
+*   Se siamo in un regime di `Crash`, c'è una probabilità del 100% di passare a un regime di `Recession` l'anno successivo.
+*   Se siamo in `Recession`, c'è una probabilità del 95% di *rimanere* in `Recession` e una del 5% di passare a `Recovery`.
 
-#### 📊 Gestione Investimenti
-- **Portafoglio ETF Personalizzabile**: Costruisci il tuo portafoglio con ETF reali, specificando allocazioni e TER
-- **Ribilanciamento Automatico**: Il software mantiene le tue allocazioni target vendendo/acquistando automaticamente
-- **Calcolo Rendimenti Realistici**: Usa distribuzioni log-normali basate su dati storici del mercato italiano
+Questo crea **memoria e dipendenza temporale**, generando cicli economici molto più realistici rispetto a shock casuali e indipendenti.
 
-#### 💰 Strategie di Prelievo Intelligenti
-1. **FISSO**: Prelevi un importo fisso annuale, corretto per l'inflazione
-2. **REGOLA_4_PERCENTO**: Prelevi una percentuale fissa del patrimonio all'inizio di ogni anno
-3. **GUARDRAIL**: Versione intelligente che adatta i prelievi in base alla performance del mercato
+### 3. Scenari Pre-configurati
+L'utente non deve impostare manualmente questi parametri complessi. Può semplicemente scegliere da un menu a tendina tra diversi **modelli macroeconomici pre-configurati**:
 
-#### 🏛️ Tassazione Italiana Integrata
-- **Capital Gain (26%)**: Calcolata su ogni plusvalenza da vendita ETF
-- **Imposta di Bollo**: 
-  - 0.20% annuo sui titoli
-  - 34.20€ su conti correnti >5.000€
-- **Tassazione Fondo Pensione**: 
-  - 20% sui rendimenti annuali
-  - Aliquota finale sul capitale ritirato
+*   **Volatile (Cicli Boom-Bust)**: Il nostro modello base con cicli di mercato pronunciati.
+*   **Stabilità (Crescita Lenta)**: Un'economia con bassa volatilità e crescita modesta.
+*   **Stagflazione Anni '70**: Simula un'economia con alta inflazione e rendimenti reali negativi.
+*   **Crisi Prolungata (Giappone)**: Modella un lungo periodo di stagnazione e deflazione.
 
-#### 🏦 Modulo Fondo Pensione Completo
-- **Accumulo con TER**: Simula costi reali del fondo
-- **Liquidazione Separata**: Gestisce capitale ritirato vs. rendita
-- **Tassazione Differenziata**: Applica le aliquote corrette per ogni componente
+### Vantaggi di Questo Approccio
+- ✅ **Realismo Superiore**: Genera sequenze di rendimenti che assomigliano a veri cicli economici storici.
+- ✅ **Stress Test Efficaci**: Permette di testare la resilienza di un piano finanziario contro scenari avversi complessi e prolungati.
+- ✅ **Comprensione Intuitiva**: L'utente può testare il proprio piano contro scenari noti ("Anni '70", "Crisi Giapponese") senza dover manipolare decine di parametri.
 
-#### 📈 Asset Allocation Dinamica (Glidepath)
-- **Riduzione Progressiva del Rischio**: Sposta gradualmente da ETF a liquidità con l'avanzare dell'età
-- **Protezione del Capitale**: Mantiene una riserva di liquidità per emergenze
-- **Ottimizzazione Automatica**: Calcola le allocazioni ottimali anno per anno
+---
 
-### Interfaccia Web Interattiva
+## 🛠️ Altre Funzionalità Chiave
 
-#### 🎛️ Sidebar di Controllo
-- **Parametri Demografici**: Età, orizzonte temporale, età di pensionamento
-- **Situazione Finanziaria**: Patrimonio iniziale, risparmi mensili, pensioni attese
-- **Configurazione Investimenti**: Rendimenti, volatilità, inflazione, costi
-- **Strategia di Prelievo**: Tipo di strategia e parametri specifici
-- **Costruttore Portafoglio**: Tabella interattiva per definire ETF e allocazioni
+Oltre al motore economico, il simulatore include un'analisi finanziaria completa e specifica per l'**Italia**:
 
-#### 📊 Dashboard dei Risultati
-- **Statistiche Principali**: Patrimonio finale mediano, probabilità di successo, prelievo sostenibile
-- **Grafici Interattivi**: 
-  - Spaghetti plot delle simulazioni
-  - Istogramma del patrimonio finale
-  - Evoluzione del patrimonio nel tempo
-- **Analisi per Fasi**: Separazione tra fase di accumulo e decumulo
-
-#### 🔍 Analisi Dettagliata
-- **Tab "Fase di Accumulo"**: Focus sui risparmi e crescita del patrimonio
-- **Tab "Fase di Decumulo"**: Analisi dei prelievi e sostenibilità
-- **Spiegazioni "For Dummies"**: Traduzione in linguaggio semplice dei risultati tecnici
+*   **Costruttore di Portafoglio ETF**: Personalizza il tuo portafoglio e calcola automaticamente i parametri di rischio/rendimento e costi (TER).
+*   **Modulo Fondo Pensione Dettagliato**: Simula l'accumulo, la tassazione agevolata sui rendimenti, la liquidazione parziale e la conversione in rendita.
+*   **Strategie di Prelievo Avanzate**: Scegli tra importo `FISSO`, la classica `REGOLA DEL 4%` o la strategia adattiva `GUARDRAIL`.
+*   **Tassazione Italiana Integrata**: Calcola automaticamente l'imposta di bollo (titoli e conto), la tassazione sul capital gain (26%) e le aliquote fiscali specifiche per il fondo pensione.
+*   **Asset Allocation Dinamica (Glidepath)**: Imposta una riduzione automatica e progressiva del rischio con l'avvicinarsi della pensione.
 
 ---
 
@@ -120,7 +104,7 @@ Se preferisci eseguire l'applicazione sul tuo computer:
 
 #### Prerequisiti
 - [Python 3.8+](https://www.python.org/downloads/)
-- Connessione internet (per installare le dipendenze)
+- `git` per clonare il repository.
 
 #### Installazione Rapida
 
@@ -129,18 +113,17 @@ Se preferisci eseguire l'applicazione sul tuo computer:
 git clone https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo.git
 cd Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo
 
-# 2. Crea ambiente virtuale
+# 2. Crea un ambiente virtuale (consigliato)
 python3 -m venv venv
 source venv/bin/activate  # Su Windows: venv\Scripts\activate
 
-# 3. Installa dipendenze
+# 3. Installa le dipendenze
 pip install -r requirements.txt
 
 # 4. Avvia l'applicazione
 streamlit run app.py
 ```
-
-L'applicazione si aprirà automaticamente nel browser all'indirizzo `http://localhost:8501`
+L'applicazione si aprirà automaticamente nel browser all'indirizzo `http://localhost:8501`.
 
 ### Guida all'Uso
 
@@ -152,104 +135,15 @@ L'applicazione si aprirà automaticamente nel browser all'indirizzo `http://loca
 
 ---
 
-## 🛠️ Tecnologie Utilizzate
+## 🤝 Contributi
 
-*   **Linguaggio:** Python 3.8+
-*   **Interfaccia Web:** [Streamlit](https://streamlit.io/) - Framework per app web interattive
-*   **Calcolo Numerico:** [NumPy](https://numpy.org/) & [Pandas](https://pandas.pydata.org/) - Analisi dati e calcoli scientifici
-*   **Grafici Interattivi:** [Plotly](https://plotly.com/) - Visualizzazioni dinamiche e responsive
-*   **Sviluppo Assistito da AI:** [Cursor](https://cursor.sh/) (con Gemini 2.5 Pro) - Editor intelligente
-
----
-
-## 📚 Concetti Chiave Spiegati
-
-### Monte Carlo Simulation
-La simulazione Monte Carlo è una tecnica matematica che usa la casualità per risolvere problemi deterministici. Nel nostro caso, genera centinaia di scenari futuri possibili per il mercato finanziario, permettendoci di vedere non solo il risultato "più probabile", ma anche tutti i possibili esiti e le loro probabilità.
-
-### Regola del 4%
-La "Regola del 4%" suggerisce che puoi prelevare in sicurezza il 4% del tuo patrimonio iniziale ogni anno, aumentandolo per l'inflazione. Il nostro simulatore testa questa regola e le sue varianti nel contesto italiano.
-
-### Glidepath
-Il "glidepath" (percorso di discesa) è una strategia che riduce gradualmente l'esposizione al rischio con l'avanzare dell'età, spostando il patrimonio da investimenti azionari a obbligazionari/liquidità.
-
-### TER (Total Expense Ratio)
-Il TER rappresenta i costi annuali di gestione di un fondo o ETF, espressi come percentuale del patrimonio investito. Costi più bassi significano rendimenti netti più alti.
-
----
-
-## ⚠️ Disclaimer e Limitazioni
-
-**Questo è uno strumento creato a scopo educativo. Non è una consulenza finanziaria.**
-
-### Limitazioni del Modello
-- **Dati Storici**: Le simulazioni si basano su dati storici che potrebbero non ripetersi
-- **Semplificazioni**: Il modello non include tutti i fattori della vita reale (es. spese impreviste, cambiamenti normativi)
-- **Assunzioni**: I rendimenti futuri sono stimati, non garantiti
-
-### Raccomandazioni
-- Usa il simulatore per **esplorare scenari** e **farti domande migliori**
-- Consulta sempre un **professionista qualificato** prima di prendere decisioni finanziarie
-- Considera il simulatore come un **punto di partenza**, non come una risposta definitiva
-
----
-
-## 🤝 Contributi e Deploy Personale
-
-Questo progetto è open source e i contributi sono benvenuti!
-
-### Contribuire al Progetto
-Se hai idee per miglioramenti, correzioni o nuove funzionalità, non esitare a:
-
-1. Aprire una [Issue](https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo/issues) per segnalare bug o suggerire miglioramenti
-2. Fare un [Pull Request](https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo/pulls) con le tue modifiche
-
-### Deployare la Tua Versione
-Se vuoi sperimentare con il codice o deployare la tua versione personale dell'app, puoi farlo con un solo click:
-
-[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo&branch=main&mainModule=app.py)
+Questo progetto è open source e i contributi sono i benvenuti. Se hai idee per miglioramenti, correzioni o nuovi modelli economici, sentiti libero di aprire una [Issue](https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo/issues) o un [Pull Request](https://github.com/luigilm98/Simulatore-di-Pianificazione-Finanziaria-Monte-Carlo/pulls).
 
 ---
 
 ## 📄 Licenza
 
-Questo progetto è rilasciato sotto licenza [MIT](LICENSE). Puoi usare, modificare e distribuire liberamente questo software.
+Questo progetto è rilasciato sotto licenza [MIT](LICENSE).
 
 ---
-
-*Grazie a Mr. RIP e Paolo Coletti per l'ispirazione e gli insegnamenti che hanno reso possibile questo progetto.* 
-
-## Guida all'Interpretazione dei Grafici
-
-### Perché il grafico del patrimonio totale "crolla" al momento della pensione?
-
-Potresti notare che, in un certo punto della fase di decumulo (tipicamente intorno all'età di ritiro dal fondo pensione), il grafico del patrimonio totale mostra una discesa netta e improvvisa. **Questo non è un errore**, ma la rappresentazione corretta di un evento finanziario complesso: la liquidazione del fondo pensione.
-
-Ecco cosa succede, spiegato con un esempio:
-
-Immagina che, al momento del ritiro, la tua situazione sia:
-- **Conto Corrente:** 50.000 €
-- **Portafoglio ETF:** 450.000 €
-- **Fondo Pensione:** 300.000 €
-- **PATRIMONIO TOTALE:** `50.000 + 450.000 + 300.000 = 800.000 €`
-
-Quando il fondo pensione viene liquidato:
-
-1.  **Il Fondo Pensione si azzera:** L'intero valore del fondo (300.000 €) viene rimosso dal calcolo del tuo patrimonio, che in quell'istante scende a 500.000 €.
-2.  **Ti arriva la liquidità:** Una parte del fondo (es. il 50%, ovvero 150.000 €) viene tassata (es. al 15%, pagando 22.500 €) e l'importo netto (**127.500 €**) viene accreditato sul tuo conto corrente.
-3.  **Nasce la rendita:** La parte rimanente del fondo (gli altri 150.000 €) viene convertita in una rendita futura, un flusso di reddito che riceverai negli anni a venire. Questi soldi **non sono più patrimonio**, ma sono diventati una promessa di pagamento.
-
-La situazione finale del patrimonio è:
-- **Conto Corrente:** `50.000 + 127.500 = 177.500 €`
-- **Portafoglio ETF:** 450.000 €
-- **Fondo Pensione:** 0 €
-- **NUOVO PATRIMONIO TOTALE:** `177.500 + 450.000 + 0 = 627.500 €`
-
-Sei passato da 800.000 € a 627.500 €. Il "crollo" nel grafico rappresenta la parte di ricchezza che hai scambiato per ottenere un reddito futuro sicuro.
-
-## Perché il mio patrimonio si esaurisce prima della fine se imposto un prelievo "sostenibile"?
-Questa è una delle intuizioni più importanti che il simulatore può offrire e non è un bug. Quando imposti un prelievo fisso a 0, il simulatore:
-1.  **Calcola un prelievo teorico:** Usa una formula finanziaria standard per determinare il massimo importo annuo che potresti prelevare se i rendimenti fossero costanti e prevedibili.
-2.  **Sottopone il piano a uno stress test:** Applica questo prelievo teorico alle migliaia di simulazioni Monte Carlo, che includono la volatilità del mercato (anni positivi e anni negativi).
-
-Il risultato che vedi nel grafico è l'esito dello stress test. Se il patrimonio mediano si esaurisce prima della fine dell'orizzonte temporale, il simulatore ti sta lanciando un avvertimento cruciale: il **rischio di sequenza dei rendimenti** (avere rendimenti scarsi nei primi anni di pensione) rende il tuo prelievo teorico troppo rischioso nella pratica per il 50% degli scenari possibili. Questa non è una visione pessimistica, ma una valutazione realistica del rischio del tuo piano.
+*Un ringraziamento speciale a Mr. RIP e Paolo Coletti, le cui idee e insegnamenti sono stati la fonte di ispirazione principale per questo progetto.*
