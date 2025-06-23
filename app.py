@@ -1197,7 +1197,8 @@ if 'risultati' in st.session_state:
             ('Patrimonio Banca (Reale)', 'saldo_banca_reale'),
             ('Patrimonio ETF (Reale)', 'saldo_etf_reale'),
             ('Patrimonio FP (Reale)', 'saldo_fp_reale'),
-            ('Variazione Patrimonio %', 'variazione_patrimonio_percentuale')
+            ('Variazione Netta Patrimonio %', 'variazione_patrimonio_percentuale'),
+            ('Rendimento Portafoglio %', 'rendimento_investimento_percentuale')
         ]
 
         for col, key in col_keys:
@@ -1227,20 +1228,23 @@ if 'risultati' in st.session_state:
             'Patrimonio Banca (Reale)': "€ {:,.0f}",
             'Patrimonio ETF (Reale)': "€ {:,.0f}",
             'Patrimonio FP (Reale)': "€ {:,.0f}",
-            'Variazione Patrimonio %': '{:+.2%}',
+            'Variazione Netta Patrimonio %': '{:+.2%}',
+            'Rendimento Portafoglio %': '{:+.2%}',
         }).apply(
             lambda x: ['color: red' if v < 0 else 'color: green' for v in x],
-            subset=['Variazione Patrimonio %']
+            subset=['Variazione Netta Patrimonio %', 'Rendimento Portafoglio %']
         ))
 
         with st.expander("Guida alla Lettura della Tabella"):
             st.markdown("""
+            - **Variazione Netta Patrimonio %**: Mostra la variazione *totale* del tuo patrimonio da un anno all'altro. Include i rendimenti di mercato, i tuoi contributi, i prelievi e le tasse. Può essere positiva anche con mercati negativi se i tuoi contributi sono alti.
+            - **Rendimento Portafoglio %**: Questo è l'indicatore chiave per giudicare la performance dei mercati. Mostra il rendimento *puro* dei tuoi investimenti (ETF e Fondo Pensione) in un anno, escludendo l'effetto dei tuoi versamenti/prelievi. Questo valore dovrebbe essere negativo negli anni di crisi che hai impostato.
             - **Obiettivo Prelievo vs Prelievo Effettivo**: L''Obiettivo' è quanto vorresti prelevare. L''Effettivo' è quanto prelevi realmente. Se hai pochi soldi, l''Effettivo' sarà più basso.
             - **Fonte Conto vs Fonte ETF**: Mostrano da dove provengono i soldi per il prelievo. Prima si usa la liquidità sul conto, poi si vendono gli ETF.
             - **Vendita ETF (Rebalance)**: NON sono soldi spesi. Sono vendite fatte per ridurre il rischio (seguendo il Glidepath). I soldi vengono spostati da ETF a liquidità.
             - **Liquidazione Capitale FP**: Somma che ricevi tutta in una volta dal fondo pensione all'età scelta. Aumenta di molto la tua liquidità in quell'anno.
             - **Entrate Anno (Reali)**: La somma di tutte le tue entrate (prelievi, pensioni) in potere d'acquisto di oggi. Questa cifra misura il tuo vero tenore di vita annuale.
-            """)
+            """) 
 
     st.markdown("---")
     st.subheader("Indicatori di Rischio e Performance del Piano (Scenario Mediano)")

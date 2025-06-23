@@ -76,7 +76,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'saldo_fp_nominale': np.zeros(num_anni + 1),
         'saldo_fp_reale': np.zeros(num_anni + 1),
         'reddito_totale_reale': np.zeros(num_anni + 1),
-        'variazione_patrimonio_percentuale': np.zeros(num_anni + 1)
+        'variazione_patrimonio_percentuale': np.zeros(num_anni + 1),
+        'rendimento_investimento_percentuale': np.zeros(num_anni + 1)
     }
 
     # Stato della simulazione
@@ -95,6 +96,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     
     guadagni_accumulo = 0
     guadagni_calcolati = False
+    guadagni_investimento_anno_nominale = 0
 
     prelievo_annuo_corrente = 0
     indice_prezzi_ultimo_prelievo = 1.0
@@ -262,6 +264,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         rendimento_mensile = (1 + rendimento_mensile) * evento_moltiplicatore - 1
         
         # 1. Applica il rendimento lordo
+        guadagno_etf_mese = patrimonio_etf * rendimento_mensile
+        guadagni_investimento_anno_nominale += guadagno_etf_mese
         patrimonio_etf *= (1 + rendimento_mensile)
         
         # 2. Applica i costi sugli ETF
@@ -273,12 +277,16 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         if parametri['attiva_fondo_pensione'] and (eta_attuale < parametri['eta_ritiro_fp'] or capitale_fp_per_rendita > 0):
              rendimento_mensile_fp = np.random.normal(parametri['rendimento_medio_fp']/12, parametri['volatilita_fp']/np.sqrt(12))
              
+             guadagno_fp_mese = 0
              # Se la rendita è attiva, il rendimento si applica solo sul capitale residuo
              if fp_convertito_in_rendita:
+                 guadagno_fp_mese = patrimonio_fp * rendimento_mensile_fp
                  patrimonio_fp *= (1 + rendimento_mensile_fp)
              else: # Altrimenti sul totale accumulato
+                 guadagno_fp_mese = patrimonio_fp * rendimento_mensile_fp
                  patrimonio_fp *= (1 + rendimento_mensile_fp)
 
+             guadagni_investimento_anno_nominale += guadagno_fp_mese
              patrimonio_fp -= patrimonio_fp * (parametri['ter_fp'] / 12)
 
         tasso_inflazione_mensile = np.random.normal(parametri['inflazione']/12, 0.005)
@@ -420,6 +428,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 if patrimonio_totale_anno_precedente > 0:
                     variazione = (patrimonio_totale_anno_corrente - patrimonio_totale_anno_precedente) / patrimonio_totale_anno_precedente
                     dati_annuali['variazione_patrimonio_percentuale'][anno_corrente] = variazione
+
+            # NUOVO: Rendimento puro da investimento
+            rendimento_investimento = guadagni_investimento_anno_nominale / patrimonio_totale_anno_precedente
+            dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = rendimento_investimento
 
             if parametri['attiva_fondo_pensione']:
                 patrimonio_fp_inizio_anno = patrimonio_fp
@@ -637,7 +649,8 @@ def run_full_simulation(parametri):
         'saldo_fp_nominale': np.zeros((n_sim, num_anni + 1)),
         'saldo_fp_reale': np.zeros((n_sim, num_anni + 1)),
         'reddito_totale_reale': np.zeros((n_sim, num_anni + 1)),
-        'variazione_patrimonio_percentuale': np.zeros((n_sim, num_anni + 1))
+        'variazione_patrimonio_percentuale': np.zeros((n_sim, num_anni + 1)),
+        'rendimento_investimento_percentuale': np.zeros((n_sim, num_anni + 1))
     }
     contributi_totali_agg = np.zeros(n_sim)
 
