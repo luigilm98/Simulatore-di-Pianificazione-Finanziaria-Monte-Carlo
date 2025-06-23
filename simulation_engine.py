@@ -206,7 +206,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'rendite_fp_nominali', 'rendite_fp_reali', 'saldo_banca_nominale', 'saldo_etf_nominale',
         'saldo_banca_reale', 'saldo_etf_reale', 'saldo_fp_nominale', 'saldo_fp_reale',
         'reddito_totale_reale', 'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
-        'indice_prezzi'
+        'contributi_totali_versati', 'indice_prezzi'
     ]}
 
     # Stato iniziale del patrimonio e altre variabili di stato
@@ -219,6 +219,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     patrimonio_negativo = False
     
     # Variabili per il calcolo dei flussi e rendimenti
+    contributi_totali_accumulati = 0
     flussi_netti_investimento_anno = 0
     guadagni_accumulo = 0
     guadagni_calcolati = False
@@ -248,13 +249,28 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         
         # --- A. FASE DI ACCUMULO: GESTIONE CONTRIBUTI ---
         if mese < inizio_prelievo_mesi:
-            contrib_banca = parametri['contributo_mensile_banca'] * indice_prezzi
-            contrib_etf = parametri['contributo_mensile_etf'] * indice_prezzi
-            patrimonio_banca += contrib_banca
-            patrimonio_etf += contrib_etf
-            etf_cost_basis += contrib_etf
-            flussi_netti_investimento_anno += contrib_etf
-        
+            # --- B. ACCANTONAMENTO E CONTRIBUTI MENSILI ---
+            # Si assume che i contributi vengano fatti all'inizio del mese, prima dei rendimenti
+            patrimonio_banca += parametri['contributo_mensile_banca']
+            contributi_totali_accumulati += parametri['contributo_mensile_banca']
+            
+            # Gestione contributo a ETF
+            investimento_etf = parametri['contributo_mensile_etf']
+            if investimento_etf > 0:
+                importo_reale_investito = min(investimento_etf, patrimonio_banca)
+                patrimonio_banca -= importo_reale_investito
+                patrimonio_etf += importo_reale_investito
+                flussi_netti_investimento_anno += importo_reale_investito
+                etf_cost_basis += importo_reale_investito
+                contributi_totali_accumulati += importo_reale_investito
+            
+            # Gestione contributo a Fondo Pensione
+            if parametri['attiva_fondo_pensione'] and eta_attuale < parametri['eta_ritiro_fp']:
+                contributo_mensile_fp = parametri['contributo_annuo_fp'] / 12
+                patrimonio_fp += contributo_mensile_fp
+                contributi_fp_anno_corrente += contributo_mensile_fp
+                contributi_totali_accumulati += contributo_mensile_fp
+
         # Calcola i guadagni totali al momento esatto dell'inizio prelievo
         if mese == inizio_prelievo_mesi and not guadagni_calcolati:
             patrimonio_a_inizio_prelievo = patrimonio_banca + patrimonio_etf + patrimonio_fp
@@ -266,13 +282,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             # Nota: questa è una stima dei contributi nominali, non tiene conto dell'indicizzazione passata
             guadagni_accumulo = patrimonio_a_inizio_prelievo - patrimonio_iniziale_totale - contributi_versati
             guadagni_calcolati = True
-
-        # --- B. GESTIONE FONDO PENSIONE (ACCUMULO) ---
-        if parametri['attiva_fondo_pensione'] and eta_attuale < parametri['eta_ritiro_fp']:
-            contributo_mensile_fp_indicizzato = (parametri['contributo_annuo_fp'] / 12) * indice_prezzi
-            patrimonio_fp += contributo_mensile_fp_indicizzato
-            flussi_netti_investimento_anno += contributo_mensile_fp_indicizzato
-            contributi_fp_anno_corrente += contributo_mensile_fp_indicizzato
 
         # --- C. GESTIONE ENTRATE PASSIVE (PENSIONI E RENDITE) ---
         if anno_corrente >= parametri['inizio_pensione_anni']:
@@ -387,6 +396,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         if mese % 12 == 0:
             # Salva l'indice prezzi di fine anno
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
+            
+            # Salva i contributi totali versati a fine anno
+            dati_annuali['contributi_totali_versati'][anno_corrente] = contributi_totali_accumulati
+            
             # Ribilanciamento, liquidazione FP, calcolo rendimenti annuali, ecc.
             
             # 1. Ribilanciamento
@@ -513,6 +526,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         "drawdown": drawdown,
         "fallimento": patrimonio_negativo,
         "guadagni_accumulo": guadagni_accumulo,
+        "contributi_totali_versati": contributi_totali_accumulati,
         "indice_prezzi_finale": indice_prezzi
     }
 
@@ -612,6 +626,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
     tutti_i_dati_annuali = []
     tutti_i_drawdown = np.zeros(n_sim)
     tutti_i_guadagni = np.zeros(n_sim)
+    tutti_i_contributi = np.zeros(n_sim)
     fallimenti = 0
     num_anni = parametri['anni_totali']
     matrice_indici_prezzi = np.zeros((n_sim, num_anni + 1))
@@ -623,6 +638,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         tutti_i_dati_annuali.append(risultati_run['dati_annuali'])
         tutti_i_drawdown[i] = risultati_run['drawdown']
         tutti_i_guadagni[i] = risultati_run['guadagni_accumulo']
+        tutti_i_contributi[i] = risultati_run['contributi_totali_versati']
         if risultati_run['fallimento']:
             fallimenti += 1
         # Aggregazione dell'indice dei prezzi di ogni run
@@ -682,6 +698,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         'sharpe_ratio_medio': 0.0,
         'patrimoni_reali_finali': patrimoni_finali_reali,
         'guadagni_accumulo_mediano_nominale': np.median(tutti_i_guadagni),
+        'contributi_totali_versati_mediano_nominale': np.median(tutti_i_contributi),
         'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato
     }
 

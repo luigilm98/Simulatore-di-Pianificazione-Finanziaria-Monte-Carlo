@@ -862,10 +862,8 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             with st.spinner("🧠 Calcolo in corso... Il modello economico sta simulando migliaia di futuri possibili..."):
                 risultati = engine.run_full_simulation(st.session_state.parametri)
                 st.session_state.risultati = risultati
-                st.session_state.simulazione_eseguita = True  # <--- AGGIUNTO: Imposta lo stato a True
+                st.session_state.simulazione_eseguita = True
                 st.success("Simulazione completata con successo!")
-                st.balloons()
-                time.sleep(2) # Pausa per apprezzare i palloncini
         except Exception as e:
             st.error(f"Si è verificato un errore durante la simulazione: {e}")
 
