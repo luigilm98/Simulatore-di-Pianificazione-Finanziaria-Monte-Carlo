@@ -405,7 +405,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             if mesi_rimanenti_rendita_fp > 0:
                 patrimonio_banca += rendita_fp_mese
                 mesi_rimanenti_rendita_fp -= 1
-            else:
+            
+            # Se la rendita è terminata, azzera il valore mensile
+            if mesi_rimanenti_rendita_fp == 0:
                 rendita_fp_mese = 0
         
         # D. OPERAZIONI DI FINE ANNO
