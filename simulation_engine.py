@@ -380,6 +380,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
         # Aggiorna l'indice dei prezzi generale
         indice_prezzi *= (1 + tasso_inflazione_mensile)
+        # Controllo di sicurezza: assicurati che l'indice prezzi rimanga sempre positivo
+        indice_prezzi = max(indice_prezzi, 1e-10)
 
         # --- F. OPERAZIONI DI FINE ANNO (ESEGUITE SOLO A DICEMBRE) ---
         if mese % 12 == 0:
@@ -634,6 +636,9 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         mesi_totali = patrimoni_tutte_le_run.shape[1] - 1
         anni_totali = len(indici_annuali) - 1
         
+        # Controllo di sicurezza: assicurati che l'indice prezzi sia sempre positivo
+        indici_annuali = np.maximum(indici_annuali, 1e-10)  # Evita zeri
+        
         # Crea array di mesi (0, 1, 2, ..., mesi_totali)
         mesi = np.arange(mesi_totali + 1)
         # Crea array di anni corrispondenti (0, 1/12, 2/12, ..., anni_totali)
@@ -642,11 +647,18 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         # Interpola linearmente l'indice prezzi per ogni mese
         indici_mensili = np.interp(anni_mesi, np.arange(anni_totali + 1), indici_annuali)
         
+        # Controllo di sicurezza: assicurati che gli indici mensili siano sempre positivi
+        indici_mensili = np.maximum(indici_mensili, 1e-10)
+        
         # Ora dividi i patrimoni mensili per gli indici prezzi mensili
         patrimoni_reali_tutte_le_run[i, :] = patrimoni_tutte_le_run[i, :] / indici_mensili
 
     # Identificazione dello scenario mediano basato sul patrimonio finale reale
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
+    
+    # Controllo di sicurezza: rimuovi eventuali valori NaN o infiniti
+    patrimoni_finali_reali = np.nan_to_num(patrimoni_finali_reali, nan=0.0, posinf=0.0, neginf=0.0)
+    
     valore_mediano = np.median(patrimoni_finali_reali)
     indice_mediano = np.abs(patrimoni_finali_reali - valore_mediano).argmin()
     dati_mediana_dettagliati = tutti_i_dati_annuali[indice_mediano]
