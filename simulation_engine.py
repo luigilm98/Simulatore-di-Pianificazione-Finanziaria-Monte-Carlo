@@ -414,11 +414,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
             # Calcolo della variazione percentuale annua del patrimonio
             patrimonio_totale_anno_corrente = patrimonio_banca + patrimonio_etf + patrimonio_fp
+            
+            patrimonio_totale_anno_precedente = 0
             if anno_corrente == 0:
-                patrimonio_iniziale_totale = parametri['capitale_iniziale'] + parametri['etf_iniziale']
-                if patrimonio_iniziale_totale > 0:
-                    variazione = (patrimonio_totale_anno_corrente - patrimonio_iniziale_totale) / patrimonio_iniziale_totale
-                    dati_annuali['variazione_patrimonio_percentuale'][anno_corrente] = variazione
+                patrimonio_totale_anno_precedente = parametri['capitale_iniziale'] + parametri['etf_iniziale']
             else:
                 patrimonio_totale_anno_precedente = (
                     dati_annuali['saldo_banca_nominale'][anno_corrente - 1] +
