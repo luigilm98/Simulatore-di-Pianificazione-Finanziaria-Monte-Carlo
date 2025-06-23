@@ -208,6 +208,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'reddito_totale_reale', 'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
         'contributi_totali_versati', 'indice_prezzi'
     ]}
+    dati_annuali['indice_prezzi'][0] = 1.0  # FIX: Imposta il valore iniziale corretto
 
     # Stato iniziale del patrimonio e altre variabili di stato
     patrimonio_banca = parametri['capitale_iniziale']
