@@ -7,7 +7,6 @@ import json
 import os
 from datetime import datetime
 import plotly.express as px
-import time
 
 import simulation_engine as engine
 
@@ -130,10 +129,9 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     Disegna il grafico principale a "cono di probabilità" per mostrare 
     l'evoluzione del patrimonio nel tempo, evidenziando gli intervalli di 
     confidenza (percentili 10-90 e 25-75) e la mediana.
-    Ora lavora con dati ANNUALI.
 
     Args:
-        data (np.ndarray): Matrice dei dati del patrimonio (simulazioni x anni).
+        data (np.ndarray): Matrice dei dati del patrimonio (simulazioni x mesi).
         title (str): Titolo del grafico.
         y_title (str): Titolo dell'asse Y.
         anni_totali (int): Durata totale della simulazione in anni.
@@ -147,9 +145,9 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     """
     fig = go.Figure()
     
-    # L'asse x (anni) deve avere la stessa lunghezza dei dati
-    anni = np.arange(data.shape[1])
-    x_axis_labels = eta_iniziale + anni
+    # L'asse x (mesi) deve avere la stessa lunghezza dei dati
+    mesi = np.arange(data.shape[1])
+    x_axis_labels = eta_iniziale + mesi / 12
 
     p10 = np.percentile(data, 10, axis=0)
     p25 = np.percentile(data, 25, axis=0)
@@ -208,21 +206,6 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
             tickprefix="€",
             tickformat=".2s"
         )
-    )
-
-    fig.update_xaxes(
-        title_text="Età",
-        tickvals=np.arange(0, anni_totali + 1, 5) + eta_iniziale,
-        tickangle=45
-    )
-    
-    # Aggiungi una linea tratteggiata per l'inizio dei prelievi
-    eta_prelievo = eta_iniziale + anni_inizio_prelievo
-    fig.add_vline(x=eta_prelievo, line_width=2, line_dash="dash", line_color="grey",
-                  annotation_text="Inizio Prelievi", 
-                  annotation_position="top left",
-                  annotation_font_size=12,
-                  annotation_font_color="grey"
     )
 
     return fig
@@ -874,14 +857,23 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'economic_model': economic_model
         }
 
-        try:
-            with st.spinner("🧠 Calcolo in corso... Il modello economico sta simulando migliaia di futuri possibili..."):
-                risultati = engine.run_full_simulation(st.session_state.parametri)
-                st.session_state.risultati = risultati
-                st.session_state.simulazione_eseguita = True
-                st.success("Simulazione completata con successo!")
-        except Exception as e:
-            st.error(f"Si è verificato un errore durante la simulazione: {e}")
+        with st.spinner('Simulazione in corso... Questo potrebbe richiedere qualche istante.'):
+            try:
+                # Pulisce i risultati precedenti prima di una nuova simulazione
+                if 'risultati' in st.session_state:
+                    del st.session_state.risultati
+                
+                # Esegui la simulazione. La nuova logica in `run_full_simulation`
+                # gestirà automaticamente il calcolo del prelievo sostenibile se necessario.
+                st.session_state.risultati = engine.run_full_simulation(st.session_state.parametri)
+                
+                st.success('Simulazione completata con successo!')
+                # Un piccolo trucco per "pulire" i parametri ?run=... dall'URL dopo la prima esecuzione
+                st.query_params.clear()
+            except ValueError as e:
+                st.error(f"Errore nei parametri: {e}")
+            except Exception as e:
+                st.error(f"Si è verificato un errore inaspettato durante la simulazione: {e}")
 
 # ==============================================================================
 # SEZIONE DI VISUALIZZAZIONE DEI RISULTATI
@@ -904,22 +896,6 @@ with st.expander("💾 Salva Risultati Simulazione"):
 # --- Sezione Riepilogo Statistico Chiave (KPI) ---
 st.header("Riepilogo Statistico Chiave")
 
-# Controllo se la simulazione è stata eseguita
-if not st.session_state.get('simulazione_eseguita', False) or 'risultati' not in st.session_state:
-    st.info("🚀 **Esegui una simulazione dalla sidebar per vedere i risultati!**")
-    st.markdown("""
-    Configura i tuoi parametri nella sidebar a sinistra e clicca su **"Esegui Simulazione"** per iniziare.
-    
-    Il simulatore ti mostrerà:
-    - 📊 L'evoluzione del tuo patrimonio nel tempo
-    - 📈 La composizione del portafoglio
-    - 🏖️ Le tue entrate in pensione
-    - 🔥 L'analisi del rischio
-    - 🧾 Il dettaglio dei flussi finanziari
-    """)
-    st.stop()
-
-# Se arriviamo qui, la simulazione è stata eseguita
 patrimonio_iniziale_totale = st.session_state.parametri['capitale_iniziale'] + st.session_state.parametri['etf_iniziale']
 contributi_versati = st.session_state.risultati['statistiche']['contributi_totali_versati_mediano_nominale']
 guadagni_da_investimento = st.session_state.risultati['statistiche']['guadagni_accumulo_mediano_nominale']
@@ -994,6 +970,46 @@ if prelievo_sostenibile_calcolato is not None:
     Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
     """)
 
+# --- Messaggio informativo sulla tendenza di mercato ---
+if st.session_state.parametri.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA' or st.session_state.parametri.get('range_volatilita', 'STANDARD') != 'STANDARD' or st.session_state.parametri.get('eventi_mercato_estremi', 'DISABILITATI') != 'DISABILITATI':
+    trend_descriptions = {
+        'PESSIMISTICA': 'ridotti del 20%',
+        'MOLTO_PESSIMISTICA': 'ridotti del 40%',
+        'OTTIMISTICA': 'aumentati del 20%',
+        'MOLTO_OTTIMISTICA': 'aumentati del 40%'
+    }
+    volatility_descriptions = {
+        'CONSERVATIVO': 'ridotta del 30%',
+        'AGGRESSIVO': 'aumentata del 50%',
+        'CATASTROFICO': 'raddoppiata'
+    }
+    event_descriptions = {
+        'REALISTICI': 'abilitati (2% probabilità annua)',
+        'FREQUENTI': 'abilitati (5% probabilità annua)',
+        'MOLTO_FREQUENTI': 'abilitati (10% probabilità annua)'
+    }
+    
+    trend_desc = trend_descriptions.get(st.session_state.parametri.get('tendenza_mercato', 'REALISTICA'), '')
+    volatility_desc = volatility_descriptions.get(st.session_state.parametri.get('range_volatilita', 'STANDARD'), '')
+    event_desc = event_descriptions.get(st.session_state.parametri.get('eventi_mercato_estremi', 'DISABILITATI'), '')
+    
+    message_parts = []
+    if st.session_state.parametri.get('tendenza_mercato', 'REALISTICA') != 'REALISTICA':
+        message_parts.append(f"**Tendenza di Mercato: {st.session_state.parametri['tendenza_mercato'].replace('_', ' ').title()}** - I rendimenti sono stati {trend_desc}")
+    if st.session_state.parametri.get('range_volatilita', 'STANDARD') != 'STANDARD':
+        message_parts.append(f"**Range di Volatilità: {st.session_state.parametri['range_volatilita'].title()}** - La volatilità è stata {volatility_desc}")
+    if st.session_state.parametri.get('eventi_mercato_estremi', 'DISABILITATI') != 'DISABILITATI':
+        message_parts.append(f"**Eventi Estremi: {st.session_state.parametri['eventi_mercato_estremi'].replace('_', ' ').title()}** - {event_desc}")
+    
+    st.info(f"""
+    🎯 **Scenario di Mercato Modificato**
+    
+    {' | '.join(message_parts)}
+    
+    Questo ti permette di testare la robustezza del tuo piano in condizioni di mercato diverse.
+    
+    **Ricorda:** I risultati mostrati riflettono questo scenario specifico. Per un'analisi completa, confronta i risultati con diverse combinazioni di parametri.
+    """)
 
 # --- Messaggio informativo sul modello economico ---
 if st.session_state.parametri.get('economic_model', "VOLATILE (CICLI BOOM-BUST)") != "VOLATILE (CICLI BOOM-BUST)":
@@ -1042,7 +1058,6 @@ dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana
     
 st.header("Riepilogo Entrate in Pensione (Scenario Mediano)")
     
-# FIX: Re-introduco il blocco di calcolo per le medie delle entrate
 # Calcoli Reali
 anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
 prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi_reali]) if anni_prelievo_effettivi_reali.size > 0 else 0
@@ -1060,22 +1075,22 @@ pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][an
 anni_rendita_fp_effettivi_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
 rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_effettivi_nominali]) if anni_rendita_fp_effettivi_nominali.size > 0 else 0
 totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale
-
+    
 col1, col2 = st.columns(2)
-  
 with col1:
     st.subheader("Valori Reali")
-    st.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che preleverai dal tuo patrimonio per sostenere il tuo tenore di vita.")
-    st.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua, al netto dell'inflazione.")
-    st.metric("Rendita Media da FP", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che riceverai dal tuo fondo pensione.")
-    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="La somma di tutte le tue entrate annue medie, al netto dell'inflazione. Questo è il tuo potere d'acquisto reale in pensione.")
-
+    st.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che preleverai dal tuo patrimonio.")
+    st.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua (es. INPS) in potere d'acquisto di oggi.")
+    st.metric("Rendita Media da Fondo Pensione", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua (in potere d'acquisto di oggi) che riceverai dal tuo fondo pensione.")
+    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="Il tuo tenore di vita totale! La somma di tutte le tue entrate annue medie (in potere d'acquisto di oggi).")
+    
 with col2:
     st.subheader("Valori Nominali")
     st.metric("Prelievo Medio dal Patrimonio (Nominale)", f"€ {prelievo_medio_nominale:,.0f}", help="La cifra media annua nominale che preleverai dal tuo patrimonio. Questo valore non tiene conto dell'inflazione.")
     st.metric("Pensione Pubblica Annua (Nominale)", f"€ {pensione_media_nominale:,.0f}", help="La stima della tua pensione statale annua nominale. Questo valore non tiene conto dell'inflazione.")
     st.metric("Rendita Media da FP (Nominale)", f"€ {rendita_fp_media_nominale:,.0f}", help="La cifra media annua nominale che riceverai dal tuo fondo pensione. Questo valore non tiene conto dell'inflazione.")
     st.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
+
 
 with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
     st.write("Array dei patrimoni finali reali (tutte le simulazioni):")
