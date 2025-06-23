@@ -629,8 +629,21 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
     # Calcolo dei valori reali usando gli indici di prezzo individuali per ogni run
     patrimoni_reali_tutte_le_run = np.zeros_like(patrimoni_tutte_le_run)
     for i in range(n_sim):
-        # Ogni run viene divisa per il suo specifico andamento dell'inflazione
-        patrimoni_reali_tutte_le_run[i, :] = patrimoni_tutte_le_run[i, :] / tutti_i_dati_annuali[i]['indice_prezzi']
+        # Interpola l'indice prezzi annuale per ottenere valori mensili
+        indici_annuali = tutti_i_dati_annuali[i]['indice_prezzi']
+        mesi_totali = patrimoni_tutte_le_run.shape[1] - 1
+        anni_totali = len(indici_annuali) - 1
+        
+        # Crea array di mesi (0, 1, 2, ..., mesi_totali)
+        mesi = np.arange(mesi_totali + 1)
+        # Crea array di anni corrispondenti (0, 1/12, 2/12, ..., anni_totali)
+        anni_mesi = mesi / 12
+        
+        # Interpola linearmente l'indice prezzi per ogni mese
+        indici_mensili = np.interp(anni_mesi, np.arange(anni_totali + 1), indici_annuali)
+        
+        # Ora dividi i patrimoni mensili per gli indici prezzi mensili
+        patrimoni_reali_tutte_le_run[i, :] = patrimoni_tutte_le_run[i, :] / indici_mensili
 
     # Identificazione dello scenario mediano basato sul patrimonio finale reale
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
