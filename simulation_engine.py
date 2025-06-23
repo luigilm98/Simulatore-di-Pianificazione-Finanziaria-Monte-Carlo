@@ -22,7 +22,7 @@ import json
 
 # ==============================================================================
 # DEFINIZIONE DEI MODELLI ECONOMICI A REGIMI
-# =================================ah=============================================
+# ==============================================================================
 ECONOMIC_MODELS = {
     "VOLATILE (CICLI BOOM-BUST)": {
         "description": "Un modello più realistico con cicli di mercato pronunciati. Le crisi sono seguite da recessioni e poi da forti riprese.",
