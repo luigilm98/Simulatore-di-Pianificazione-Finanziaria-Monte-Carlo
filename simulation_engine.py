@@ -205,7 +205,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'fp_liquidato_nominale', 'pensioni_pubbliche_nominali', 'pensioni_pubbliche_reali',
         'rendite_fp_nominali', 'rendite_fp_reali', 'saldo_banca_nominale', 'saldo_etf_nominale',
         'saldo_banca_reale', 'saldo_etf_reale', 'saldo_fp_nominale', 'saldo_fp_reale',
-        'reddito_totale_reale', 'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale'
+        'reddito_totale_reale', 'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
+        'indice_prezzi'
     ]}
 
     # Stato iniziale del patrimonio e altre variabili di stato
@@ -382,6 +383,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
         # --- F. OPERAZIONI DI FINE ANNO (ESEGUITE SOLO A DICEMBRE) ---
         if mese % 12 == 0:
+            # Salva l'indice prezzi di fine anno
+            dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             # Ribilanciamento, liquidazione FP, calcolo rendimenti annuali, ecc.
             
             # 1. Ribilanciamento
