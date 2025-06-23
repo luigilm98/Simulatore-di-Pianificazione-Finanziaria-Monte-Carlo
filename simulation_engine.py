@@ -240,6 +240,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     patrimonio_etf = parametri['etf_iniziale']
     etf_cost_basis = patrimonio_etf
     patrimonio_fp = 0
+    contributi_totali_fp = 0
     etf_cashflow_anno = 0.0
     
     dati_annuali['saldo_banca_nominale'][0] = patrimonio_banca
@@ -255,6 +256,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     prelievo_annuo_nominale_corrente = 0.0
     prelievo_annuo_nominale_iniziale = 0.0
     indice_prezzi_inizio_pensione = 1.0
+
+    # Variabili di stato per la gestione della rendita FP
+    rendita_fp_mese = 0
+    mesi_rimanenti_rendita_fp = 0
 
     # Modello economico a regimi
     model_name = parametri.get('economic_model', "VOLATILE (CICLI BOOM-BUST)")
@@ -287,6 +292,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         dati_annuali['pensioni_pubbliche_nominali'][anno_corrente] += pensione_pubblica_mese
         dati_annuali['pensioni_pubbliche_reali'][anno_corrente] += pensione_pubblica_mese / indice_prezzi
         dati_annuali['rendite_fp_nominali'][anno_corrente] += rendita_fp_mese
+        dati_annuali['rendite_fp_reali'][anno_corrente] += rendita_fp_mese / indice_prezzi
         
         # Calcolo del reddito reale da pensioni/rendite
         reddito_da_pensioni_reale = (pensione_pubblica_mese + rendita_fp_mese) / indice_prezzi
@@ -373,16 +379,64 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         current_market_regime = _choose_next_regime(current_market_regime, market_regime_definitions)
         current_inflation_regime = _choose_next_regime(current_inflation_regime, inflation_regime_definitions)
 
+        # E. GESTIONE FONDO PENSIONE (logica annuale e di liquidazione)
+        if parametri.get('attiva_fondo_pensione', False):
+            # Evento di liquidazione all'età di ritiro
+            if int(eta_attuale) == parametri.get('eta_ritiro_fp', 100) and mese % 12 == 1:
+                if patrimonio_fp > 0:
+                    guadagni_fp = patrimonio_fp - contributi_totali_fp
+                    tasse_fp = max(0, guadagni_fp) * parametri.get('aliquota_finale_fp', 0.15)
+                    patrimonio_fp_netto = patrimonio_fp - tasse_fp
+                    
+                    percentuale_capitale = parametri.get('percentuale_capitale_fp', 0.5)
+                    capitale_liquidato = patrimonio_fp_netto * percentuale_capitale
+                    importo_per_rendita = patrimonio_fp_netto - capitale_liquidato
+                    
+                    patrimonio_banca += capitale_liquidato
+                    
+                    durata_rendita_anni = parametri.get('durata_rendita_fp_anni', 25)
+                    if durata_rendita_anni > 0:
+                        mesi_rimanenti_rendita_fp = durata_rendita_anni * 12
+                        rendita_fp_mese = importo_per_rendita / mesi_rimanenti_rendita_fp if mesi_rimanenti_rendita_fp > 0 else 0
+                    
+                    patrimonio_fp = 0 # Il fondo viene azzerato dopo la conversione
+
+            # Erogazione della rendita mensile
+            if mesi_rimanenti_rendita_fp > 0:
+                patrimonio_banca += rendita_fp_mese
+                mesi_rimanenti_rendita_fp -= 1
+            else:
+                rendita_fp_mese = 0
+        
         # D. OPERAZIONI DI FINE ANNO
         if mese % 12 == 0:
+            # Crescita annuale del fondo pensione (se attivo e non ancora liquidato)
+            if parametri.get('attiva_fondo_pensione', False) and patrimonio_fp > 0:
+                 # 1. Applica rendimento
+                rendimento_fp = np.random.normal(
+                    parametri.get('rendimento_medio_fp', 0.04),
+                    parametri.get('volatilita_fp', 0.08)
+                )
+                patrimonio_fp *= (1 + rendimento_fp)
+                # 2. Sottrai costi (TER)
+                patrimonio_fp -= patrimonio_fp * parametri.get('ter_fp', 0.01)
+            
+            # Contributo annuale al fondo pensione (se attivo)
+            if parametri.get('attiva_fondo_pensione', False) and eta_attuale < parametri.get('eta_ritiro_fp', 100):
+                contributo_fp = parametri.get('contributo_annuo_fp', 0)
+                patrimonio_fp += contributo_fp
+                contributi_totali_fp += contributo_fp
+
             patrimonio_inizio_anno = dati_annuali['saldo_banca_nominale'][anno_corrente-1] + dati_annuali['saldo_etf_nominale'][anno_corrente-1]
             patrimonio_fine_anno = patrimonio_banca + patrimonio_etf
             
             dati_annuali['variazione_patrimonio_percentuale'][anno_corrente] = (patrimonio_fine_anno - patrimonio_inizio_anno) / patrimonio_inizio_anno if patrimonio_inizio_anno > 0 else 0
             dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
             dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
+            dati_annuali['saldo_fp_nominale'][anno_corrente] = patrimonio_fp
             dati_annuali['saldo_banca_reale'][anno_corrente] = patrimonio_banca / indice_prezzi
             dati_annuali['saldo_etf_reale'][anno_corrente] = patrimonio_etf / indice_prezzi
+            dati_annuali['saldo_fp_reale'][anno_corrente] = patrimonio_fp / indice_prezzi
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             dati_annuali['contributi_totali_versati'][anno_corrente] = contributi_totali_accumulati
             
