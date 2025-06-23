@@ -919,20 +919,47 @@ if not st.session_state.get('simulazione_eseguita', False) or 'risultati' not in
     """)
     st.stop()
 
-# Se arriviamo qui, la simulazione è stata eseguita
-patrimonio_iniziale_totale = st.session_state.parametri['capitale_iniziale'] + st.session_state.parametri['etf_iniziale']
-contributi_versati = st.session_state.risultati['statistiche']['contributi_totali_versati_mediano_nominale']
-guadagni_da_investimento = st.session_state.risultati['statistiche']['guadagni_accumulo_mediano_nominale']
-    
-reddito_annuo_reale_pensione = st.session_state.risultati['statistiche_prelievi']['totale_reale_medio_annuo']
-patrimonio_finale_reale = st.session_state.risultati['statistiche']['patrimonio_finale_mediano_reale']
-anni_di_spesa_coperti = 0.0
-if reddito_annuo_reale_pensione > 0:
-    anni_di_spesa_coperti = patrimonio_finale_reale / reddito_annuo_reale_pensione
-else:
-    # Se non c'è reddito annuo, il patrimonio non può coprire "anni di spesa"
-    anni_di_spesa_coperti = 0.0
+# Se arriviamo qui, la simulazione è stata eseguita e possiamo procedere con i calcoli.
+# --- INIZIO BLOCCO DI CALCOLO UNIFICATO ---
+# Tutti i calcoli per i KPI e i riepiloghi verranno derivati dallo SCENARIO MEDIANO
+# per garantire la massima coerenza informativa in tutta la dashboard.
 
+dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+stats_aggregate = st.session_state.risultati['statistiche']
+
+# 1. Calcolo Componenti del Patrimonio
+patrimonio_iniziale_totale = st.session_state.parametri['capitale_iniziale'] + st.session_state.parametri['etf_iniziale']
+# Usiamo i valori mediani calcolati dal motore, che sono più robusti
+contributi_versati = stats_aggregate['contributi_totali_versati_mediano_nominale']
+guadagni_da_investimento = stats_aggregate['guadagni_accumulo_mediano_nominale']
+
+# 2. Calcolo Entrate Medie Annue (dallo scenario mediano)
+# Reali
+anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
+prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi_reali]) if anni_prelievo_effettivi_reali.size > 0 else 0
+anni_pensione_effettivi_reali = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
+pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi_reali]) if anni_pensione_effettivi_reali.size > 0 else 0
+anni_rendita_fp_effettivi_reali = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
+rendita_fp_media_reale = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_effettivi_reali]) if anni_rendita_fp_effettivi_reali.size > 0 else 0
+reddito_annuo_reale_pensione = prelievo_medio_reale + pensione_media_reale + rendita_fp_media_reale
+
+# Nominali
+anni_prelievo_effettivi_nominali = np.where(dati_mediana['prelievi_effettivi_nominali'] > 0)[0]
+prelievo_medio_nominale = np.mean(dati_mediana['prelievi_effettivi_nominali'][anni_prelievo_effettivi_nominali]) if anni_prelievo_effettivi_nominali.size > 0 else 0
+anni_pensione_effettivi_nominali = np.where(dati_mediana['pensioni_pubbliche_nominali'] > 0)[0]
+pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_effettivi_nominali]) if anni_pensione_effettivi_nominali.size > 0 else 0
+anni_rendita_fp_effettivi_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
+rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_effettivi_nominali]) if anni_rendita_fp_effettivi_nominali.size > 0 else 0
+totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale
+
+# 3. Calcolo "Anni di Spesa" (basato sui dati mediani, ora coerente)
+patrimonio_finale_reale = stats_aggregate['patrimonio_finale_mediano_reale']
+anni_di_spesa_coperti = patrimonio_finale_reale / reddito_annuo_reale_pensione if reddito_annuo_reale_pensione > 0 else 0
+
+# --- FINE BLOCCO DI CALCOLO UNIFICATO ---
+
+
+# --- Visualizzazione KPI Principali ---
 st.markdown("##### Il Tuo Percorso Finanziario in Numeri")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric(
@@ -955,7 +982,6 @@ col4.metric(
 
 # --- Performance Media per Fase ---
 st.subheader("Performance Media per Fase (Scenario Mediano)")
-dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
 variazioni_annue = np.array(dati_mediana.get('variazione_patrimonio_percentuale', [0]))
 idx_inizio_prelievo = st.session_state.parametri['anni_inizio_prelievo']
 variazioni_valide = variazioni_annue[:st.session_state.parametri['anni_totali']]
@@ -1032,34 +1058,15 @@ with col2:
 st.markdown("---")
 st.subheader("Indicatori di Rischio del Piano")
 col1, col2, col3 = st.columns(3)
-col1.metric("Probabilità di Fallimento", f"{st.session_state.risultati['statistiche']['probabilita_fallimento']:.2%}", delta=f"{-st.session_state.risultati['statistiche']['probabilita_fallimento']:.2%}", delta_color="inverse", help="La percentuale di simulazioni in cui il tuo patrimonio è sceso a zero prima della fine dell'orizzonte temporale. Un valore basso è l'obiettivo principale.")
-col2.metric("Drawdown Massimo Peggiore", f"{st.session_state.risultati['statistiche']['drawdown_massimo_peggiore']:.2%}", delta=f"{st.session_state.risultati['statistiche']['drawdown_massimo_peggiore']:.2%}", delta_color="inverse", help="La perdita massima percentuale subita dal tuo portafoglio dal suo picco al suo minimo in una singola simulazione. Misura la 'botta' peggiore che il tuo piano ha dovuto sopportare.")
-col3.metric("Sharpe Ratio Medio", f"{st.session_state.risultati['statistiche']['sharpe_ratio_medio']:.2f}", help="Un indicatore che misura il rendimento del tuo portafoglio rispetto al rischio che ti sei preso. Un valore più alto indica un miglior rendimento per unità di rischio. Sopra 1.0 è considerato ottimo.")
+col1.metric("Probabilità di Fallimento", f"{stats_aggregate['probabilita_fallimento']:.2%}", delta=f"{-stats_aggregate['probabilita_fallimento']:.2%}", delta_color="inverse", help="La percentuale di simulazioni in cui il tuo patrimonio è sceso a zero prima della fine dell'orizzonte temporale. Un valore basso è l'obiettivo principale.")
+col2.metric("Drawdown Massimo Peggiore", f"{stats_aggregate['drawdown_massimo_peggiore']:.2%}", delta=f"{stats_aggregate['drawdown_massimo_peggiore']:.2%}", delta_color="inverse", help="La perdita massima percentuale subita dal tuo portafoglio dal suo picco al suo minimo in una singola simulazione. Misura la 'botta' peggiore che il tuo piano ha dovuto sopportare.")
+col3.metric("Sharpe Ratio Medio", f"{stats_aggregate['sharpe_ratio_medio']:.2f}", help="Un indicatore che misura il rendimento del tuo portafoglio rispetto al rischio che ti sei preso. Un valore più alto indica un miglior rendimento per unità di rischio. Sopra 1.0 è considerato ottimo.")
 
 st.markdown("---")
 # --- Riepilogo Entrate ---
-dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
-    
 st.header("Riepilogo Entrate in Pensione (Scenario Mediano)")
     
-# FIX: Re-introduco il blocco di calcolo per le medie delle entrate
-# Calcoli Reali
-anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
-prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi_reali]) if anni_prelievo_effettivi_reali.size > 0 else 0
-anni_pensione_effettivi_reali = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
-pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi_reali]) if anni_pensione_effettivi_reali.size > 0 else 0
-anni_rendita_fp_effettivi_reali = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
-rendita_fp_media_reale = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_effettivi_reali]) if anni_rendita_fp_effettivi_reali.size > 0 else 0
-totale_medio_reale = prelievo_medio_reale + pensione_media_reale + rendita_fp_media_reale
-
-# Calcoli Nominali
-anni_prelievo_effettivi_nominali = np.where(dati_mediana['prelievi_effettivi_nominali'] > 0)[0]
-prelievo_medio_nominale = np.mean(dati_mediana['prelievi_effettivi_nominali'][anni_prelievo_effettivi_nominali]) if anni_prelievo_effettivi_nominali.size > 0 else 0
-anni_pensione_effettivi_nominali = np.where(dati_mediana['pensioni_pubbliche_nominali'] > 0)[0]
-pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_effettivi_nominali]) if anni_pensione_effettivi_nominali.size > 0 else 0
-anni_rendita_fp_effettivi_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
-rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_effettivi_nominali]) if anni_rendita_fp_effettivi_nominali.size > 0 else 0
-totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale
+# I calcoli sono già stati fatti nel blocco unificato sopra, li usiamo per la visualizzazione
 
 col1, col2 = st.columns(2)
   
@@ -1068,7 +1075,7 @@ with col1:
     st.metric("Prelievo Medio dal Patrimonio", f"€ {prelievo_medio_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che preleverai dal tuo patrimonio per sostenere il tuo tenore di vita.")
     st.metric("Pensione Pubblica Annua", f"€ {pensione_media_reale:,.0f}", help="La stima della tua pensione statale annua, al netto dell'inflazione.")
     st.metric("Rendita Media da FP", f"€ {rendita_fp_media_reale:,.0f}", help="La cifra media annua, al netto dell'inflazione, che riceverai dal tuo fondo pensione.")
-    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {totale_medio_reale:,.0f}", help="La somma di tutte le tue entrate annue medie, al netto dell'inflazione. Questo è il tuo potere d'acquisto reale in pensione.")
+    st.metric("TOTALE ENTRATE MEDIE ANNUE", f"€ {reddito_annuo_reale_pensione:,.0f}", help="La somma di tutte le tue entrate annue medie, al netto dell'inflazione. Questo è il tuo potere d'acquisto reale in pensione.")
 
 with col2:
     st.subheader("Valori Nominali")
