@@ -230,9 +230,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     
     # Variabili per il calcolo dell'inflazione e dei prelievi
     indice_prezzi = 1.0
-    prelievo_annuo_corrente = 0
-    indice_prezzi_ultimo_prelievo = 1.0
+    prelievo_annuo_nominale_corrente = 0.0
     indice_prezzi_inizio_pensione = 1.0
+    prelievo_annuo_nominale_iniziale = 0.0
     
     # Variabili per il Fondo Pensione
     patrimonio_fp_inizio_anno = 0
@@ -248,128 +248,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     
     # --- 2. LOOP DI SIMULAZIONE MENSILE ---
     for mese in range(1, mesi_totali + 1):
-        anno_corrente = (mese - 1) // 12
-        eta_attuale = eta_iniziale + anno_corrente
+        anno_corrente = (mese -1) // 12 + 1
+        eta_attuale = parametri['eta_iniziale'] + (mese - 1) / 12
         
-        # --- A. FASE DI ACCUMULO: GESTIONE CONTRIBUTI ---
-        if mese < inizio_prelievo_mesi:
-            # --- B. ACCANTONAMENTO E CONTRIBUTI MENSILI ---
-            # Si assume che i contributi vengano fatti all'inizio del mese, prima dei rendimenti
-            patrimonio_banca += parametri['contributo_mensile_banca']
-            contributi_totali_accumulati += parametri['contributo_mensile_banca']
-            
-            # Gestione contributo a ETF
-            investimento_etf = parametri['contributo_mensile_etf']
-            if investimento_etf > 0:
-                importo_reale_investito = min(investimento_etf, patrimonio_banca)
-                patrimonio_banca -= importo_reale_investito
-                patrimonio_etf += importo_reale_investito
-                flussi_netti_investimento_anno += importo_reale_investito
-                etf_cost_basis += importo_reale_investito
-                contributi_totali_accumulati += importo_reale_investito
-            
-            # Gestione contributo a Fondo Pensione
-            if parametri['attiva_fondo_pensione'] and eta_attuale < parametri['eta_ritiro_fp']:
-                contributo_mensile_fp = parametri['contributo_annuo_fp'] / 12
-                patrimonio_fp += contributo_mensile_fp
-                contributi_fp_anno_corrente += contributo_mensile_fp
-                contributi_totali_accumulati += contributo_mensile_fp
-
-        # Calcola i guadagni totali al momento esatto dell'inizio prelievo
-        if mese == inizio_prelievo_mesi and not guadagni_calcolati:
-            patrimonio_a_inizio_prelievo = patrimonio_banca + patrimonio_etf + patrimonio_fp
-            patrimonio_iniziale_totale = parametri['capitale_iniziale'] + parametri['etf_iniziale']
-            contributi_versati = (
-                (parametri['contributo_mensile_banca'] + parametri['contributo_mensile_etf']) * (mese - 1) +
-                (parametri['contributo_annuo_fp'] * anno_corrente)
-            )
-            # Nota: questa è una stima dei contributi nominali, non tiene conto dell'indicizzazione passata
-            guadagni_accumulo = patrimonio_a_inizio_prelievo - patrimonio_iniziale_totale - contributi_versati
-            guadagni_calcolati = True
-
-        # --- C. GESTIONE ENTRATE PASSIVE (PENSIONI E RENDITE) ---
-        if anno_corrente >= parametri['inizio_pensione_anni']:
-            if anno_corrente == parametri['inizio_pensione_anni'] and (mese - 1) % 12 == 0:
-                indice_prezzi_inizio_pensione = indice_prezzi
-            pensione_mensile = (parametri['pensione_pubblica_annua'] / 12) * (indice_prezzi / indice_prezzi_inizio_pensione)
-            patrimonio_banca += pensione_mensile
-
-        if fp_convertito_in_rendita:
-            rendita_mensile_indicizzata = rendita_mensile_nominale_tassata_fp * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
-            patrimonio_banca += rendita_mensile_indicizzata
-            if capitale_fp_per_rendita > 0:
-                quota_capitale_erosa = (rendita_annua_nominale_lorda_fp / 12) * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
-                capitale_fp_per_rendita = max(0, capitale_fp_per_rendita - quota_capitale_erosa)
-                patrimonio_fp = capitale_fp_per_rendita
-
-        # --- D. FASE DI DECUMULO: CALCOLO E GESTIONE PRELIEVI ---
-        prelievo_mensile = 0
-        if mese >= inizio_prelievo_mesi:
-            # Il ricalcolo del prelievo annuo avviene solo all'inizio di ogni anno
-            if (mese - inizio_prelievo_mesi) % 12 == 0:
-                patrimonio_prelevabile = patrimonio_banca + patrimonio_etf
-                # Esclude la liquidazione FP dell'anno precedente per non distorcere il calcolo
-                if anno_corrente > 0:
-                    patrimonio_prelevabile -= dati_annuali['fp_liquidato_nominale'][anno_corrente - 1]
-
-                if patrimonio_prelevabile <= 0:
-                    prelievo_annuo_corrente = 0
-                else:
-                    inflazione_dal_precedente = indice_prezzi / indice_prezzi_ultimo_prelievo
-                    strategia = parametri['strategia_prelievo']
-                    
-                    if mese == inizio_prelievo_mesi: # Primo prelievo in assoluto
-                        prelievo_annuo_corrente = (prelievo_annuo_da_usare * indice_prezzi if strategia == 'FISSO'
-                                                   else patrimonio_prelevabile * parametri['percentuale_regola_4'])
-                    else: # Prelievi successivi
-                        if strategia == 'FISSO':
-                            prelievo_annuo_corrente *= inflazione_dal_precedente
-                        elif strategia == 'REGOLA_4_PERCENTO':
-                            prelievo_annuo_corrente = patrimonio_prelevabile * parametri['percentuale_regola_4']
-                        elif strategia == 'GUARDRAIL':
-                            prelievo_annuo_corrente *= inflazione_dal_precedente
-                            soglia_sup = parametri['percentuale_regola_4'] * (1 + parametri['banda_guardrail'])
-                            soglia_inf = parametri['percentuale_regola_4'] * (1 - parametri['banda_guardrail'])
-                            tasso_attuale = prelievo_annuo_corrente / patrimonio_prelevabile if patrimonio_prelevabile > 0 else float('inf')
-                            if tasso_attuale > soglia_sup: prelievo_annuo_corrente *= 0.90
-                            elif tasso_attuale < soglia_inf: prelievo_annuo_corrente *= 1.10
-                    
-                dati_annuali['prelievi_target_nominali'][anno_corrente] = prelievo_annuo_corrente
-                indice_prezzi_ultimo_prelievo = indice_prezzi
-
-            prelievo_mensile = prelievo_annuo_corrente / 12
-        
-        # Se necessario, vende ETF per coprire il prelievo mensile, calcolando le tasse
-        ricavo_netto_vendita_etf = 0
-        if prelievo_mensile > 0:
-            fabbisogno_liquidita = max(0, prelievo_mensile - patrimonio_banca)
-            if fabbisogno_liquidita > 0 and patrimonio_etf > 0:
-                cost_basis_ratio = etf_cost_basis / patrimonio_etf if patrimonio_etf > 0 else 1
-                tasse_implicite = (1 - cost_basis_ratio) * parametri['tassazione_capital_gain']
-                importo_lordo_da_vendere = fabbisogno_liquidita / (1 - tasse_implicite) if (1 - tasse_implicite) > 0 else float('inf')
-                importo_venduto = min(importo_lordo_da_vendere, patrimonio_etf)
-
-                if importo_venduto > 0:
-                    costo_proporzionale = (importo_venduto / patrimonio_etf) * etf_cost_basis
-                    plusvalenza = importo_venduto - costo_proporzionale
-                    tasse_pagate = plusvalenza * parametri['tassazione_capital_gain']
-                    ricavo_netto_vendita_etf = importo_venduto - tasse_pagate
-
-                    patrimonio_banca += ricavo_netto_vendita_etf
-                    patrimonio_etf -= importo_venduto
-                    flussi_netti_investimento_anno -= importo_venduto
-                    etf_cost_basis -= costo_proporzionale
-
-        # Esegue il prelievo effettivo dalla liquidità
-        prelievo_effettivo_mensile = min(patrimonio_banca, prelievo_mensile) if prelievo_mensile > 0 else 0
-        if prelievo_effettivo_mensile > 0:
-            patrimonio_banca -= prelievo_effettivo_mensile
-            dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_effettivo_mensile
-            quota_da_etf = min(prelievo_effettivo_mensile, ricavo_netto_vendita_etf)
-            dati_annuali['prelievi_da_etf_nominali'][anno_corrente] += quota_da_etf
-            dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += prelievo_effettivo_mensile - quota_da_etf
-
-        # --- E. RENDIMENTI, COSTI E INFLAZIONE ---
+        # --- A. CALCOLO RENDIMENTI E INFLAZIONE MENSILI ---
         # Determina il prossimo stato economico e calcola i rendimenti del mese
         market_regime_params = market_regime_definitions[current_market_regime]
         inflation_regime_params = inflation_regime_definitions[current_inflation_regime]
@@ -396,131 +278,109 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # Controllo di sicurezza: assicurati che l'indice prezzi rimanga sempre positivo
         indice_prezzi = max(indice_prezzi, 1e-10)
 
-        # --- F. OPERAZIONI DI FINE ANNO (ESEGUITE SOLO A DICEMBRE) ---
-        if mese % 12 == 0:
-            # FIX: Calcola il patrimonio totale all'inizio dell'anno PRIMA di ogni altra operazione
-            patrimonio_totale_fine_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
+        # --- B. ACCANTONAMENTO E CONTRIBUTI MENSILI ---
+        if mese < inizio_prelievo_mesi:
+            # Si assume che i contributi vengano fatti all'inizio del mese, prima dei rendimenti
+            patrimonio_banca += parametri['contributo_mensile_banca']
+            contributi_totali_accumulati += parametri['contributo_mensile_banca']
             
-            # FIX: Calcola il patrimonio di inizio anno usando i dati salvati l'anno precedente
-            # per avere un confronto corretto prima dei prelievi/costi.
-            if anno_corrente > 0:
-                patrimonio_totale_inizio_anno = (dati_annuali['saldo_banca_nominale'][anno_corrente - 1] +
-                                               dati_annuali['saldo_etf_nominale'][anno_corrente - 1] +
-                                               dati_annuali['saldo_fp_nominale'][anno_corrente - 1])
-            else:
-                patrimonio_totale_inizio_anno = parametri['capitale_iniziale'] + parametri['etf_iniziale']
+            # Gestione contributo a ETF
+            investimento_etf = parametri['contributo_mensile_etf']
+            if investimento_etf > 0:
+                importo_reale_investito = min(investimento_etf, patrimonio_banca)
+                patrimonio_banca -= importo_reale_investito
+                patrimonio_etf += importo_reale_investito
+                flussi_netti_investimento_anno += importo_reale_investito
+                etf_cost_basis += importo_reale_investito
+                contributi_totali_accumulati += importo_reale_investito
+            
+            # Gestione contributo a Fondo Pensione
+            if parametri['attiva_fondo_pensione'] and eta_attuale < parametri['eta_ritiro_fp']:
+                contributo_mensile_fp = parametri['contributo_annuo_fp'] / 12
+                patrimonio_fp += contributo_mensile_fp
+                contributi_fp_anno_corrente += contributo_mensile_fp
+                contributi_totali_accumulati += contributo_mensile_fp
 
-            patrimonio_investito_inizio_anno = 0
-            if anno_corrente == 0:
-                 patrimonio_investito_inizio_anno = parametri['etf_iniziale']
+        # --- C. FASE DI PRELIEVO: GESTIONE USCITE ---
+        if mese >= inizio_prelievo_mesi:
             
-            # Salva l'indice prezzi di fine anno
-            dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
-            
-            # Salva i contributi totali versati a fine anno
-            dati_annuali['contributi_totali_versati'][anno_corrente] = contributi_totali_accumulati
-            
-            # Ribilanciamento, liquidazione FP, calcolo rendimenti annuali, ecc.
-            
-            # 1. Ribilanciamento
-            strategia_ribilanciamento = parametri.get('strategia_ribilanciamento', 'GLIDEPATH')
-            if strategia_ribilanciamento != 'NESSUNO':
-                target_alloc_etf = -1.0 
-                if strategia_ribilanciamento == 'GLIDEPATH':
-                    if anno_corrente >= parametri['inizio_glidepath_anni'] and anno_corrente <= parametri['fine_glidepath_anni']:
-                        patrimonio_investibile_check = patrimonio_banca + patrimonio_etf
-                        if patrimonio_investibile_check > 0 and allocazione_etf_inizio_glidepath < 0:
-                             allocazione_etf_inizio_glidepath = patrimonio_etf / patrimonio_investibile_check
-                        durata = float(parametri['fine_glidepath_anni'] - parametri['inizio_glidepath_anni'])
-                        progresso = (anno_corrente - parametri['inizio_glidepath_anni']) / durata if durata > 0 else 1.0
-                        alloc_partenza = allocazione_etf_inizio_glidepath if allocazione_etf_inizio_glidepath >= 0 else (patrimonio_etf / (patrimonio_banca + patrimonio_etf) if (patrimonio_banca + patrimonio_etf) > 0 else 0)
-                        target_alloc_etf = alloc_partenza * (1 - progresso) + parametri['allocazione_etf_finale'] * progresso
-                    elif anno_corrente > parametri['fine_glidepath_anni']:
-                        target_alloc_etf = parametri['allocazione_etf_finale']
-                elif strategia_ribilanciamento == 'ANNUALE_FISSO':
-                    target_alloc_etf = parametri.get('allocazione_etf_fissa', 0.60)
+            # Calcola i guadagni totali UNA SOLA VOLTA, al momento esatto dell'inizio prelievo
+            if not guadagni_calcolati:
+                patrimonio_attuale = patrimonio_banca + patrimonio_etf + patrimonio_fp
+                contributi_fino_a_prelievo = contributi_totali_accumulati
+                guadagni_accumulo = patrimonio_attuale - (parametri['capitale_iniziale'] + parametri['etf_iniziale']) - contributi_fino_a_prelievo
+                guadagni_calcolati = True
 
-                if target_alloc_etf >= 0:
-                    patrimonio_investibile = patrimonio_banca + patrimonio_etf
-                    if patrimonio_investibile > 0:
-                        rebalance_amount = (patrimonio_investibile * target_alloc_etf) - patrimonio_etf
-                        if rebalance_amount < -1:
-                            importo_da_vendere = abs(rebalance_amount)
-                            dati_annuali['vendite_rebalance_nominali'][anno_corrente] += importo_da_vendere
-                            costo_proporzionale = (importo_da_vendere / patrimonio_etf) * etf_cost_basis if patrimonio_etf > 0 else 0
-                            plusvalenza = importo_da_vendere - costo_proporzionale
-                            tasse_da_pagare = max(0, plusvalenza * parametri['tassazione_capital_gain'])
-                            patrimonio_etf -= importo_da_vendere
-                            flussi_netti_investimento_anno -= importo_da_vendere
-                            etf_cost_basis -= costo_proporzionale
-                            patrimonio_banca += (importo_da_vendere - tasse_da_pagare)
-                        elif rebalance_amount > 1:
-                            importo_da_comprare = min(rebalance_amount, patrimonio_banca)
-                            patrimonio_banca -= importo_da_comprare
-                            patrimonio_etf += importo_da_comprare
-                            flussi_netti_investimento_anno += importo_da_comprare
-                            etf_cost_basis += importo_da_comprare
-            
-            # 2. Gestione Fiscale e Liquidazione Fondo Pensione
-            if parametri['attiva_fondo_pensione'] and not fp_convertito_in_rendita:
-                patrimonio_fp_post_costi = patrimonio_fp
-                rendimento_maturato_anno = patrimonio_fp_post_costi - patrimonio_fp_inizio_anno - contributi_fp_anno_corrente
-                if rendimento_maturato_anno > 0:
-                    tassa_su_rendimento = rendimento_maturato_anno * parametri['tassazione_rendimenti_fp']
-                    patrimonio_fp -= tassa_su_rendimento
+            # FIX: Imposta/aggiorna l'importo del prelievo annuale nominale SOLO UNA VOLTA ALL'ANNO.
+            is_new_retirement_year = (mese - inizio_prelievo_mesi) % 12 == 0
+            if is_new_retirement_year:
+                if parametri['strategia_prelievo'] == 'FISSO':
+                    prelievo_annuo_nominale_corrente = prelievo_annuo_da_usare * indice_prezzi
                 
-                patrimonio_fp_inizio_anno = patrimonio_fp
-                contributi_fp_anno_corrente = 0
-                
-                if eta_attuale >= parametri['eta_ritiro_fp'] and patrimonio_fp > 0:
-                    capitale_ritirato = patrimonio_fp * parametri['percentuale_capitale_fp']
-                    dati_annuali['fp_liquidato_nominale'][anno_corrente] = capitale_ritirato
-                    patrimonio_banca += capitale_ritirato * (1 - parametri['aliquota_finale_fp'])
-                    capitale_fp_per_rendita = patrimonio_fp * (1 - parametri['percentuale_capitale_fp'])
-                    
-                    if parametri['durata_rendita_fp_anni'] > 0 and capitale_fp_per_rendita > 0:
-                        tasso_interesse_annuo_fp = parametri['rendimento_medio_fp'] - parametri['ter_fp']
-                        n_anni_rendita = parametri['durata_rendita_fp_anni']
-                        if tasso_interesse_annuo_fp > 0:
-                            fattore_rendita = tasso_interesse_annuo_fp / (1 - (1 + tasso_interesse_annuo_fp) ** -n_anni_rendita)
-                            rendita_annua_nominale_lorda_fp = capitale_fp_per_rendita * fattore_rendita
-                        else:
-                            rendita_annua_nominale_lorda_fp = capitale_fp_per_rendita / n_anni_rendita
-                        
-                        rendita_mensile_nominale_tassata_fp = (rendita_annua_nominale_lorda_fp / 12) * (1 - parametri['aliquota_finale_fp'])
-                        indice_prezzi_inizio_rendita_fp = indice_prezzi
-                    
-                    patrimonio_fp = capitale_fp_per_rendita
-                    fp_convertito_in_rendita = True
+                elif parametri['strategia_prelievo'] == 'REGOLA_4_PERCENTO':
+                    if mese == inizio_prelievo_mesi:
+                        patrimonio_a_prelievo = patrimonio_banca + patrimonio_etf
+                        prelievo_annuo_nominale_iniziale = patrimonio_a_prelievo * (parametri['percentuale_regola_4'] / 100)
+                        indice_prezzi_inizio_pensione = indice_prezzi
+                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale
+                    else:
+                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
 
-            # --- 3. SALVATAGGIO DATI ANNUALI E CALCOLO RENDIMENTI ---
-            dati_annuali['saldo_banca_nominale'][anno_corrente] = patrimonio_banca
-            dati_annuali['saldo_etf_nominale'][anno_corrente] = patrimonio_etf
-            dati_annuali['saldo_fp_nominale'][anno_corrente] = patrimonio_fp
-            dati_annuali['saldo_banca_reale'][anno_corrente] = patrimonio_banca / indice_prezzi
-            dati_annuali['saldo_etf_reale'][anno_corrente] = patrimonio_etf / indice_prezzi
-            dati_annuali['saldo_fp_reale'][anno_corrente] = patrimonio_fp / indice_prezzi
-
-            patrimonio_totale_fine_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
+            # Il prelievo mensile è semplicemente 1/12 dell'obiettivo annuale
+            prelievo_mensile_target = prelievo_annuo_nominale_corrente / 12
             
-            patrimonio_investito_inizio_anno = 0
-            if anno_corrente == 0:
-                 patrimonio_investito_inizio_anno = parametri['etf_iniziale']
+            # Esegui il prelievo effettivo
+            prelievo_effettivo = min(prelievo_mensile_target, patrimonio_banca + patrimonio_etf)
+            dati_annuali['prelievi_target_nominali'][anno_corrente] += prelievo_mensile_target
+            dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_effettivo
+            dati_annuali['prelievi_effettivi_reali'][anno_corrente] += prelievo_effettivo / indice_prezzi
             
-            # Calcolo Variazione Netta e Rendimento Puro
-            if patrimonio_totale_inizio_anno > 0:
-                dati_annuali['variazione_patrimonio_percentuale'][anno_corrente] = \
-                    (patrimonio_totale_fine_anno - patrimonio_totale_inizio_anno) / patrimonio_totale_inizio_anno
-                
-            if patrimonio_investito_inizio_anno > 0:
-                patrimonio_investito_fine_anno = patrimonio_etf + patrimonio_fp
-                guadagni_anno = patrimonio_investito_fine_anno - patrimonio_investito_inizio_anno - flussi_netti_investimento_anno
-                dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = guadagni_anno / patrimonio_investito_inizio_anno
+            # Se necessario, vende ETF per coprire il prelievo mensile, calcolando le tasse
+            ricavo_netto_vendita_etf = 0
+            if prelievo_effettivo > 0:
+                fabbisogno_liquidita = max(0, prelievo_effettivo - patrimonio_banca)
+                if fabbisogno_liquidita > 0 and patrimonio_etf > 0:
+                    cost_basis_ratio = etf_cost_basis / patrimonio_etf if patrimonio_etf > 0 else 1
+                    tasse_implicite = (1 - cost_basis_ratio) * parametri['tassazione_capital_gain']
+                    importo_lordo_da_vendere = fabbisogno_liquidita / (1 - tasse_implicite) if (1 - tasse_implicite) > 0 else float('inf')
+                    importo_venduto = min(importo_lordo_da_vendere, patrimonio_etf)
 
-            flussi_netti_investimento_anno = 0
-            if parametri['attiva_fondo_pensione']: patrimonio_fp_inizio_anno = patrimonio_fp
+                    if importo_venduto > 0:
+                        costo_proporzionale = (importo_venduto / patrimonio_etf) * etf_cost_basis
+                        plusvalenza = importo_venduto - costo_proporzionale
+                        tasse_pagate = plusvalenza * parametri['tassazione_capital_gain']
+                        ricavo_netto_vendita_etf = importo_venduto - tasse_pagate
 
-        # --- G. AGGIORNAMENTO STATO E CONTROLLO FALLIMENTO ---
+                        patrimonio_banca += ricavo_netto_vendita_etf
+                        patrimonio_etf -= importo_venduto
+                        flussi_netti_investimento_anno -= importo_venduto
+                        etf_cost_basis -= costo_proporzionale
+
+            # Esegue il prelievo effettivo dalla liquidità
+            prelievo_effettivo_mensile = min(patrimonio_banca, prelievo_effettivo) if prelievo_effettivo > 0 else 0
+            if prelievo_effettivo_mensile > 0:
+                patrimonio_banca -= prelievo_effettivo_mensile
+                dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_effettivo_mensile
+                quota_da_etf = min(prelievo_effettivo_mensile, ricavo_netto_vendita_etf)
+                dati_annuali['prelievi_da_etf_nominali'][anno_corrente] += quota_da_etf
+                dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += prelievo_effettivo_mensile - quota_da_etf
+
+        # --- D. GESTIONE ENTRATE PASSIVE (PENSIONI E RENDITE) ---
+        if anno_corrente >= parametri['inizio_pensione_anni']:
+            if anno_corrente == parametri['inizio_pensione_anni'] and (mese - 1) % 12 == 0:
+                indice_prezzi_inizio_pensione = indice_prezzi
+            pensione_mensile = (parametri['pensione_pubblica_annua'] / 12) * (indice_prezzi / indice_prezzi_inizio_pensione)
+            patrimonio_banca += pensione_mensile
+
+        if fp_convertito_in_rendita:
+            rendita_mensile_indicizzata = rendita_mensile_nominale_tassata_fp * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
+            patrimonio_banca += rendita_mensile_indicizzata
+            if capitale_fp_per_rendita > 0:
+                quota_capitale_erosa = (rendita_annua_nominale_lorda_fp / 12) * (indice_prezzi / indice_prezzi_inizio_rendita_fp)
+                capitale_fp_per_rendita = max(0, capitale_fp_per_rendita - quota_capitale_erosa)
+                patrimonio_fp = capitale_fp_per_rendita
+
+        # --- E. AGGIORNAMENTO STATO E CONTROLLO FALLIMENTO ---
         # Questa sezione ora non è più necessaria per lo storico,
         # perché i dati vengono già salvati annualmente.
         # Mantieniamo il controllo di fallimento.
