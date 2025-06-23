@@ -211,7 +211,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
     # Modello economico a regimi
     model_name = parametri.get('economic_model', "VOLATILE (CICLI BOOM-BUST)")
-    market_regime_definitions, inflation_regime_definitions = _get_regime_params(model_name)
+    economic_model_params = _get_regime_params(model_name)
+    market_regime_definitions = economic_model_params['market_regimes']
+    inflation_regime_definitions = economic_model_params['inflation_regimes']
     current_market_regime = np.random.choice(list(market_regime_definitions.keys()))
     current_inflation_regime = np.random.choice(list(inflation_regime_definitions.keys()))
 
