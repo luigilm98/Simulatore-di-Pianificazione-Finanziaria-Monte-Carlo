@@ -540,8 +540,8 @@ def _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare):
     patrimoni_reali_tutte_le_run = np.zeros((n_simulazioni, mesi_totali + 1))
     reddito_reale_annuo_tutte_le_run = np.zeros((n_simulazioni, parametri['anni_totali']))
     
-    # Dati dettagliati solo per la simulazione mediana
-    dati_mediana_dettagliati = {}
+    # Lista per contenere i dati annuali di OGNI simulazione
+    tutti_i_dati_annuali_run = []
     
     # Contatori per statistiche
     totale_contributi_versati_nominale = np.zeros(n_simulazioni)
@@ -563,14 +563,14 @@ def _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare):
         if risultati_run['fallimento']:
             fallimenti += 1
 
-        if i == n_simulazioni // 2: # Salva i dati dettagliati per la run mediana
-            dati_mediana_dettagliati = risultati_run['dati_annuali']
+        # Aggiungi i dati annuali di questa run alla lista
+        tutti_i_dati_annuali_run.append(risultati_run['dati_annuali'])
             
     return (
         patrimoni_tutte_le_run,
         patrimoni_reali_tutte_le_run,
         reddito_reale_annuo_tutte_le_run,
-        dati_mediana_dettagliati,
+        tutti_i_dati_annuali_run,
         {
             'totale_contributi_versati_nominale': totale_contributi_versati_nominale,
             'guadagni_accumulo_nominale': guadagni_accumulo_nominale,
@@ -658,7 +658,7 @@ def run_full_simulation(parametri):
         patrimoni_tutte_le_run,
         patrimoni_reali_tutte_le_run,
         reddito_reale_annuo_tutte_le_run,
-        dati_mediana_dettagliati,
+        tutti_i_dati_annuali_run,
         contatori_statistiche
     ) = _esegui_simulazioni_principali(parametri, prelievo_annuo_da_usare)
 
@@ -666,6 +666,14 @@ def run_full_simulation(parametri):
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
     patrimoni_finali_nominali = patrimoni_tutte_le_run[:, -1]
     
+    # --- NUOVA LOGICA PER TROVARE LA SIMULAZIONE MEDIANA ---
+    # 1. Calcola il valore mediano dei patrimoni finali reali
+    valore_mediano = np.median(patrimoni_finali_reali)
+    # 2. Trova l'indice della simulazione il cui patrimonio finale è più vicino alla mediana
+    indice_mediano = np.abs(patrimoni_finali_reali - valore_mediano).argmin()
+    # 3. Estrai i dati dettagliati di quella specifica simulazione
+    dati_mediana_dettagliati = tutti_i_dati_annuali_run[indice_mediano]
+
     # Calcolo del patrimonio all'inizio dei prelievi
     idx_inizio_prelievo_mesi = parametri['anni_inizio_prelievo'] * 12
     patrimoni_inizio_prelievi_reali = patrimoni_reali_tutte_le_run[:, idx_inizio_prelievo_mesi]
