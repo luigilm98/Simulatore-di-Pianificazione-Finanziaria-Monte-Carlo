@@ -517,16 +517,13 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             patrimonio_negativo = True
     
     # --- 3. OUTPUT FINALE DELLA SINGOLA RUN ---
-    # Costruisce lo storico mensile del patrimonio dai dati annuali per il drawdown
-    patrimoni_nominali_tutte_le_run = np.array([
-        d['saldo_banca_nominale'] + d['saldo_etf_nominale'] + d['saldo_fp_nominale'] 
-        for d in dati_annuali.values()
-    ])
+    # FIX: Calcola correttamente lo storico del patrimonio per il calcolo del drawdown
+    patrimonio_storico_nominale = dati_annuali['saldo_banca_nominale'] + dati_annuali['saldo_etf_nominale'] + dati_annuali['saldo_fp_nominale']
     
     drawdown = 0
-    if np.any(patrimoni_nominali_tutte_le_run > 0):
-        picchi = np.maximum.accumulate(patrimoni_nominali_tutte_le_run)
-        drawdown_values = (patrimoni_nominali_tutte_le_run - picchi) / picchi
+    if np.any(patrimonio_storico_nominale > 0):
+        picchi = np.maximum.accumulate(patrimonio_storico_nominale)
+        drawdown_values = (patrimonio_storico_nominale - picchi) / picchi
         drawdown = np.min(drawdown_values)
 
     return {
