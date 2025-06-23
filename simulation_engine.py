@@ -181,12 +181,13 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     dati_annuali = {k: np.zeros(num_anni + 1) for k in [
         'saldo_banca_nominale', 'saldo_etf_nominale', 'saldo_fp_nominale',
         'saldo_banca_reale', 'saldo_etf_reale', 'saldo_fp_reale',
+        'stipendi_netti_nominali',
         'prelievi_target_nominali', 'prelievi_effettivi_nominali', 'prelievi_effettivi_reali',
         'prelievi_da_banca_nominali', 'prelievi_da_etf_nominali',
         'pensioni_pubbliche_nominali', 'pensioni_pubbliche_reali',
         'rendite_fp_nominali', 'rendite_fp_reali',
         'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
-        'contributi_totali_versati', 'indice_prezzi'
+        'contributi_totali_versati', 'indice_prezzi', 'reddito_totale_reale'
     ]}
 
     # Stato iniziale dei saldi e delle variabili
@@ -222,7 +223,29 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         anno_corrente = (mese - 1) // 12 + 1
         eta_attuale = parametri['eta_iniziale'] + (mese - 1) / 12
 
-        # A. FASE DI ACCUMULO (prima dei rendimenti)
+        # A. ENTRATE MENSILI (Pensione / Rendite)
+        # Lo stipendio non viene calcolato qui, i risparmi vengono aggiunti
+        # direttamente come "contributi" nella fase di accumulo.
+
+        # Calcolo Pensione Pubblica
+        pensione_pubblica_mese = 0
+        inizio_pensione_mesi = parametri.get('inizio_pensione_anni', num_anni + 1) * 12
+        if mese >= inizio_pensione_mesi:
+            pensione_pubblica_mese = parametri.get('pensione_pubblica_annua', 0) / 12
+        
+        # Calcolo Rendita Fondo Pensione (logica non implementata in questa versione)
+        rendita_fp_mese = 0
+        
+        # Aggiornamento contabile delle entrate
+        patrimonio_banca += pensione_pubblica_mese # La pensione viene accreditata in banca
+        dati_annuali['pensioni_pubbliche_nominali'][anno_corrente] += pensione_pubblica_mese
+        dati_annuali['rendite_fp_nominali'][anno_corrente] += rendita_fp_mese
+        
+        # Calcolo del reddito reale da pensioni/rendite
+        reddito_da_pensioni_reale = (pensione_pubblica_mese + rendita_fp_mese) / indice_prezzi
+        dati_annuali['reddito_totale_reale'][anno_corrente] += reddito_da_pensioni_reale
+
+        # B. FASE DI ACCUMULO (prima dei rendimenti)
         if mese < inizio_prelievo_mesi:
             # Contributi
             patrimonio_banca += parametri['contributo_mensile_banca']
@@ -284,6 +307,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 dati_annuali['prelievi_effettivi_reali'][anno_corrente] += prelievo_totale_mese / indice_prezzi
                 dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += prelevato_da_banca
                 dati_annuali['prelievi_da_etf_nominali'][anno_corrente] += prelevato_da_etf_netto
+                
+                # Aggiungi il prelievo al reddito totale reale dell'anno
+                dati_annuali['reddito_totale_reale'][anno_corrente] += prelievo_totale_mese / indice_prezzi
 
         # C. RENDIMENTI, COSTI E AGGIORNAMENTO INFLAZIONE
         market_regime = market_regime_definitions[current_market_regime]
