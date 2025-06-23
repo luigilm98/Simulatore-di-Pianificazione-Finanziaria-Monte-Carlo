@@ -198,7 +198,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     inizio_prelievo_mesi = parametri['anni_inizio_prelievo'] * 12 + 1
 
     # Inizializzazione degli array per i risultati annuali
-    # Vengono pre-allocati per efficienza
     dati_annuali = {k: np.zeros(num_anni + 1) for k in [
         'prelievi_target_nominali', 'prelievi_effettivi_nominali', 'prelievi_effettivi_reali',
         'prelievi_da_banca_nominali', 'prelievi_da_etf_nominali', 'vendite_rebalance_nominali',
@@ -208,7 +207,6 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'reddito_totale_reale', 'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
         'contributi_totali_versati', 'indice_prezzi'
     ]}
-    dati_annuali['indice_prezzi'][0] = 1.0  # FIX: Imposta il valore iniziale corretto
 
     # Stato iniziale del patrimonio e altre variabili di stato
     patrimonio_banca = parametri['capitale_iniziale']
@@ -216,7 +214,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     etf_cost_basis = parametri['etf_iniziale']
     patrimonio_fp = 0
     
-    patrimonio_storico = [patrimonio_banca + patrimonio_etf]
+    # FIX: Salva i valori iniziali (anno 0) direttamente nel dizionario annuale
+    dati_annuali['saldo_banca_nominale'][0] = patrimonio_banca
+    dati_annuali['saldo_etf_nominale'][0] = patrimonio_etf
+    dati_annuali['saldo_fp_nominale'][0] = patrimonio_fp
+    dati_annuali['indice_prezzi'][0] = 1.0
+
     patrimonio_negativo = False
     
     # Variabili per il calcolo dei flussi e rendimenti
@@ -484,7 +487,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
             patrimonio_totale_fine_anno = patrimonio_banca + patrimonio_etf + patrimonio_fp
             
-            patrimonio_totale_inizio_anno = (patrimonio_storico[anno_corrente * 12])
+            patrimonio_totale_inizio_anno = (patrimonio_banca + patrimonio_etf + patrimonio_fp)
             patrimonio_investito_inizio_anno = 0
             if anno_corrente == 0:
                  patrimonio_investito_inizio_anno = parametri['etf_iniziale']
@@ -506,23 +509,27 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             if parametri['attiva_fondo_pensione']: patrimonio_fp_inizio_anno = patrimonio_fp
 
         # --- G. AGGIORNAMENTO STATO E CONTROLLO FALLIMENTO ---
+        # Questa sezione ora non è più necessaria per lo storico,
+        # perché i dati vengono già salvati annualmente.
+        # Mantieniamo il controllo di fallimento.
         patrimonio_totale_mese = max(0, patrimonio_banca + patrimonio_etf + patrimonio_fp)
-        patrimonio_storico.append(patrimonio_totale_mese)
-        
         if patrimonio_totale_mese <= 0 and mese >= inizio_prelievo_mesi:
             patrimonio_negativo = True
     
     # --- 3. OUTPUT FINALE DELLA SINGOLA RUN ---
-    # Calcolo drawdown e Sharpe ratio per la run
-    patrimoni_np = np.array(patrimonio_storico)
+    # Costruisce lo storico mensile del patrimonio dai dati annuali per il drawdown
+    patrimoni_nominali_tutte_le_run = np.array([
+        d['saldo_banca_nominale'] + d['saldo_etf_nominale'] + d['saldo_fp_nominale'] 
+        for d in dati_annuali.values()
+    ])
+    
     drawdown = 0
-    if np.any(patrimoni_np > 0):
-        picchi = np.maximum.accumulate(patrimoni_np)
-        drawdown_values = (patrimoni_np - picchi) / picchi
+    if np.any(patrimoni_nominali_tutte_le_run > 0):
+        picchi = np.maximum.accumulate(patrimoni_nominali_tutte_le_run)
+        drawdown_values = (patrimoni_nominali_tutte_le_run - picchi) / picchi
         drawdown = np.min(drawdown_values)
 
     return {
-        "patrimonio_storico": patrimonio_storico,
         "dati_annuali": dati_annuali,
         "drawdown": drawdown,
         "fallimento": patrimonio_negativo,
@@ -622,67 +629,48 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
 
     # Inizializzazione contenitori per i risultati aggregati
     n_sim = parametri['n_simulazioni']
-    mesi_totali = parametri['anni_totali'] * 12
-    patrimoni_tutte_le_run = np.zeros((n_sim, mesi_totali + 1))
-    tutti_i_dati_annuali = []
+    num_anni = parametri['anni_totali']
+    
+    # FIX: Inizializza un array per contenere tutti i dati annuali di tutte le run
+    tutti_i_dati_annuali = [{} for _ in range(n_sim)]
     tutti_i_drawdown = np.zeros(n_sim)
     tutti_i_guadagni = np.zeros(n_sim)
     tutti_i_contributi = np.zeros(n_sim)
     fallimenti = 0
-    num_anni = parametri['anni_totali']
-    matrice_indici_prezzi = np.zeros((n_sim, num_anni + 1))
 
     # Esecuzione delle N simulazioni
     for i in range(n_sim):
         risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
-        patrimoni_tutte_le_run[i, :] = risultati_run['patrimonio_storico']
-        tutti_i_dati_annuali.append(risultati_run['dati_annuali'])
+        tutti_i_dati_annuali[i] = risultati_run['dati_annuali']
         tutti_i_drawdown[i] = risultati_run['drawdown']
         tutti_i_guadagni[i] = risultati_run['guadagni_accumulo']
         tutti_i_contributi[i] = risultati_run['contributi_totali_versati']
         if risultati_run['fallimento']:
             fallimenti += 1
-        # Aggregazione dell'indice dei prezzi di ogni run
-        matrice_indici_prezzi[i] = risultati_run['dati_annuali']['indice_prezzi']
             
-    # Calcolo dei valori reali usando gli indici di prezzo individuali per ogni run
-    patrimoni_reali_tutte_le_run = np.zeros_like(patrimoni_tutte_le_run)
+    # --- Calcolo dei valori reali e nominali per i grafici ---
+    patrimoni_nominali_tutte_le_run = np.array([
+        d['saldo_banca_nominale'] + d['saldo_etf_nominale'] + d['saldo_fp_nominale'] 
+        for d in tutti_i_dati_annuali
+    ])
+    
+    patrimoni_reali_tutte_le_run = np.zeros_like(patrimoni_nominali_tutte_le_run)
     for i in range(n_sim):
-        # Interpola l'indice prezzi annuale per ottenere valori mensili
-        indici_annuali = tutti_i_dati_annuali[i]['indice_prezzi']
-        mesi_totali = patrimoni_tutte_le_run.shape[1] - 1
-        anni_totali = len(indici_annuali) - 1
-        
-        # Controllo di sicurezza: assicurati che l'indice prezzi sia sempre positivo
-        indici_annuali = np.maximum(indici_annuali, 1e-10)  # Evita zeri
-        
-        # Crea array di mesi (0, 1, 2, ..., mesi_totali)
-        mesi = np.arange(mesi_totali + 1)
-        # Crea array di anni corrispondenti (0, 1/12, 2/12, ..., anni_totali)
-        anni_mesi = mesi / 12
-        
-        # Interpola linearmente l'indice prezzi per ogni mese
-        indici_mensili = np.interp(anni_mesi, np.arange(anni_totali + 1), indici_annuali)
-        
-        # Controllo di sicurezza: assicurati che gli indici mensili siano sempre positivi
-        indici_mensili = np.maximum(indici_mensili, 1e-10)
-        
-        # Ora dividi i patrimoni mensili per gli indici prezzi mensili
-        patrimoni_reali_tutte_le_run[i, :] = patrimoni_tutte_le_run[i, :] / indici_mensili
+        indici_prezzi = tutti_i_dati_annuali[i]['indice_prezzi']
+        indici_prezzi = np.maximum(indici_prezzi, 1e-10) # Safety check
+        patrimoni_reali_tutte_le_run[i, :] = patrimoni_nominali_tutte_le_run[i, :] / indici_prezzi
 
     # Identificazione dello scenario mediano basato sul patrimonio finale reale
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
-    
-    # Controllo di sicurezza: rimuovi eventuali valori NaN o infiniti
     patrimoni_finali_reali = np.nan_to_num(patrimoni_finali_reali, nan=0.0, posinf=0.0, neginf=0.0)
     
     valore_mediano = np.median(patrimoni_finali_reali)
-    indice_mediano = np.abs(patrimoni_finali_reali - valore_mediano).argmin()
+    indice_mediano = np.abs(patrimoni_finali_reali - valore_mediano).argmin() if len(patrimoni_finali_reali) > 0 else 0
     dati_mediana_dettagliati = tutti_i_dati_annuali[indice_mediano]
 
     # Calcolo delle statistiche aggregate finali
-    patrimoni_finali_nominali = patrimoni_tutte_le_run[:, -1]
-    idx_inizio_prelievo = parametri['anni_inizio_prelievo'] * 12
+    patrimoni_finali_nominali = patrimoni_nominali_tutte_le_run[:, -1]
+    idx_inizio_prelievo = parametri['anni_inizio_prelievo']
     
     statistiche = {
         'patrimonio_finale_mediano_nominale': np.median(patrimoni_finali_nominali),
@@ -691,10 +679,10 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         'patrimonio_finale_mediano_reale': valore_mediano,
         'patrimonio_finale_top_10_reale': np.percentile(patrimoni_finali_reali, 90),
         'patrimonio_finale_peggior_10_reale': np.percentile(patrimoni_finali_reali, 10),
-        'patrimonio_inizio_prelievi_mediano_nominale': np.median(patrimoni_tutte_le_run[:, idx_inizio_prelievo]),
+        'patrimonio_inizio_prelievi_mediano_nominale': np.median(patrimoni_nominali_tutte_le_run[:, idx_inizio_prelievo]),
         'patrimonio_inizio_prelievi_mediano_reale': np.median(patrimoni_reali_tutte_le_run[:, idx_inizio_prelievo]),
-        'probabilita_fallimento': fallimenti / n_sim,
-        'drawdown_massimo_peggiore': np.min(tutti_i_drawdown),
+        'probabilita_fallimento': fallimenti / n_sim if n_sim > 0 else 0,
+        'drawdown_massimo_peggiore': np.min(tutti_i_drawdown) if len(tutti_i_drawdown) > 0 else 0,
         # Sharpe Ratio non più calcolato per semplicità nel nuovo modello
         'sharpe_ratio_medio': 0.0,
         'patrimoni_reali_finali': patrimoni_finali_reali,
@@ -712,7 +700,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         "statistiche": statistiche,
         "statistiche_prelievi": statistiche_prelievi,
         "dati_grafici_principali": {
-            "nominale": patrimoni_tutte_le_run,
+            "nominale": patrimoni_nominali_tutte_le_run,
             "reale": patrimoni_reali_tutte_le_run,
             "reddito_reale_annuo": reddito_reale_annuo_tutte_le_run
         },

@@ -130,9 +130,10 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     Disegna il grafico principale a "cono di probabilità" per mostrare 
     l'evoluzione del patrimonio nel tempo, evidenziando gli intervalli di 
     confidenza (percentili 10-90 e 25-75) e la mediana.
+    Ora lavora con dati ANNUALI.
 
     Args:
-        data (np.ndarray): Matrice dei dati del patrimonio (simulazioni x mesi).
+        data (np.ndarray): Matrice dei dati del patrimonio (simulazioni x anni).
         title (str): Titolo del grafico.
         y_title (str): Titolo dell'asse Y.
         anni_totali (int): Durata totale della simulazione in anni.
@@ -146,9 +147,9 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
     """
     fig = go.Figure()
     
-    # L'asse x (mesi) deve avere la stessa lunghezza dei dati
-    mesi = np.arange(data.shape[1])
-    x_axis_labels = eta_iniziale + mesi / 12
+    # L'asse x (anni) deve avere la stessa lunghezza dei dati
+    anni = np.arange(data.shape[1])
+    x_axis_labels = eta_iniziale + anni
 
     p10 = np.percentile(data, 10, axis=0)
     p25 = np.percentile(data, 25, axis=0)
@@ -207,6 +208,21 @@ def plot_wealth_summary_chart(data, title, y_title, anni_totali, eta_iniziale, a
             tickprefix="€",
             tickformat=".2s"
         )
+    )
+
+    fig.update_xaxes(
+        title_text="Età",
+        tickvals=np.arange(0, anni_totali + 1, 5) + eta_iniziale,
+        tickangle=45
+    )
+    
+    # Aggiungi una linea tratteggiata per l'inizio dei prelievi
+    eta_prelievo = eta_iniziale + anni_inizio_prelievo
+    fig.add_vline(x=eta_prelievo, line_width=2, line_dash="dash", line_color="grey",
+                  annotation_text="Inizio Prelievi", 
+                  annotation_position="top left",
+                  annotation_font_size=12,
+                  annotation_font_color="grey"
     )
 
     return fig
