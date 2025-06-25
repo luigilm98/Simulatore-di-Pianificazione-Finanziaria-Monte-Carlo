@@ -680,7 +680,8 @@ def _calcola_prelievo_sostenibile(parametri):
     params_test = parametri.copy()
     params_test['prelievo_annuo'] = 0
     params_test['n_simulazioni'] = max(100, params_test['n_simulazioni'] // 4)
-    
+    params_test['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
+
     risultati_test = run_full_simulation(params_test)
     patrimoni_reali_test = risultati_test['dati_grafici_principali']['reale']
     
@@ -697,6 +698,7 @@ def _calcola_prelievo_sostenibile(parametri):
     def mediana_finale(prelievo):
         params_run = parametri.copy()
         params_run['n_simulazioni'] = max(100, params_run['n_simulazioni'] // 4)
+        params_run['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
         risultati_run = run_full_simulation(params_run, prelievo_annuo_da_usare=prelievo)
         return np.median(risultati_run['statistiche']['patrimonio_finale_mediano_reale'])
 
@@ -745,7 +747,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
     # Gestione del calcolo del prelievo sostenibile
     prelievo_sostenibile_calcolato = None
     if prelievo_annuo_da_usare is None:
-        if parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0:
+        if parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0 and not parametri.get('_in_routine_sostenibile', False):
             prelievo_sostenibile_calcolato = _calcola_prelievo_sostenibile(parametri)
             prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
         else:
