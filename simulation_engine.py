@@ -392,10 +392,10 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         pensione_pubblica_mese = 0
         inizio_pensione_mesi = parametri.get('inizio_pensione_anni', num_anni + 1) * 12
         if mese >= inizio_pensione_mesi:
-            # La pensione pubblica è già in termini reali, la rivalutiamo per inflazione
-            pensione_annua_nominale = parametri.get('pensione_pubblica_annua', 0)
-            for a in range(inizio_pensione_mesi // 12, mese // 12):
-                pensione_annua_nominale *= (1 + inflazione_mensile * 12)  # Approssimazione annuale
+            # La pensione pubblica impostata dall'utente è in termini reali
+            # Deve essere rivalutata per inflazione per mantenere il potere d'acquisto
+            pensione_annua_reale = parametri.get('pensione_pubblica_annua', 0)
+            pensione_annua_nominale = pensione_annua_reale * indice_prezzi
             pensione_pubblica_mese = pensione_annua_nominale / 12
         
         # Aggiornamento contabile: accredito entrate e salvataggio dati

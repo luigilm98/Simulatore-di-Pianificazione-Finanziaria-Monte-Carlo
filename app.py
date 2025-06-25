@@ -933,6 +933,15 @@ patrimonio_iniziale_totale = st.session_state.parametri['capitale_iniziale'] + s
 contributi_versati = stats_aggregate['contributi_totali_versati_mediano_nominale']
 guadagni_da_investimento = stats_aggregate['guadagni_accumulo_mediano_nominale']
 
+# Calcolo percentili patrimonio all'inizio prelievi
+idx_inizio_prelievo = st.session_state.parametri['anni_inizio_prelievo']
+patrimoni_nominali = st.session_state.risultati['dati_grafici_principali']['nominale'][:, idx_inizio_prelievo]
+patrimoni_reali = st.session_state.risultati['dati_grafici_principali']['reale'][:, idx_inizio_prelievo]
+patrimonio_inizio_prelievi_top_10_nominale = np.percentile(patrimoni_nominali, 90)
+patrimonio_inizio_prelievi_peggior_10_nominale = np.percentile(patrimoni_nominali, 10)
+patrimonio_inizio_prelievi_top_10_reale = np.percentile(patrimoni_reali, 90)
+patrimonio_inizio_prelievi_peggior_10_reale = np.percentile(patrimoni_reali, 10)
+
 # 2. Calcolo Entrate Medie Annue (dallo scenario mediano)
 # Reali
 anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
@@ -1054,6 +1063,8 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Valori Nominali")
     st.metric("Patrimonio all'Inizio Prelievi (50°)", f"€ {st.session_state.risultati['statistiche']['patrimonio_inizio_prelievi_mediano_nominale']:,.0f}", help="Il valore nominale del tuo patrimonio nel momento in cui inizi a prelevare (passaggio da accumulo a decumulo).")
+    st.metric("Patrimonio all'Inizio Prelievi (Top 10%)", f"€ {patrimonio_inizio_prelievi_top_10_nominale:,.0f}", help="Il valore nominale del patrimonio all'inizio prelievi nello scenario migliore (top 10%).")
+    st.metric("Patrimonio all'Inizio Prelievi (Peggior 10%)", f"€ {patrimonio_inizio_prelievi_peggior_10_nominale:,.0f}", help="Il valore nominale del patrimonio all'inizio prelievi nello scenario peggiore (peggior 10%).")
     st.metric("Patrimonio Finale Mediano (50°)", f"€ {st.session_state.risultati['statistiche']['patrimonio_finale_mediano_nominale']:,.0f}", help="Il valore nominale (non aggiustato per l'inflazione) del tuo patrimonio alla fine della simulazione nello scenario mediano.")
     st.metric("Patrimonio Finale (Top 10%)", f"€ {st.session_state.risultati['statistiche']['patrimonio_finale_top_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto fortunato (migliore del 90% delle simulazioni).")
     st.metric("Patrimonio Finale (Peggior 10%)", f"€ {st.session_state.risultati['statistiche']['patrimonio_finale_peggior_10_nominale']:,.0f}", help="Il tuo patrimonio finale nominale in uno scenario molto sfortunato (peggiore del 90% delle simulazioni).")
@@ -1061,6 +1072,8 @@ with col1:
 with col2:
     st.subheader("Valori Reali")
     st.metric("Patrimonio all'Inizio Prelievi (50°)", f"€ {st.session_state.risultati['statistiche']['patrimonio_inizio_prelievi_mediano_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio nel momento in cui inizi a prelevare. Questo è il 'tesoretto' che hai accumulato per la pensione.")
+    st.metric("Patrimonio all'Inizio Prelievi (Top 10%)", f"€ {patrimonio_inizio_prelievi_top_10_reale:,.0f}", help="Il potere d'acquisto del patrimonio all'inizio prelievi nello scenario migliore (top 10%).")
+    st.metric("Patrimonio all'Inizio Prelievi (Peggior 10%)", f"€ {patrimonio_inizio_prelievi_peggior_10_reale:,.0f}", help="Il potere d'acquisto del patrimonio all'inizio prelievi nello scenario peggiore (peggior 10%).")
     st.metric("Patrimonio Reale Finale Mediano (50°)", f"€ {st.session_state.risultati['statistiche']['patrimonio_finale_mediano_reale']:,.0f}", help="Il POTERE D'ACQUISTO reale del tuo patrimonio finale nello scenario mediano. Questo è il valore che conta davvero, perché tiene conto dell'inflazione.")
     st.metric("Patrimonio Reale Finale (Top 10%)", f"€ {st.session_state.risultati['statistiche']['patrimonio_finale_top_10_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio finale in uno scenario molto fortunato.")
     st.metric("Patrimonio Reale Finale (Peggior 10%)", f"€ {st.session_state.risultati['statistiche']['patrimonio_finale_peggior_10_reale']:,.0f}", help="Il potere d'acquisto del tuo patrimonio finale in uno scenario molto sfortunato.")
@@ -1095,9 +1108,7 @@ with col2:
     st.metric("Liquidazione Fondo Pensione (una tantum, Nominale)", f"€ {fp_liquidato_nominale:,.0f}", help="La quota del fondo pensione liquidata in capitale all'inizio della pensione, in valori nominali.")
     st.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
 
-with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
-    st.write("Array dei patrimoni finali reali (tutte le simulazioni):")
-    st.write(st.session_state.risultati['statistiche']['patrimoni_reali_finali'])
+
 
 # --- Guida alla Lettura e Limiti del Modello ---
 with st.expander("🔍 Guida alla Lettura: Perché il mio piano ha successo (o fallisce)?"):
