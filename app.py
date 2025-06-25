@@ -719,7 +719,7 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
     descrizioni_modelli = {k: v['description'] for k, v in engine.ECONOMIC_MODELS.items()}
     
     economic_model = st.selectbox(
-        "🧠 Modello Economico",
+        "Modello Economico",
         options=modelli_economici,
         index=modelli_economici.index(p.get('economic_model', "VOLATILE (CICLI BOOM-BUST)")),
         help="Scegli lo scenario macroeconomico di lungo termine per la simulazione. Ogni modello ha diversi regimi di mercato (es. crash, recessione) e di inflazione, con probabilità realistiche di transizione tra loro. Questo è il motore principale per testare la robustezza del piano."
@@ -1127,16 +1127,18 @@ with col2:
 
 # --- Messaggi Informativi Contestuali ---
 prelievo_sostenibile_calcolato = st.session_state.risultati['statistiche'].get('prelievo_sostenibile_calcolato')
-if prelievo_sostenibile_calcolato is not None:
+if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato > 0:
     st.info(f"""
     **Hai richiesto il calcolo del prelievo massimo sostenibile.**
-    
-    Abbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.
-    
+    \nAbbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.\n
     I risultati della simulazione qui sotto (es. Probabilità di Fallimento) rappresentano uno **stress test** di questo piano. 
     Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
     """)
 
+# --- Forza la visualizzazione del prelievo sostenibile calcolato se presente ---
+if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato > 0:
+    prelievo_medio_reale = prelievo_sostenibile_calcolato
+    prelievo_medio_nominale = prelievo_sostenibile_calcolato  # Per semplicità, mostra lo stesso valore anche tra i nominali
 
 # --- Messaggio informativo sul modello economico ---
 if st.session_state.parametri.get('economic_model', "VOLATILE (CICLI BOOM-BUST)") != "VOLATILE (CICLI BOOM-BUST)":
