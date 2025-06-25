@@ -958,6 +958,9 @@ anni_di_spesa_coperti = patrimonio_finale_reale / reddito_annuo_reale_pensione i
 
 # --- FINE BLOCCO DI CALCOLO UNIFICATO ---
 
+# Calcolo valori per liquidazione fondo pensione (fix variabile non definita)
+fp_liquidato_reale = np.sum(dati_mediana.get('fp_liquidato_reale', np.zeros_like(dati_mediana['saldo_banca_nominale'])))
+fp_liquidato_nominale = np.sum(dati_mediana.get('fp_liquidato_nominale', np.zeros_like(dati_mediana['saldo_banca_nominale'])))
 
 # --- Visualizzazione KPI Principali ---
 st.markdown("##### Il Tuo Percorso Finanziario in Numeri")
@@ -1082,6 +1085,7 @@ with col2:
     st.metric("Prelievo Medio dal Patrimonio (Nominale)", f"€ {prelievo_medio_nominale:,.0f}", help="La cifra media annua nominale che preleverai dal tuo patrimonio. Questo valore non tiene conto dell'inflazione.")
     st.metric("Pensione Pubblica Annua (Nominale)", f"€ {pensione_media_nominale:,.0f}", help="La stima della tua pensione statale annua nominale. Questo valore non tiene conto dell'inflazione.")
     st.metric("Rendita Media da FP (Nominale)", f"€ {rendita_fp_media_nominale:,.0f}", help="La cifra media annua nominale che riceverai dal tuo fondo pensione. Questo valore non tiene conto dell'inflazione.")
+    st.metric("Liquidazione Fondo Pensione (una tantum, Nominale)", f"€ {fp_liquidato_nominale:,.0f}", help="La quota del fondo pensione liquidata in capitale all'inizio della pensione, in valori nominali.")
     st.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
 
 with st.expander("🐞 DEBUG: Dati Grezzi Simulazione"):
