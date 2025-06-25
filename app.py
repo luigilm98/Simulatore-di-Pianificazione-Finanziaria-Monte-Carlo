@@ -833,11 +833,37 @@ with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
         index=['FISSO', 'REGOLA_4_PERCENTO', 'GUARDRAIL'].index(p.get('strategia_prelievo', 'REGOLA_4_PERCENTO')),
         help="Scegli come verranno calcolati i prelievi dal tuo patrimonio una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
     )
-    prelievo_annuo = st.number_input(
-        "Importo Prelievo Fisso Annuo (€)",
-        min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
-        help="Usato SOLO con la strategia 'FISSO'. Imposta un importo specifico o lascia a 0 per far calcolare al simulatore un prelievo sostenibile. Questo calcolo mira a trovare un importo che il tuo patrimonio possa sostenere per tutta la durata della simulazione con un'alta probabilità di successo, il che potrebbe risultare in un capitale residuo alla fine."
-    )
+    
+    # Nuovo controllo per distinguere tra prelievo fisso e calcolo automatico
+    if strategia_prelievo == 'FISSO':
+        tipo_prelievo_fisso = st.radio(
+            "Tipo di Prelievo Fisso",
+            options=['Importo Specifico', 'Calcolo Automatico Sostenibile'],
+            index=0 if p.get('tipo_prelievo_fisso', 'Importo Specifico') == 'Importo Specifico' else 1,
+            help="Scegli se impostare un importo specifico o far calcolare automaticamente il prelievo massimo sostenibile dal tuo patrimonio."
+        )
+        
+        if tipo_prelievo_fisso == 'Importo Specifico':
+            prelievo_annuo = st.number_input(
+                "Importo Prelievo Fisso Annuo (€)",
+                min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
+                help="L'importo fisso che preleverai ogni anno dal tuo patrimonio durante la pensione."
+            )
+            calcola_prelievo_sostenibile = False
+        else:  # Calcolo Automatico Sostenibile
+            prelievo_annuo = 0  # Placeholder, verrà calcolato dal motore
+            calcola_prelievo_sostenibile = True
+            st.info("🔍 Il simulatore calcolerà automaticamente il prelievo massimo sostenibile dal tuo patrimonio.")
+    else:
+        # Per le altre strategie, usa sempre il valore specificato
+        prelievo_annuo = st.number_input(
+            "Importo Prelievo Fisso Annuo (€)",
+            min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
+            help="Usato SOLO con la strategia 'FISSO'. Per le altre strategie, questo valore viene ignorato."
+        )
+        calcola_prelievo_sostenibile = False
+        tipo_prelievo_fisso = 'Importo Specifico'
+    
     percentuale_regola_4 = st.slider(
         "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
         help="Il tasso di prelievo iniziale per le strategie 'REGOLA_4_PERCENTO' e 'GUARDRAIL'. Il 4% è una regola standard, ma puoi adattarla alla tua situazione."
@@ -926,6 +952,7 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
             'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
             'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
+            'calcola_prelievo_sostenibile': calcola_prelievo_sostenibile, 'tipo_prelievo_fisso': tipo_prelievo_fisso,
             
             'strategia_ribilanciamento': strategia_ribilanciamento, 
             'inizio_glidepath_anni': inizio_glidepath_anni, 
