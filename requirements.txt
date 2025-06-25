@@ -1,5 +1,11 @@
+# requirements.txt per Simulatore di Resilienza Finanziaria v2.0
+# Include librerie per dati storici, PDF, simulazione avanzata
 streamlit
 numpy
 pandas
 plotly
-scipy 
+matplotlib
+scipy
+fpdf
+openpyxl
+requests 

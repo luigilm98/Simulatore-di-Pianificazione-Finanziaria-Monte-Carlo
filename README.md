@@ -147,3 +147,57 @@ Questo progetto è rilasciato sotto licenza [MIT](LICENSE).
 
 ---
 *Un ringraziamento speciale a Mr. RIP e Paolo Coletti, le cui idee e insegnamenti sono stati la fonte di ispirazione principale per questo progetto.*
+
+# Simulatore di Resilienza Finanziaria Personale (v2.0)
+
+## Visione
+
+Questa versione 2.0 nasce per offrire uno strumento realmente utile a professionisti, accademici e utenti evoluti che vogliono:
+- Valutare la **robustezza** del proprio piano finanziario contro crisi, inflazione, longevità, eventi di vita reale.
+- Ricevere **raccomandazioni pratiche** e scenari "what if" personalizzati.
+- Comprendere i **rischi veri** (drawdown, impoverimento, perdita di potere d'acquisto) e non solo la probabilità di "fallimento".
+- Ottenere **report professionali** e trasparenti, con spiegazioni e suggerimenti.
+
+## Caratteristiche Distintive
+
+- **Simulazione multi-scenario realistica**: dati storici, rolling window, bootstrapping, eventi di vita, longevità stocastica.
+- **Stress test automatici**: crisi 2008, inflazione anni '70, bear market giapponese, ecc.
+- **Analisi di resilienza**: drawdown, tempo di recupero, rischio impoverimento reale.
+- **Strategie dinamiche**: prelievi adattivi, asset allocation dinamica, bucket strategy.
+- **Reportistica professionale**: PDF, executive summary, raccomandazioni.
+- **Motore di raccomandazione**: suggerimenti automatici su come migliorare la resilienza.
+- **Trasparenza e validazione**: assunzioni esplicite, confronto con benchmark storici.
+
+## Roadmap Tecnica
+
+1. **Struttura modulare**: separazione netta tra logica, dati, UI.
+2. **Integrazione dati storici**: S&P 500, inflazione, crisi, longevity tables.
+3. **Moduli di stress test**: crisi, inflazione, longevità, spese impreviste.
+4. **Nuova dashboard**: filtri, confronto scenari, spiegazioni.
+5. **Motore di raccomandazione**: regole e AI per suggerimenti.
+6. **Reportistica PDF professionale**.
+7. **Validazione e trasparenza**: documentazione, assunzioni, fonti.
+
+## Flusso Utente
+
+1. Carica il proprio profilo finanziario (asset, redditi, spese, età, preferenze).
+2. Scegli scenari di stress (crisi, inflazione, longevità, ecc.).
+3. Simula e ricevi un report con:
+   - Probabilità di successo/fallimento
+   - Anni a rischio
+   - Drawdown massimo e tempo di recupero
+   - Raccomandazioni pratiche
+   - Confronto tra strategie
+4. Esporta il report per discussione con clienti, banca, famiglia.
+
+## Stato di Avanzamento
+- [ ] Struttura modulare base
+- [ ] Integrazione dati storici
+- [ ] Motore di simulazione resiliente
+- [ ] Dashboard interattiva
+- [ ] Reportistica PDF
+- [ ] Motore di raccomandazione
+
+---
+
+**Questa versione punta a essere uno strumento di pianificazione finanziaria realmente professionale, trasparente e utile per decisioni di vita reale.**
