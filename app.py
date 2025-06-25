@@ -744,9 +744,27 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
     else:
         inflazione_modello = 0.025  # Default 2.5% se non calcolabile
     
+    # Assicurati che inflazione_modello sia un numero valido
+    if not isinstance(inflazione_modello, (int, float)) or np.isnan(inflazione_modello):
+        inflazione_modello = 0.025  # Default 2.5% se non valido
+    
+    # Controlli specifici per modelli problematici
+    if economic_model == "CRISI PROLUNGATA (GIAPPONE)":
+        # Il modello giapponese ha deflazione, usiamo un range più conservativo
+        inflazione_modello = max(0.01, inflazione_modello)  # Minimo 1%
+    elif economic_model == "STAGFLAZIONE ANNI '70":
+        # Il modello stagflazione ha inflazione molto alta, limitiamo il range
+        inflazione_modello = min(0.08, inflazione_modello)  # Massimo 8%
+    
     # Range di aggiustamento ±1% intorno all'inflazione del modello
-    min_adj = max(0, inflazione_modello - 0.01)
+    min_adj = max(0.001, inflazione_modello - 0.01)  # Minimo 0.1% per evitare valori negativi
     max_adj = min(0.10, inflazione_modello + 0.01)
+    
+    # Assicurati che min_adj e max_adj siano diversi
+    if min_adj >= max_adj:
+        min_adj = max(0.001, inflazione_modello - 0.005)
+        max_adj = min(0.10, inflazione_modello + 0.005)
+    
     default_adj = p.get('inflazione', inflazione_modello)
     if default_adj < min_adj or default_adj > max_adj:
         default_adj = inflazione_modello
