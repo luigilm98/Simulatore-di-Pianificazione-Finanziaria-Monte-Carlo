@@ -1144,12 +1144,18 @@ if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato
     \nAbbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.\n
     I risultati della simulazione qui sotto (es. Probabilità di Fallimento) rappresentano uno **stress test** di questo piano. 
     Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
+    
+    **DEBUG:** Il prelievo effettivamente usato nella simulazione mediana è: **€ {prelievo_medio_reale:,.0f}** (reale), **€ {prelievo_medio_nominale:,.0f}** (nominale).
     """)
 
 # --- Forza la visualizzazione del prelievo sostenibile calcolato se presente ---
 if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato > 0:
     prelievo_medio_reale = prelievo_sostenibile_calcolato
-    prelievo_medio_nominale = prelievo_sostenibile_calcolato  # Per semplicità, mostra lo stesso valore anche tra i nominali
+    prelievo_medio_nominale = prelievo_sostenibile_calcolato
+
+# --- Warning se i prelievi effettivi sono nulli o trascurabili ---
+if prelievo_medio_reale < 1:
+    st.warning("⚠️ Attenzione: il prelievo medio dal patrimonio risulta nullo o trascurabile. Controlla i parametri inseriti o la strategia di prelievo. Potrebbe esserci un errore nella logica o parametri troppo restrittivi.")
 
 # --- Messaggio informativo sul modello economico ---
 if st.session_state.parametri.get('economic_model', "VOLATILE (CICLI BOOM-BUST)") != "VOLATILE (CICLI BOOM-BUST)":
