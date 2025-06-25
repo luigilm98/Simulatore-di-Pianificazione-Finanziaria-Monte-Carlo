@@ -666,16 +666,9 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 def _calcola_prelievo_sostenibile(parametri):
     """
     Trova il prelievo annuo reale massimo sostenibile con una ricerca binaria.
-    
     L'obiettivo è trovare il tasso di prelievo che porta il patrimonio reale
     finale *mediano* il più vicino possibile a zero, senza diventare negativo.
     Utilizza un numero ridotto di simulazioni per la velocità.
-
-    Args:
-        parametri (dict): Il dizionario completo dei parametri della simulazione.
-
-    Returns:
-        float: L'importo del prelievo annuo reale sostenibile calcolato.
     """
     params_test = parametri.copy()
     params_test['prelievo_annuo'] = 0
@@ -688,17 +681,23 @@ def _calcola_prelievo_sostenibile(parametri):
     idx_inizio_prelievo = parametri['anni_inizio_prelievo']
     capitale_reale_mediano_a_prelievo = np.median(patrimoni_reali_test[:, idx_inizio_prelievo])
 
-    if capitale_reale_mediano_a_prelievo <= 0: return 0
     anni_prelievo = parametri['anni_totali'] - parametri['anni_inizio_prelievo']
-    if anni_prelievo <= 0: return 0
-        
-    limite_inferiore, limite_superiore = 0, capitale_reale_mediano_a_prelievo / anni_prelievo
+    if anni_prelievo <= 0:
+        return 0
+    # Se il capitale mediano è basso ma non nullo, prova comunque a cercare un prelievo >0
+    if capitale_reale_mediano_a_prelievo <= 0:
+        return 0
+    
+    # Range più ampio per la ricerca binaria
+    limite_inferiore = 0
+    limite_superiore = max(1, capitale_reale_mediano_a_prelievo * 2 / max(1, anni_prelievo))
     prelievo_ottimale = 0
     soglia = 10000  # Patrimonio finale massimo accettato
     max_fallimento = 0.10  # Probabilità di fallimento massima accettata
     
     def mediana_finale(prelievo):
         params_run = parametri.copy()
+        params_run['prelievo_annuo'] = prelievo  # Assicura che venga usato il valore corretto
         params_run['n_simulazioni'] = max(100, params_run['n_simulazioni'] // 4)
         params_run['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
         risultati_run = run_full_simulation(params_run, prelievo_annuo_da_usare=prelievo)
@@ -708,14 +707,15 @@ def _calcola_prelievo_sostenibile(parametri):
 
     for _ in range(50):
         prelievo_corrente = (limite_inferiore + limite_superiore) / 2
-        if prelievo_corrente < 1: break
+        if prelievo_corrente < 1:
+            break
         patrimonio_risultante, prob_fallimento = mediana_finale(prelievo_corrente)
         if abs(patrimonio_risultante) <= soglia and prob_fallimento <= max_fallimento:
             prelievo_ottimale = prelievo_corrente
             limite_inferiore = prelievo_corrente
         else:
             limite_superiore = prelievo_corrente
-            
+                
     return prelievo_ottimale
 
 
