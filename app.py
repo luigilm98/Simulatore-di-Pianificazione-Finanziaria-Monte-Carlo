@@ -1140,6 +1140,7 @@ with col2:
     st.metric("Pensione Pubblica Annua (Nominale)", f"€ {pensione_media_nominale:,.0f}", help="La stima della tua pensione statale annua nominale. Questo valore non tiene conto dell'inflazione.")
     st.metric("Rendita Media da FP (Nominale)", f"€ {rendita_fp_media_nominale:,.0f}", help="La cifra media annua nominale che riceverai dal tuo fondo pensione. Questo valore non tiene conto dell'inflazione.")
     st.metric("Liquidazione Fondo Pensione (una tantum, Nominale)", f"€ {fp_liquidato_nominale:,.0f}", help="La quota del fondo pensione liquidata in capitale all'inizio della pensione, in valori nominali.")
+    st.metric("Liquidazione Fondo Pensione (una tantum, Reale)", f"€ {fp_liquidato_reale:,.0f}", help="La quota del fondo pensione liquidata in capitale all'inizio della pensione, in potere d'acquisto reale.")
     st.metric("TOTALE ENTRATE MEDIE ANNUE (Nominale)", f"€ {totale_medio_nominale:,.0f}", help="La somma di tutte le tue entrate annue medie nominali. Questo valore non tiene conto dell'inflazione.")
 
 
