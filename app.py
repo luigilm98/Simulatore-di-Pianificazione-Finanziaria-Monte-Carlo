@@ -40,19 +40,21 @@ with st.form("profilo_utente"):
     if pct_azioni + pct_obblig + pct_liquidita != 100:
         st.error("La somma delle percentuali deve essere 100%.")
     submitted = st.form_submit_button("Salva profilo")
-    if submitted and pct_azioni + pct_obblig + pct_liquidita == 100:
-        st.session_state['profilo_utente'] = {
-            'eta': eta,
-            'orizzonte': orizzonte,
-            'capitale_iniziale': capitale_iniziale,
-            'reddito_annuo': reddito_annuo,
-            'spese_annue': spese_annue,
-            'obiettivo_prelievo': obiettivo_prelievo,
-            'pct_azioni': pct_azioni,
-            'pct_obblig': pct_obblig,
-            'pct_liquidita': pct_liquidita
-        }
-        st.success("Profilo utente salvato! Ora puoi scegliere gli scenari di stress.")
+
+# Salvataggio profilo utente fuori dal form
+if submitted and pct_azioni + pct_obblig + pct_liquidita == 100:
+    st.session_state['profilo_utente'] = {
+        'eta': eta,
+        'orizzonte': orizzonte,
+        'capitale_iniziale': capitale_iniziale,
+        'reddito_annuo': reddito_annuo,
+        'spese_annue': spese_annue,
+        'obiettivo_prelievo': obiettivo_prelievo,
+        'pct_azioni': pct_azioni,
+        'pct_obblig': pct_obblig,
+        'pct_liquidita': pct_liquidita
+    }
+    st.success("Profilo utente salvato! Ora puoi scegliere gli scenari di stress.")
 
 # --- 2. Scelta scenari di stress ---
 st.header("2. Scegli scenari di stress")
@@ -77,21 +79,23 @@ with st.form("scenari_stress"):
     spesa_anno = st.slider("Anno spesa imprevista", 1, 40, 20)
 
     submitted_stress = st.form_submit_button("Salva scenari di stress")
-    if submitted_stress:
-        st.session_state['scenari_stress'] = {
-            'crash': crash,
-            'crash_severity': crash_severity,
-            'crash_year': crash_year,
-            'infl_shock': infl_shock,
-            'infl_rate': infl_rate,
-            'infl_duration': infl_duration,
-            'longevity': longevity,
-            'extra_years': extra_years,
-            'spesa_shock': spesa_shock,
-            'spesa_importo': spesa_importo,
-            'spesa_anno': spesa_anno
-        }
-        st.success("Scenari di stress salvati! Ora puoi eseguire la simulazione.")
+
+# Salvataggio scenari di stress fuori dal form
+if submitted_stress:
+    st.session_state['scenari_stress'] = {
+        'crash': crash,
+        'crash_severity': crash_severity,
+        'crash_year': crash_year,
+        'infl_shock': infl_shock,
+        'infl_rate': infl_rate,
+        'infl_duration': infl_duration,
+        'longevity': longevity,
+        'extra_years': extra_years,
+        'spesa_shock': spesa_shock,
+        'spesa_importo': spesa_importo,
+        'spesa_anno': spesa_anno
+    }
+    st.success("Scenari di stress salvati! Ora puoi eseguire la simulazione.")
 
 # --- 3. Esecuzione simulazione e visualizzazione risultati ---
 st.header("3. Esegui simulazione e visualizza risultati")
@@ -235,12 +239,14 @@ if 'last_simulation' in st.session_state:
     with st.form("save_scenario_form"):
         scenario_name = st.text_input("Nome scenario da salvare", "Scenario " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"))
         save_btn = st.form_submit_button("Salva scenario")
-        if save_btn:
-            fname = os.path.join(SCENARIO_DIR, scenario_name.replace(" ", "_") + ".json")
-            with open(fname, "w") as f:
-                json.dump(st.session_state['last_simulation'], f, indent=2)
-            st.success(f"Scenario '{scenario_name}' salvato!")
-            del st.session_state['last_simulation']
+
+# Salvataggio scenario fuori dal form
+if 'save_btn' in locals() and save_btn:
+    fname = os.path.join(SCENARIO_DIR, scenario_name.replace(" ", "_") + ".json")
+    with open(fname, "w") as f:
+        json.dump(st.session_state['last_simulation'], f, indent=2)
+    st.success(f"Scenario '{scenario_name}' salvato!")
+    del st.session_state['last_simulation']
 
 scenari_files = [f for f in os.listdir(SCENARIO_DIR) if f.endswith('.json')]
 if scenari_files:
