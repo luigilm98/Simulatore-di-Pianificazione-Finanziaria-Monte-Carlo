@@ -750,6 +750,11 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         if parametri['strategia_prelievo'] == 'FISSO' and parametri['prelievo_annuo'] == 0 and not parametri.get('_in_routine_sostenibile', False):
             prelievo_sostenibile_calcolato = _calcola_prelievo_sostenibile(parametri)
             prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
+            # Rilancia la simulazione principale con il prelievo sostenibile calcolato
+            parametri2 = parametri.copy()
+            parametri2['prelievo_annuo'] = prelievo_sostenibile_calcolato
+            parametri2['_in_routine_sostenibile'] = True  # Evita ricorsione
+            return run_full_simulation(parametri2, prelievo_annuo_da_usare=prelievo_sostenibile_calcolato)
         else:
             prelievo_annuo_da_usare = parametri['prelievo_annuo']
 
