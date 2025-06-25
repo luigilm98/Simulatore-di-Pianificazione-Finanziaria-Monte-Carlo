@@ -417,11 +417,14 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
         # C. FASE DI ACCUMULO (prima dei rendimenti)
         if mese < inizio_prelievo_mesi:
-            # Contributi
-            patrimonio_banca += parametri['contributo_mensile_banca']
-            contributi_totali_accumulati += parametri['contributo_mensile_banca']
+            # Rivaluta i contributi per l'inflazione corrente
+            contributo_mensile_banca_nominale = parametri['contributo_mensile_banca'] * indice_prezzi
+            contributo_mensile_etf_nominale = parametri['contributo_mensile_etf'] * indice_prezzi
+
+            patrimonio_banca += contributo_mensile_banca_nominale
+            contributi_totali_accumulati += contributo_mensile_banca_nominale
             
-            investimento_etf = min(parametri['contributo_mensile_etf'], patrimonio_banca)
+            investimento_etf = min(contributo_mensile_etf_nominale, patrimonio_banca)
             if investimento_etf > 0:
                 patrimonio_banca -= investimento_etf
                 patrimonio_etf += investimento_etf
@@ -720,33 +723,6 @@ def _calcola_prelievo_sostenibile(parametri):
 
 
 def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
-    """
-    Funzione orchestratrice principale per l'esecuzione della simulazione completa.
-
-    Questa funzione esegue i seguenti passaggi:
-    1. Valida i parametri di input.
-    2. Se l'utente ha richiesto un prelievo "sostenibile", lo calcola
-       preventivamente con `_calcola_prelievo_sostenibile`.
-    3. Esegue il numero completo di simulazioni (`n_simulazioni`) invocando
-       ripetutamente `_esegui_una_simulazione`.
-    4. Aggrega i risultati di tutte le traiettorie.
-    5. Identifica lo "scenario mediano" (quello il cui patrimonio finale reale
-       è più vicino alla mediana di tutti i risultati) per l'analisi dettagliata.
-    6. Calcola un'ampia gamma di statistiche aggregate (es. probabilità di
-       fallimento, percentili del patrimonio, Sharpe ratio, ecc.).
-    7. Restituisce un dizionario strutturato con tutti i dati necessari per
-       la visualizzazione nell'interfaccia utente.
-
-    Args:
-        parametri (dict): Il dizionario completo dei parametri della simulazione.
-        prelievo_annuo_da_usare (float, optional): Usato internamente per la
-            ricerca del prelievo sostenibile. Se `None`, viene gestito
-            normalmente.
-
-    Returns:
-        dict: Un dizionario annidato contenente le statistiche finali, i dati
-              per i grafici principali e i dati dettagliati dello scenario mediano.
-    """
     valida_parametri(parametri)
     
     # Gestione del calcolo del prelievo sostenibile
@@ -755,11 +731,9 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         if parametri['strategia_prelievo'] == 'FISSO' and parametri.get('calcola_prelievo_sostenibile', False) and not parametri.get('_in_routine_sostenibile', False):
             prelievo_sostenibile_calcolato = _calcola_prelievo_sostenibile(parametri)
             prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
-            # Rilancia la simulazione principale con il prelievo sostenibile calcolato
-            parametri2 = parametri.copy()
-            parametri2['prelievo_annuo'] = prelievo_sostenibile_calcolato
-            parametri2['_in_routine_sostenibile'] = True  # Evita ricorsione
-            return run_full_simulation(parametri2, prelievo_annuo_da_usare=prelievo_sostenibile_calcolato)
+            parametri['prelievo_annuo'] = prelievo_sostenibile_calcolato
+            parametri['_in_routine_sostenibile'] = True  # Evita ricorsione
+            # NON fare return! Prosegui con la simulazione principale usando il valore trovato
         else:
             prelievo_annuo_da_usare = parametri['prelievo_annuo']
 

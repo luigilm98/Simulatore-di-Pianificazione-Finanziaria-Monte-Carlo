@@ -695,6 +695,11 @@ with st.sidebar.expander("📚 Storico Simulazioni", expanded=False):
 
 # --- Sezione 2: Parametri di Base ---
 with st.sidebar.expander("1. Parametri di Base", expanded=True):
+    st.markdown("""
+    <span style='color: #007bff; font-weight: bold;'>ℹ️ Nota:</span> 
+    I contributi mensili che inserisci (sia per il conto corrente che per il PAC ETF) sono **sempre in termini di potere d'acquisto reale**. 
+    Il simulatore li adeguerà automaticamente all'inflazione ogni anno, così che se imposti ad esempio 500€ al mese, questi saranno sempre equivalenti a 500€ di oggi anche tra 30 anni (il valore nominale crescerà con l'inflazione).
+    """, unsafe_allow_html=True)
     p = st.session_state.get('parametri', {})
     eta_iniziale = st.number_input("Età Iniziale", min_value=1, max_value=100, value=p.get('eta_iniziale', 27), help="La tua età attuale. È il punto di partenza per tutti i calcoli temporali.")
     capitale_iniziale = st.number_input("Capitale Conto Corrente (€)", min_value=0, step=1000, value=p.get('capitale_iniziale', 17000), help="La liquidità che hai oggi sul conto corrente o in asset a bassissimo rischio/rendimento.")
