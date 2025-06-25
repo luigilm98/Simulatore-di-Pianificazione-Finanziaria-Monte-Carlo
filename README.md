@@ -150,54 +150,70 @@ Questo progetto è rilasciato sotto licenza [MIT](LICENSE).
 
 # Simulatore di Resilienza Finanziaria Personale (v2.0)
 
-## Visione
+## Descrizione
 
-Questa versione 2.0 nasce per offrire uno strumento realmente utile a professionisti, accademici e utenti evoluti che vogliono:
-- Valutare la **robustezza** del proprio piano finanziario contro crisi, inflazione, longevità, eventi di vita reale.
-- Ricevere **raccomandazioni pratiche** e scenari "what if" personalizzati.
-- Comprendere i **rischi veri** (drawdown, impoverimento, perdita di potere d'acquisto) e non solo la probabilità di "fallimento".
-- Ottenere **report professionali** e trasparenti, con spiegazioni e suggerimenti.
+Questa versione 2.0 è una piattaforma professionale per la simulazione, analisi e confronto di scenari di pianificazione finanziaria personale. Permette di:
+- Simulare l'evoluzione del patrimonio con rolling window storica, asset allocation personalizzata e stress test realistici (crisi, inflazione, longevità, spese shock)
+- Ricevere analisi automatica del rischio (drawdown, impoverimento, longevità)
+- Ottenere raccomandazioni pratiche e executive summary
+- Salvare, confrontare, eliminare e scaricare scenari multipli
+- Esportare dati e reportistica (Excel, CSV, PDF)
+- Usare tutto da browser, senza installazione, oppure localmente
 
-## Caratteristiche Distintive
+## Funzionalità principali
+- **Dashboard Streamlit** moderna e interattiva
+- **Simulazione rolling window** con asset allocation, stress test, analisi rischio e raccomandazioni automatiche
+- **Salvataggio e confronto scenari**: puoi salvare, confrontare, eliminare e scaricare i risultati di più simulazioni
+- **Esportazione dati**: scarica i risultati e i confronti in Excel/CSV, genera report PDF
+- **Executive summary e limiti del modello** sempre visibili
 
-- **Simulazione multi-scenario realistica**: dati storici, rolling window, bootstrapping, eventi di vita, longevità stocastica.
-- **Stress test automatici**: crisi 2008, inflazione anni '70, bear market giapponese, ecc.
-- **Analisi di resilienza**: drawdown, tempo di recupero, rischio impoverimento reale.
-- **Strategie dinamiche**: prelievi adattivi, asset allocation dinamica, bucket strategy.
-- **Reportistica professionale**: PDF, executive summary, raccomandazioni.
-- **Motore di raccomandazione**: suggerimenti automatici su come migliorare la resilienza.
-- **Trasparenza e validazione**: assunzioni esplicite, confronto con benchmark storici.
+## Come usare la versione 2.0
 
-## Roadmap Tecnica
+### 1. **Installazione locale (per sviluppatori o uso privato)**
 
-1. **Struttura modulare**: separazione netta tra logica, dati, UI.
-2. **Integrazione dati storici**: S&P 500, inflazione, crisi, longevity tables.
-3. **Moduli di stress test**: crisi, inflazione, longevità, spese impreviste.
-4. **Nuova dashboard**: filtri, confronto scenari, spiegazioni.
-5. **Motore di raccomandazione**: regole e AI per suggerimenti.
-6. **Reportistica PDF professionale**.
-7. **Validazione e trasparenza**: documentazione, assunzioni, fonti.
+1. Clona il repository:
+   ```bash
+   git clone <URL_DEL_REPO>
+   cd <NOME_CARTELLA_REPO>
+   git checkout v2.0-resilienza
+   ```
+2. Installa le dipendenze:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Avvia la dashboard:
+   ```bash
+   streamlit run app.py
+   ```
+4. Si aprirà il browser con la dashboard pronta all'uso.
 
-## Flusso Utente
+### 2. **Deploy online su Streamlit Cloud (consigliato)**
 
-1. Carica il proprio profilo finanziario (asset, redditi, spese, età, preferenze).
-2. Scegli scenari di stress (crisi, inflazione, longevità, ecc.).
-3. Simula e ricevi un report con:
-   - Probabilità di successo/fallimento
-   - Anni a rischio
-   - Drawdown massimo e tempo di recupero
-   - Raccomandazioni pratiche
-   - Confronto tra strategie
-4. Esporta il report per discussione con clienti, banca, famiglia.
+1. Fai il push del branch `v2.0-resilienza` su GitHub.
+2. Vai su [https://share.streamlit.io/](https://share.streamlit.io/) e collega il tuo account GitHub.
+3. Clicca su "New app", scegli il repo, il branch `v2.0-resilienza` e come file di avvio `app.py`.
+4. Clicca "Deploy": Streamlit Cloud installerà tutto e ti darà un link pubblico (es: `https://nome-app.streamlit.app`).
+5. Condividi il link: chiunque potrà usare il simulatore da browser, senza installare nulla.
 
-## Stato di Avanzamento
-- [ ] Struttura modulare base
-- [ ] Integrazione dati storici
-- [ ] Motore di simulazione resiliente
-- [ ] Dashboard interattiva
-- [ ] Reportistica PDF
-- [ ] Motore di raccomandazione
+**Nota:** Puoi anche fare il merge su `main` e deployare da lì, se vuoi che il link principale punti sempre alla versione più aggiornata.
+
+## Cosa è cambiato rispetto alla versione precedente
+- Tutta la logica è ora in `app.py` e nei moduli v2 (`data_loader.py`, `simulation_engine_v2.py`, ecc.)
+- Tutti i file legacy e di test sono stati rimossi
+- La cartella `simulation_history/` contiene solo i dati delle simulazioni salvate
+- Il progetto è snello, ordinato e pronto per il deploy
+
+## Dipendenze principali
+- streamlit
+- numpy
+- pandas
+- plotly
+- fpdf
+
+## Note
+- I dati storici usati sono simulati, ma puoi facilmente integrare dati reali nei moduli.
+- Le raccomandazioni sono indicative e non costituiscono consulenza finanziaria personalizzata.
 
 ---
 
-**Questa versione punta a essere uno strumento di pianificazione finanziaria realmente professionale, trasparente e utile per decisioni di vita reale.**
+**Per qualsiasi domanda o supporto, apri una issue o contattami!**
