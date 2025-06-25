@@ -702,7 +702,7 @@ def _calcola_prelievo_sostenibile(parametri):
         params_run['n_simulazioni'] = max(100, params_run['n_simulazioni'] // 4)
         params_run['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
         risultati_run = run_full_simulation(params_run, prelievo_annuo_da_usare=prelievo)
-        patrimonio_finale = np.median(risultati_run['statistiche']['patrimonio_finale_mediano_reale'])
+        patrimonio_finale = np.median(risultati_run['dati_grafici_principali']['reale'][:, -1])
         prob_fallimento = risultati_run['statistiche']['probabilita_fallimento']
         return patrimonio_finale, prob_fallimento
 
