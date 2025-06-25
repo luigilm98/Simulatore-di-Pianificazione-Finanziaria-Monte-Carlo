@@ -937,8 +937,13 @@ guadagni_da_investimento = stats_aggregate['guadagni_accumulo_mediano_nominale']
 # Reali
 anni_prelievo_effettivi_reali = np.where(dati_mediana['prelievi_effettivi_reali'] > 0)[0]
 prelievo_medio_reale = np.mean(dati_mediana['prelievi_effettivi_reali'][anni_prelievo_effettivi_reali]) if anni_prelievo_effettivi_reali.size > 0 else 0
-anni_pensione_effettivi_reali = np.where(dati_mediana['pensioni_pubbliche_reali'] > 0)[0]
-pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi_reali]) if anni_pensione_effettivi_reali.size > 0 else 0
+
+# Calcolo pensione pubblica: solo negli anni in cui viene effettivamente erogata
+inizio_pensione_anni = st.session_state.parametri.get('inizio_pensione_anni', 40)
+anni_totali = st.session_state.parametri['anni_totali']
+anni_pensione_effettivi = np.arange(inizio_pensione_anni, anni_totali + 1)
+pensione_media_reale = np.mean(dati_mediana['pensioni_pubbliche_reali'][anni_pensione_effettivi]) if anni_pensione_effettivi.size > 0 else 0
+
 anni_rendita_fp_effettivi_reali = np.where(dati_mediana['rendite_fp_reali'] > 0)[0]
 rendita_fp_media_reale = np.mean(dati_mediana['rendite_fp_reali'][anni_rendita_fp_effettivi_reali]) if anni_rendita_fp_effettivi_reali.size > 0 else 0
 reddito_annuo_reale_pensione = prelievo_medio_reale + pensione_media_reale + rendita_fp_media_reale
@@ -946,8 +951,10 @@ reddito_annuo_reale_pensione = prelievo_medio_reale + pensione_media_reale + ren
 # Nominali
 anni_prelievo_effettivi_nominali = np.where(dati_mediana['prelievi_effettivi_nominali'] > 0)[0]
 prelievo_medio_nominale = np.mean(dati_mediana['prelievi_effettivi_nominali'][anni_prelievo_effettivi_nominali]) if anni_prelievo_effettivi_nominali.size > 0 else 0
-anni_pensione_effettivi_nominali = np.where(dati_mediana['pensioni_pubbliche_nominali'] > 0)[0]
-pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_effettivi_nominali]) if anni_pensione_effettivi_nominali.size > 0 else 0
+
+# Calcolo pensione pubblica nominale: solo negli anni in cui viene effettivamente erogata
+pensione_media_nominale = np.mean(dati_mediana['pensioni_pubbliche_nominali'][anni_pensione_effettivi]) if anni_pensione_effettivi.size > 0 else 0
+
 anni_rendita_fp_effettivi_nominali = np.where(dati_mediana['rendite_fp_nominali'] > 0)[0]
 rendita_fp_media_nominale = np.mean(dati_mediana['rendite_fp_nominali'][anni_rendita_fp_effettivi_nominali]) if anni_rendita_fp_effettivi_nominali.size > 0 else 0
 totale_medio_nominale = prelievo_medio_nominale + pensione_media_nominale + rendita_fp_media_nominale

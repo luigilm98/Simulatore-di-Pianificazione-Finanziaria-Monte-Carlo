@@ -210,6 +210,80 @@ def valida_parametri(parametri):
             raise ValueError("TER FP deve essere tra 0 e 1")
         if not (0 <= parametri['aliquota_finale_fp'] <= 1):
             raise ValueError("Aliquota finale FP deve essere tra 0 e 1 (es. 0.15 per 15%)")
+    
+    # Validazione parametri ribilanciamento
+    if parametri.get('strategia_ribilanciamento', 'GLIDEPATH') == 'GLIDEPATH':
+        inizio_glidepath = parametri.get('inizio_glidepath_anni', 20)
+        fine_glidepath = parametri.get('fine_glidepath_anni', 40)
+        if inizio_glidepath >= fine_glidepath:
+            raise ValueError("Inizio glidepath deve essere prima della fine")
+        if fine_glidepath > parametri.get('anni_totali', 40):
+            raise ValueError("Fine glidepath oltre l'orizzonte temporale")
+    
+    # Validazione parametri costi e tasse
+    if not (0 <= parametri.get('imposta_bollo_titoli', 0.002) <= 1):
+        raise ValueError("Imposta di bollo titoli deve essere tra 0 e 1")
+    if parametri.get('imposta_bollo_conto', 34.20) < 0:
+        raise ValueError("Imposta di bollo conto non può essere negativa")
+    
+    # Validazione strategia prelievo
+    if parametri.get('strategia_prelievo', 'REGOLA_4_PERCENTO') == 'GUARDRAIL':
+        if not (0 <= parametri.get('banda_guardrail', 0.10) <= 1):
+            raise ValueError("Banda guardrail deve essere tra 0 e 1")
+
+def _calcola_allocazione_annuale(parametri):
+    """
+    Calcola l'allocazione ETF/liquidità per ogni anno in base alla strategia di ribilanciamento.
+    
+    Args:
+        parametri: Parametri della simulazione
+        
+    Returns:
+        Array con allocazione ETF per ogni anno (0-1)
+    """
+    anni_totali = parametri.get('anni_totali', 40)
+    strategia_ribilanciamento = parametri.get('strategia_ribilanciamento', 'GLIDEPATH')
+    
+    # Allocazione iniziale basata sui valori iniziali
+    capitale_iniziale = parametri.get('capitale_iniziale', 0)
+    etf_iniziale = parametri.get('etf_iniziale', 0)
+    patrimonio_totale_iniziale = capitale_iniziale + etf_iniziale
+    
+    if patrimonio_totale_iniziale > 0:
+        allocazione_iniziale = etf_iniziale / patrimonio_totale_iniziale
+    else:
+        allocazione_iniziale = 0.60  # Default 60% ETF, 40% liquidità
+    
+    allocazioni_annuali = np.zeros(anni_totali)
+    
+    if strategia_ribilanciamento == 'GLIDEPATH':
+        # Glidepath: riduzione progressiva del rischio
+        inizio_glidepath = parametri.get('inizio_glidepath_anni', 20)
+        fine_glidepath = parametri.get('fine_glidepath_anni', 40)
+        allocazione_finale = parametri.get('allocazione_etf_finale', 0.333)
+        
+        for anno in range(anni_totali):
+            if anno < inizio_glidepath:
+                # Fase accumulo: allocazione costante
+                allocazioni_annuali[anno] = allocazione_iniziale
+            elif anno >= fine_glidepath:
+                # Fase finale: allocazione target
+                allocazioni_annuali[anno] = allocazione_finale
+            else:
+                # Fase transizione: riduzione lineare
+                progresso = (anno - inizio_glidepath) / (fine_glidepath - inizio_glidepath)
+                allocazioni_annuali[anno] = allocazione_iniziale + progresso * (allocazione_finale - allocazione_iniziale)
+                
+    elif strategia_ribilanciamento == 'ANNUALE_FISSO':
+        # Ribilanciamento annuale a allocazione fissa
+        allocazione_fissa = parametri.get('allocazione_etf_fissa', 0.60)
+        allocazioni_annuali[:] = allocazione_fissa
+        
+    else:  # NESSUNO
+        # Nessun ribilanciamento: allocazione iniziale mantenuta
+        allocazioni_annuali[:] = allocazione_iniziale
+    
+    return allocazioni_annuali
 
 def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     """
@@ -233,7 +307,8 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         'rendite_fp_nominali', 'rendite_fp_reali',
         'fp_liquidato_nominale', 'fp_liquidato_reale',
         'variazione_patrimonio_percentuale', 'rendimento_investimento_percentuale',
-        'contributi_totali_versati', 'indice_prezzi', 'reddito_totale_reale'
+        'contributi_totali_versati', 'indice_prezzi', 'reddito_totale_reale',
+        'vendite_rebalance_nominali'
     ]}
 
     # Stato iniziale dei saldi e delle variabili
@@ -260,6 +335,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
     # Variabili di stato per la gestione della rendita FP
     rendita_fp_mese = 0
+    rendita_fp_mese_iniziale = 0
     mesi_rimanenti_rendita_fp = 0
 
     # Modello economico a regimi
@@ -278,31 +354,34 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # A. GESTIONE EVENTI E FONDO PENSIONE
         if parametri.get('attiva_fondo_pensione', False):
             # Evento di liquidazione all'età di ritiro (eseguito solo una volta)
-            if int(eta_attuale) == parametri.get('eta_ritiro_fp', 100) and mese % 12 == 1:
-                if patrimonio_fp > 0:
-                    guadagni_fp = patrimonio_fp - contributi_totali_fp
-                    tasse_fp = max(0, guadagni_fp) * parametri.get('aliquota_finale_fp', 0.15)
-                    patrimonio_fp_netto = patrimonio_fp - tasse_fp
-                    
-                    percentuale_capitale = parametri.get('percentuale_capitale_fp', 0.5)
-                    capitale_liquidato = patrimonio_fp_netto * percentuale_capitale
-                    importo_per_rendita = patrimonio_fp_netto - capitale_liquidato
-                    
-                    patrimonio_banca += capitale_liquidato
-                    
-                    # Salva la liquidazione FP nell'anno corrente (sia nominale che reale)
-                    dati_annuali['fp_liquidato_nominale'][anno_corrente] += capitale_liquidato
-                    dati_annuali['fp_liquidato_reale'][anno_corrente] += capitale_liquidato / indice_prezzi
-                    
-                    durata_rendita_anni = parametri.get('durata_rendita_fp_anni', 25)
-                    if durata_rendita_anni > 0:
-                        mesi_rimanenti_rendita_fp = durata_rendita_anni * 12
-                        rendita_fp_mese = importo_per_rendita / mesi_rimanenti_rendita_fp if mesi_rimanenti_rendita_fp > 0 else 0
-                    
-                    patrimonio_fp = 0 # Il fondo viene azzerato
+            if int(eta_attuale) == parametri.get('eta_ritiro_fp', 67) and mese % 12 == 1 and patrimonio_fp > 0:
+                guadagni_fp = patrimonio_fp - contributi_totali_fp
+                tasse_fp = max(0, guadagni_fp) * parametri.get('aliquota_finale_fp', 0.15)
+                patrimonio_fp_netto = patrimonio_fp - tasse_fp
+                
+                percentuale_capitale = parametri.get('percentuale_capitale_fp', 0.5)
+                capitale_liquidato = patrimonio_fp_netto * percentuale_capitale
+                importo_per_rendita = patrimonio_fp_netto - capitale_liquidato
+                
+                patrimonio_banca += capitale_liquidato
+                
+                # Salva la liquidazione FP nell'anno corrente (sia nominale che reale)
+                dati_annuali['fp_liquidato_nominale'][anno_corrente] += capitale_liquidato
+                dati_annuali['fp_liquidato_reale'][anno_corrente] += capitale_liquidato / indice_prezzi
+                
+                durata_rendita_anni = parametri.get('durata_rendita_fp_anni', 25)
+                if durata_rendita_anni > 0:
+                    mesi_rimanenti_rendita_fp = durata_rendita_anni * 12
+                    # Calcola rendita mensile iniziale (verrà rivalutata per inflazione)
+                    rendita_fp_mese_iniziale = importo_per_rendita / mesi_rimanenti_rendita_fp if mesi_rimanenti_rendita_fp > 0 else 0
+                    rendita_fp_mese = rendita_fp_mese_iniziale
+                
+                patrimonio_fp = 0 # Il fondo viene azzerato
 
-            # Erogazione della rendita mensile
+            # Erogazione della rendita mensile (rivalutata per inflazione)
             if mesi_rimanenti_rendita_fp > 0:
+                # Rivaluta la rendita per inflazione
+                rendita_fp_mese = rendita_fp_mese_iniziale * indice_prezzi
                 mesi_rimanenti_rendita_fp -= 1
             
             if mesi_rimanenti_rendita_fp == 0:
@@ -313,7 +392,11 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         pensione_pubblica_mese = 0
         inizio_pensione_mesi = parametri.get('inizio_pensione_anni', num_anni + 1) * 12
         if mese >= inizio_pensione_mesi:
-            pensione_pubblica_mese = parametri.get('pensione_pubblica_annua', 0) / 12
+            # La pensione pubblica è già in termini reali, la rivalutiamo per inflazione
+            pensione_annua_nominale = parametri.get('pensione_pubblica_annua', 0)
+            for a in range(inizio_pensione_mesi // 12, mese // 12):
+                pensione_annua_nominale *= (1 + inflazione_mensile * 12)  # Approssimazione annuale
+            pensione_pubblica_mese = pensione_annua_nominale / 12
         
         # Aggiornamento contabile: accredito entrate e salvataggio dati
         patrimonio_banca += pensione_pubblica_mese + rendita_fp_mese
@@ -360,6 +443,33 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                         prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale
                     else:
                         prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
+                elif parametri['strategia_prelievo'] == 'GUARDRAIL':
+                    if mese == inizio_prelievo_mesi:
+                        patrimonio_a_prelievo = patrimonio_banca + patrimonio_etf
+                        prelievo_annuo_nominale_iniziale = patrimonio_a_prelievo * parametri['percentuale_regola_4']
+                        indice_prezzi_inizio_pensione = indice_prezzi
+                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale
+                    else:
+                        # Calcola trend di mercato (ultimi 3 anni)
+                        anni_da_prelievo = (mese - inizio_prelievo_mesi) // 12
+                        if anni_da_prelievo >= 3:
+                            # Calcola trend basato sul patrimonio attuale vs iniziale
+                            patrimonio_attuale = patrimonio_banca + patrimonio_etf
+                            trend_mercato = patrimonio_attuale / (patrimonio_a_prelievo * (indice_prezzi / indice_prezzi_inizio_pensione))
+                            
+                            banda_guardrail = parametri.get('banda_guardrail', 0.10)
+                            if trend_mercato > (1 + banda_guardrail):
+                                # Mercato in forte crescita: aumenta prelievo
+                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione) * (1 + banda_guardrail * 0.5)
+                            elif trend_mercato < (1 - banda_guardrail):
+                                # Mercato in calo: riduce prelievo
+                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione) * (1 - banda_guardrail * 0.5)
+                            else:
+                                # Mercato stabile: prelievo normale
+                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
+                        else:
+                            # Primi anni: prelievo normale
+                            prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
             
             prelievo_mensile_target = prelievo_annuo_nominale_corrente / 12 if prelievo_annuo_nominale_corrente > 0 else 0
             if prelievo_mensile_target > 0:
@@ -401,12 +511,67 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         
         patrimonio_etf *= (1 + rendimento_mensile)
         patrimonio_etf -= patrimonio_etf * (parametri['ter_etf'] / 12)
+        
+        # Applica costo fisso ETF mensile
+        costo_fisso_mensile = parametri.get('costo_fisso_etf_mensile', 0.0)
+        if costo_fisso_mensile > 0:
+            patrimonio_banca -= costo_fisso_mensile
+        
+        # Applica imposte di bollo (annuali, a fine anno)
+        if mese % 12 == 0:
+            # Imposta di bollo titoli
+            if patrimonio_etf > 0:
+                imposta_bollo_titoli = patrimonio_etf * parametri.get('imposta_bollo_titoli', 0.002)
+                patrimonio_etf -= imposta_bollo_titoli
+            
+            # Imposta di bollo conto (se giacenza > 5000€)
+            if patrimonio_banca > 5000:
+                imposta_bollo_conto = parametri.get('imposta_bollo_conto', 34.20)
+                patrimonio_banca -= imposta_bollo_conto
+        
         indice_prezzi *= (1 + inflazione_mensile)
 
         current_market_regime = _choose_next_regime(current_market_regime, market_regime_definitions)
         current_inflation_regime = _choose_next_regime(current_inflation_regime, inflation_regime_definitions)
         
-        # F. OPERAZIONI DI FINE ANNO
+        # F. RIBILANCIAMENTO ANNUALE (eccetto strategia NESSUNO)
+        if mese % 12 == 0 and parametri.get('strategia_ribilanciamento', 'GLIDEPATH') != 'NESSUNO':
+            allocazioni_annuali = _calcola_allocazione_annuale(parametri)
+            allocazione_target = allocazioni_annuali[anno_corrente - 1] if anno_corrente > 0 else allocazioni_annuali[0]
+            
+            patrimonio_totale = patrimonio_banca + patrimonio_etf
+            patrimonio_target_etf = patrimonio_totale * allocazione_target
+            
+            # Calcolo trasferimenti per ribilanciamento
+            if patrimonio_etf > patrimonio_target_etf:
+                # Troppo ETF: vendo ETF per comprare liquidità
+                trasferimento = patrimonio_etf - patrimonio_target_etf
+                
+                # Calcola tasse sul capital gain
+                if patrimonio_etf > 0 and etf_cost_basis > 0:
+                    costo_proporzionale = (trasferimento / patrimonio_etf) * etf_cost_basis
+                    plusvalenza = trasferimento - costo_proporzionale
+                    tasse_rebalance = max(0, plusvalenza) * parametri['tassazione_capital_gain']
+                    
+                    patrimonio_etf -= trasferimento
+                    patrimonio_banca += trasferimento - tasse_rebalance
+                    etf_cost_basis -= costo_proporzionale
+                    
+                    # Track vendite di ribilanciamento
+                    dati_annuali['vendite_rebalance_nominali'][anno_corrente] += trasferimento
+                else:
+                    patrimonio_etf -= trasferimento
+                    patrimonio_banca += trasferimento
+                    dati_annuali['vendite_rebalance_nominali'][anno_corrente] += trasferimento
+            
+            elif patrimonio_etf < patrimonio_target_etf:
+                # Troppo liquidità: vendo liquidità per comprare ETF
+                trasferimento = patrimonio_target_etf - patrimonio_etf
+                patrimonio_banca -= trasferimento
+                patrimonio_etf += trasferimento
+                etf_cost_basis += trasferimento  # Aggiorna cost basis
+        
+        # G. OPERAZIONI DI FINE ANNO
         if mese % 12 == 0:
             # Crescita annuale e contributo al fondo pensione (se attivo)
             if parametri.get('attiva_fondo_pensione', False):
@@ -418,9 +583,17 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     )
                     patrimonio_fp *= (1 + rendimento_fp)
                     patrimonio_fp -= patrimonio_fp * parametri.get('ter_fp', 0.01)
+                    
+                    # Applica tassazione sui rendimenti (se configurata)
+                    tassazione_rendimenti_fp = parametri.get('tassazione_rendimenti_fp', 0.20)
+                    if tassazione_rendimenti_fp > 0:
+                        rendimento_netto = patrimonio_fp - contributi_totali_fp
+                        if rendimento_netto > 0:
+                            tasse_rendimenti = rendimento_netto * tassazione_rendimenti_fp
+                            patrimonio_fp -= tasse_rendimenti
                 
-                # Il contributo viene aggiunto solo prima dell'età di ritiro
-                if eta_attuale < parametri.get('eta_ritiro_fp', 100):
+                # Il contributo viene aggiunto durante tutta la fase di accumulo
+                if anno_corrente < parametri['anni_inizio_prelievo']:
                     contributo_fp = parametri.get('contributo_annuo_fp', 0)
                     patrimonio_fp += contributo_fp
                     contributi_totali_fp += contributo_fp
