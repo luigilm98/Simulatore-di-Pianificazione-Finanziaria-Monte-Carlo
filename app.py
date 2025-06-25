@@ -1138,20 +1138,18 @@ with col2:
 
 # --- Messaggi Informativi Contestuali ---
 prelievo_sostenibile_calcolato = st.session_state.risultati['statistiche'].get('prelievo_sostenibile_calcolato')
+prelievo_effettivamente_usato = st.session_state.risultati['statistiche'].get('prelievo_effettivamente_usato')
 if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato > 0:
     st.info(f"""
     **Hai richiesto il calcolo del prelievo massimo sostenibile.**
     \nAbbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.\n
-    I risultati della simulazione qui sotto (es. Probabilità di Fallimento) rappresentano uno **stress test** di questo piano. 
-    Se la probabilità di fallimento è alta, significa che, a causa della volatilità dei mercati, questo livello di prelievo è considerato rischioso.
-    
-    **DEBUG:** Il prelievo effettivamente usato nella simulazione mediana è: **€ {prelievo_medio_reale:,.0f}** (reale), **€ {prelievo_medio_nominale:,.0f}** (nominale).
+    **DEBUG:** Il prelievo effettivamente usato nella simulazione principale è: **€ {prelievo_effettivamente_usato:,.0f}**.
     """)
 
-# --- Forza la visualizzazione del prelievo sostenibile calcolato se presente ---
-if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato > 0:
-    prelievo_medio_reale = prelievo_sostenibile_calcolato
-    prelievo_medio_nominale = prelievo_sostenibile_calcolato
+# --- Forza la visualizzazione del prelievo effettivamente usato se >0 ---
+if prelievo_effettivamente_usato is not None and prelievo_effettivamente_usato > 0:
+    prelievo_medio_reale = prelievo_effettivamente_usato
+    prelievo_medio_nominale = prelievo_effettivamente_usato
 
 # --- Warning se i prelievi effettivi sono nulli o trascurabili ---
 if prelievo_medio_reale < 1:

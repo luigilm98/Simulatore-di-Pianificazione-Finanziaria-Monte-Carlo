@@ -713,28 +713,31 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
     
     # Gestione del calcolo del prelievo sostenibile
     prelievo_sostenibile_calcolato = None
+    prelievo_effettivamente_usato = None
     if prelievo_annuo_da_usare is None:
         if parametri['strategia_prelievo'] == 'FISSO' and parametri.get('calcola_prelievo_sostenibile', False) and not parametri.get('_in_routine_sostenibile', False):
             prelievo_sostenibile_calcolato = _calcola_prelievo_sostenibile(parametri)
             prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
             parametri['prelievo_annuo'] = prelievo_sostenibile_calcolato
             parametri['_in_routine_sostenibile'] = True  # Evita ricorsione
-            # NON fare return! Prosegui con la simulazione principale usando il valore trovato
+            prelievo_effettivamente_usato = prelievo_sostenibile_calcolato
+            # Debug: stampa il valore calcolato
+            print(f"[DEBUG] Prelievo sostenibile calcolato: {prelievo_sostenibile_calcolato}")
         else:
             prelievo_annuo_da_usare = parametri['prelievo_annuo']
+            prelievo_effettivamente_usato = prelievo_annuo_da_usare
+    else:
+        prelievo_effettivamente_usato = prelievo_annuo_da_usare
 
     # Inizializzazione contenitori per i risultati aggregati
     n_sim = parametri['n_simulazioni']
     num_anni = parametri['anni_totali']
-    
-    # FIX: Inizializza un array per contenere tutti i dati annuali di tutte le run
     tutti_i_dati_annuali = [{} for _ in range(n_sim)]
     tutti_i_drawdown = np.zeros(n_sim)
     tutti_i_guadagni = np.zeros(n_sim)
     tutti_i_contributi = np.zeros(n_sim)
     fallimenti = 0
 
-    # Esecuzione delle N simulazioni
     for i in range(n_sim):
         risultati_run = _esegui_una_simulazione(parametri, prelievo_annuo_da_usare)
         tutti_i_dati_annuali[i] = risultati_run['dati_annuali']
@@ -743,31 +746,26 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         tutti_i_contributi[i] = risultati_run['contributi_totali_versati']
         if risultati_run['fallimento']:
             fallimenti += 1
-            
-    # --- Calcolo dei valori reali e nominali per i grafici ---
+
     patrimoni_nominali_tutte_le_run = np.array([
         d['saldo_banca_nominale'] + d['saldo_etf_nominale'] + d['saldo_fp_nominale'] 
         for d in tutti_i_dati_annuali
     ])
-    
     patrimoni_reali_tutte_le_run = np.zeros_like(patrimoni_nominali_tutte_le_run)
     for i in range(n_sim):
         indici_prezzi = tutti_i_dati_annuali[i]['indice_prezzi']
-        indici_prezzi = np.maximum(indici_prezzi, 1e-10) # Safety check
+        indici_prezzi = np.maximum(indici_prezzi, 1e-10)
         patrimoni_reali_tutte_le_run[i, :] = patrimoni_nominali_tutte_le_run[i, :] / indici_prezzi
 
-    # Identificazione dello scenario mediano basato sul patrimonio finale reale
     patrimoni_finali_reali = patrimoni_reali_tutte_le_run[:, -1]
     patrimoni_finali_reali = np.nan_to_num(patrimoni_finali_reali, nan=0.0, posinf=0.0, neginf=0.0)
-    
     valore_mediano = np.median(patrimoni_finali_reali)
     indice_mediano = np.abs(patrimoni_finali_reali - valore_mediano).argmin() if len(patrimoni_finali_reali) > 0 else 0
     dati_mediana_dettagliati = tutti_i_dati_annuali[indice_mediano]
 
-    # Calcolo delle statistiche aggregate finali
     patrimoni_finali_nominali = patrimoni_nominali_tutte_le_run[:, -1]
     idx_inizio_prelievo = parametri['anni_inizio_prelievo']
-    
+
     statistiche = {
         'patrimonio_finale_mediano_nominale': np.median(patrimoni_finali_nominali),
         'patrimonio_finale_top_10_nominale': np.percentile(patrimoni_finali_nominali, 90),
@@ -783,16 +781,17 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         'patrimoni_reali_finali': patrimoni_finali_reali,
         'guadagni_accumulo_mediano_nominale': np.median(tutti_i_guadagni),
         'contributi_totali_versati_mediano_nominale': np.median(tutti_i_contributi),
-        'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato
+        'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato,
+        'prelievo_effettivamente_usato': prelievo_effettivamente_usato
     }
 
-    # Estrazione redditi per analisi
     reddito_reale_annuo_tutte_le_run = np.array([run['reddito_totale_reale'] for run in tutti_i_dati_annuali])
-    # Calcolo statistiche prelievi
     statistiche_prelievi = {
         'totale_reale_medio_annuo': np.mean(reddito_reale_annuo_tutte_le_run) if reddito_reale_annuo_tutte_le_run.size > 0 else 0.0
     }
-    
+    # Debug: stampa il valore effettivamente usato
+    print(f"[DEBUG] Prelievo effettivamente usato nella simulazione principale: {prelievo_effettivamente_usato}")
+
     return {
         "statistiche": statistiche,
         "statistiche_prelievi": statistiche_prelievi,
