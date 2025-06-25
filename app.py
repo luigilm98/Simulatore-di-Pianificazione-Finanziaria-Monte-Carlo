@@ -732,6 +732,13 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
     else:
         inflazione_modello = 0.025  # Default 2.5% se non calcolabile
     
+    # Range di aggiustamento ±1% intorno all'inflazione del modello
+    min_adj = max(0, inflazione_modello - 0.01)
+    max_adj = min(0.10, inflazione_modello + 0.01)
+    default_adj = p.get('inflazione', inflazione_modello)
+    if default_adj < min_adj or default_adj > max_adj:
+        default_adj = inflazione_modello
+
     def percent_it(val):
         return f"{val*100:.2f}".replace('.', ',') + '%'
 
