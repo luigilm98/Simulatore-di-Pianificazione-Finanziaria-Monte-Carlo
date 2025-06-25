@@ -649,11 +649,11 @@ def get_default_portfolio():
     Utile per inizializzare lo stato dell'applicazione.
     """
     return pd.DataFrame([
-        {"Fondo": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating", "Ticker": "VWCE", "Allocazione (%)": 90.0, "TER (%)": 0.22, "Rendimento Atteso (%)": 8.0, "Volatilità Attesa (%)": 15.0},
-        {"Fondo": "Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture", "Ticker": "CRB", "Allocazione (%)": 3.0, "TER (%)": 0.30, "Rendimento Atteso (%)": 5.0, "Volatilità Attesa (%)": 18.0},
-        {"Fondo": "iShares MSCI EM UCITS ETF (Acc)", "Ticker": "EIMI", "Allocazione (%)": 3.0, "TER (%)": 0.18, "Rendimento Atteso (%)": 9.0, "Volatilità Attesa (%)": 22.0},
-        {"Fondo": "Amundi MSCI Japan UCITS ETF Acc", "Ticker": "SJP", "Allocazione (%)": 3.0, "TER (%)": 0.12, "Rendimento Atteso (%)": 7.0, "Volatilità Attesa (%)": 16.0},
-        {"Fondo": "iShares Automation & Robotics UCITS ETF", "Ticker": "RBOT", "Allocazione (%)": 1.0, "TER (%)": 0.40, "Rendimento Atteso (%)": 12.0, "Volatilità Attesa (%)": 25.0},
+        {"Fondo": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating", "Ticker": "VWCE", "Allocazione (%)": 90.0, "TER (%)": 0.22, "Rendimento Atteso (%)": 8.0, "Volatilità Attesa (%)": 15.0, "Categoria": "Azioni"},
+        {"Fondo": "Amundi Bloomberg Equal-Weight Commodity Ex-Agriculture", "Ticker": "CRB", "Allocazione (%)": 3.0, "TER (%)": 0.30, "Rendimento Atteso (%)": 5.0, "Volatilità Attesa (%)": 18.0, "Categoria": "Commodities"},
+        {"Fondo": "iShares MSCI EM UCITS ETF (Acc)", "Ticker": "EIMI", "Allocazione (%)": 3.0, "TER (%)": 0.18, "Rendimento Atteso (%)": 9.0, "Volatilità Attesa (%)": 22.0, "Categoria": "Azioni"},
+        {"Fondo": "Amundi MSCI Japan UCITS ETF Acc", "Ticker": "SJP", "Allocazione (%)": 3.0, "TER (%)": 0.12, "Rendimento Atteso (%)": 7.0, "Volatilità Attesa (%)": 16.0, "Categoria": "Azioni"},
+        {"Fondo": "iShares Automation & Robotics UCITS ETF", "Ticker": "RBOT", "Allocazione (%)": 1.0, "TER (%)": 0.40, "Rendimento Atteso (%)": 12.0, "Volatilità Attesa (%)": 25.0, "Categoria": "Azioni"},
     ])
 
 # --- Inizializzazione del portfolio nello stato della sessione ---
@@ -701,7 +701,19 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
     etf_iniziale = st.number_input("Valore Portafoglio ETF (€)", min_value=0, step=1000, value=p.get('etf_iniziale', 600), help="Il valore di mercato attuale di tutti i tuoi investimenti in ETF/azioni.")
     contributo_mensile_banca = st.number_input("Contributo Mensile Conto (€)", min_value=0, step=50, value=p.get('contributo_mensile_banca', 1300), help="La cifra che riesci a risparmiare e accantonare sul conto corrente ogni mese. Questi soldi verranno usati per il ribilanciamento o per le spese.")
     contributo_mensile_etf = st.number_input("Contributo Mensile ETF (€)", min_value=0, step=50, value=p.get('contributo_mensile_etf', 300), help="La cifra che investi attivamente ogni mese nel tuo portafoglio ETF. Questo è il motore principale del tuo Piano di Accumulo (PAC).")
-    
+
+    # --- NUOVA MODALITÀ DI COMBINAZIONE PARAMETRI RENDIMENTO ---
+    modalita_parametri_rendimento = st.selectbox(
+        "Modalità di Combinazione Parametri Rendimento",
+        options=[
+            "Solo Modello Economico",
+            "Solo Portafoglio ETF",
+            "Combinazione Pesata"
+        ],
+        index=["Solo Modello Economico", "Solo Portafoglio ETF", "Combinazione Pesata"].index(p.get('modalita_parametri_rendimento', "Combinazione Pesata")),
+        help="Scegli come calcolare i rendimenti e la volatilità degli investimenti: solo in base al modello economico, solo in base al tuo portafoglio ETF, oppure una combinazione pesata tra i due (in base all'allocazione azionaria/obbligazionaria)."
+    )
+
     # --- NUOVO CONTROLLO MODELLO ECONOMICO ---
     modelli_economici = list(engine.ECONOMIC_MODELS.keys())
     descrizioni_modelli = {k: v['description'] for k, v in engine.ECONOMIC_MODELS.items()}
@@ -760,7 +772,7 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
 # --- Sezione 3: Costruttore di Portafoglio ---
 with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
     st.markdown("Modifica l'allocazione, il TER e le stime di rendimento/volatilità per ogni ETF.")
-    
+    categorie_possibili = ["Azioni", "Obbligazioni", "Commodities", "REIT", "Altro"]
     edited_portfolio = st.data_editor(
         st.session_state.portfolio,
         column_config={
@@ -768,6 +780,7 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
             "TER (%)": st.column_config.NumberColumn(format="%.2f%%", min_value=0),
             "Rendimento Atteso (%)": st.column_config.NumberColumn(format="%.2f%%"),
             "Volatilità Attesa (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Categoria": st.column_config.SelectboxColumn(options=categorie_possibili),
         },
         num_rows="dynamic",
         key="portfolio_editor"
@@ -778,7 +791,6 @@ with st.sidebar.expander("2. Costruttore di Portafoglio ETF", expanded=True):
         st.warning(f"L'allocazione totale è {total_allocation:.2f}%. Assicurati che sia 100%.")
     else:
         st.success("Allocazione totale: 100%.")
-    
     st.session_state.portfolio = edited_portfolio
     
     weights = edited_portfolio["Allocazione (%)"] / 100
@@ -885,6 +897,9 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
     if not np.isclose(st.session_state.portfolio["Allocazione (%)"].sum(), 100):
         st.sidebar.error("L'allocazione del portafoglio deve essere esattamente 100% per eseguire la simulazione.")
     else:
+        # Calcolo peso azionario per la combinazione pesata
+        peso_azioni = st.session_state.portfolio[st.session_state.portfolio['Categoria'] == 'Azioni']["Allocazione (%)"].sum() / 100
+        
         st.session_state.parametri = {
             'eta_iniziale': eta_iniziale, 'capitale_iniziale': capitale_iniziale, 'etf_iniziale': etf_iniziale,
             'contributo_mensile_banca': contributo_mensile_banca, 'contributo_mensile_etf': contributo_mensile_etf, 
@@ -907,7 +922,9 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'volatilita_fp': volatilita_fp, 'ter_fp': ter_fp, 'tassazione_rendimenti_fp': tassazione_rendimenti_fp, 'aliquota_finale_fp': aliquota_finale_fp,
             'eta_ritiro_fp': eta_ritiro_fp, 'percentuale_capitale_fp': percentuale_capitale_fp, 'durata_rendita_fp_anni': durata_rendita_fp_anni,
             'pensione_pubblica_annua': pensione_pubblica_annua, 'inizio_pensione_anni': inizio_pensione_anni,
-            'economic_model': economic_model
+            'economic_model': economic_model,
+            'modalita_parametri_rendimento': modalita_parametri_rendimento,
+            'peso_azioni': peso_azioni,
         }
 
         try:

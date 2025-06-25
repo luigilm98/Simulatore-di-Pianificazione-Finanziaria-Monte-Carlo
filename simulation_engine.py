@@ -346,6 +346,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     current_market_regime = np.random.choice(list(market_regime_definitions.keys()))
     current_inflation_regime = np.random.choice(list(inflation_regime_definitions.keys()))
 
+    # --- LOGICA COMBINAZIONE PARAMETRI RENDIMENTO ---
+    modalita_parametri = parametri.get('modalita_parametri_rendimento', 'Combinazione Pesata')
+    peso_azioni = parametri.get('peso_azioni', 0.6)  # Default 60% azioni se non specificato
+    rendimento_portafoglio = parametri.get('rendimento_medio', 0.06)
+    volatilita_portafoglio = parametri.get('volatilita', 0.12)
+
     # --- 2. LOOP DI SIMULAZIONE MENSILE ---
     for mese in range(1, mesi_totali + 1):
         anno_corrente = (mese - 1) // 12 + 1
@@ -506,7 +512,19 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
         # E. RENDIMENTI, COSTI E AGGIORNAMENTO INFLAZIONE
         market_regime = market_regime_definitions[current_market_regime]
         inflation_regime = inflation_regime_definitions[current_inflation_regime]
-        rendimento_mensile = np.random.normal(market_regime['mean'] / 12, market_regime['vol'] / np.sqrt(12))
+
+        # --- SCEGLI I PARAMETRI DI RENDIMENTO/VOlATILITÀ DA USARE ---
+        if modalita_parametri == 'Solo Modello Economico':
+            mean_mese = market_regime['mean'] / 12
+            vol_mese = market_regime['vol'] / np.sqrt(12)
+        elif modalita_parametri == 'Solo Portafoglio ETF':
+            mean_mese = rendimento_portafoglio / 12
+            vol_mese = volatilita_portafoglio / np.sqrt(12)
+        else:  # Combinazione Pesata
+            mean_mese = (peso_azioni * market_regime['mean'] + (1 - peso_azioni) * rendimento_portafoglio) / 12
+            vol_mese = (peso_azioni * market_regime['vol'] + (1 - peso_azioni) * volatilita_portafoglio) / np.sqrt(12)
+
+        rendimento_mensile = np.random.normal(mean_mese, vol_mese)
         inflazione_mensile = np.random.normal(inflation_regime['mean'] / 12, inflation_regime['vol'] / np.sqrt(12))
         
         patrimonio_etf *= (1 + rendimento_mensile)
