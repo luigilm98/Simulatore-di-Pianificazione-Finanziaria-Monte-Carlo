@@ -685,7 +685,7 @@ def _calcola_prelievo_sostenibile(parametri):
     risultati_test = run_full_simulation(params_test)
     patrimoni_reali_test = risultati_test['dati_grafici_principali']['reale']
     
-    idx_inizio_prelievo = parametri['anni_inizio_prelievo'] * 12
+    idx_inizio_prelievo = parametri['anni_inizio_prelievo']
     capitale_reale_mediano_a_prelievo = np.median(patrimoni_reali_test[:, idx_inizio_prelievo])
 
     if capitale_reale_mediano_a_prelievo <= 0: return 0
