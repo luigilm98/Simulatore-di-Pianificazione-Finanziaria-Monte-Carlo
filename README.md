@@ -2,7 +2,7 @@
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://simulatore-di-pianificazione-finanziaria-monte-carlo-amaeuqvh8.streamlit.app/)
 
-Questo non è il solito simulatore Monte Carlo. Invece di usare un modello statistico semplicistico, questo strumento integra un **Modello Economico a Regimi Commutabili (Regime-Switching Model)** per generare scenari futuri molto più realistici, simulando veri e propri cicli economici completi di crash, recessioni e riprese.
+Questo strumento integra un **Modello Economico a Regimi Commutabili (Regime-Switching Model)** per generare scenari futuri realistici, simulando veri e propri cicli economici completi di crash, recessioni e riprese.
 
 ---
 
