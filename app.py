@@ -713,9 +713,43 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
         help="Scegli lo scenario macroeconomico di lungo termine per la simulazione. Ogni modello ha diversi regimi di mercato (es. crash, recessione) e di inflazione, con probabilità realistiche di transizione tra loro. Questo è il motore principale per testare la robustezza del piano."
     )
     st.caption(f"_{descrizioni_modelli[economic_model]}_")
-    # --- FINE NUOVO CONTROLLO ---
     
-    inflazione = st.slider("Inflazione Media Annua (%)", 0.0, 10.0, p.get('inflazione', 0.03) * 100, 0.1, help="Il tasso a cui i prezzi aumentano e il denaro perde potere d'acquisto. Un'inflazione del 3% significa che tra un anno, 100€ compreranno beni per 97€.") / 100
+    # Calcola l'inflazione media del modello selezionato
+    model_params = engine._get_regime_params(economic_model)
+    inflation_regimes = model_params['inflation_regimes']
+    
+    # Calcola l'inflazione media pesata per le probabilità di transizione
+    inflazione_modello = 0
+    total_weight = 0
+    for regime_name, regime_params in inflation_regimes.items():
+        # Usa la probabilità di rimanere nello stesso regime come peso
+        weight = regime_params.get('transitions', {}).get(regime_name, 0.5)
+        inflazione_modello += regime_params['mean'] * weight
+        total_weight += weight
+    
+    if total_weight > 0:
+        inflazione_modello = inflazione_modello / total_weight
+    else:
+        inflazione_modello = 0.025  # Default 2.5% se non calcolabile
+    
+    # Mostra l'inflazione del modello e permette piccoli aggiustamenti
+    st.markdown(f"**📊 Inflazione del Modello: {inflazione_modello:.1%}**")
+    
+    # Range di aggiustamento ±1% intorno all'inflazione del modello
+    min_adj = max(0, inflazione_modello - 0.01)
+    max_adj = min(0.10, inflazione_modello + 0.01)
+    default_adj = p.get('inflazione', inflazione_modello)
+    
+    # Assicurati che il valore di default sia nel range
+    if default_adj < min_adj or default_adj > max_adj:
+        default_adj = inflazione_modello
+    
+    inflazione = st.slider(
+        "Aggiustamento Inflazione (±1%)", 
+        min_adj, max_adj, default_adj, 0.001,
+        help=f"Piccolo aggiustamento all'inflazione del modello ({inflazione_modello:.1%}). Range: {min_adj:.1%} - {max_adj:.1%}"
+    )
+    # --- FINE NUOVO CONTROLLO ---
     
     anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
     n_simulazioni = st.slider("Numero Simulazioni", 10, 1000, p.get('n_simulazioni', 250), 10, help="Più simulazioni esegui, più accurata sarà la stima delle probabilità. 250 è un buon compromesso tra velocità e precisione.")
