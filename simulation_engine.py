@@ -21,29 +21,29 @@ import numpy as np
 import json
 
 # ============================================================================
-# DEFINIZIONE DEI MODELLI ECONOMICI A REGIMI
+# DEFINIZIONE DEI MODELLI ECONOMICI A REGIMI (VERSIONE MIGLIORATA)
 # ==============================================================================
 ECONOMIC_MODELS = {
     "VOLATILE (CICLI BOOM-BUST)": {
-        "description": "Un modello più realistico con cicli di mercato pronunciati. Le crisi sono seguite da recessioni e poi da forti riprese.",
+        "description": "Modello realistico con cicli di mercato basato su dati storici S&P 500. Include fasi di crescita sostenuta, correzioni moderate e recessioni gestibili.",
         "market_regimes": {
-            'Normal': {'mean': 0.08, 'vol': 0.15, 'transitions': {'Normal': 0.99, 'Crash': 0.01}},
-            'Crash': {'mean': -0.40, 'vol': 0.50, 'transitions': {'Recession': 1.0}},
-            'Recession': {'mean': -0.05, 'vol': 0.30, 'transitions': {'Recession': 0.95, 'Recovery': 0.05}},
-            'Recovery': {'mean': 0.25, 'vol': 0.40, 'transitions': {'Normal': 1.0}}
+            'Bull Market': {'mean': 0.15, 'vol': 0.12, 'transitions': {'Bull Market': 0.95, 'Correction': 0.05}},
+            'Correction': {'mean': -0.15, 'vol': 0.25, 'transitions': {'Bear Market': 0.7, 'Bull Market': 0.3}},
+            'Bear Market': {'mean': -0.25, 'vol': 0.30, 'transitions': {'Bear Market': 0.8, 'Recovery': 0.2}},
+            'Recovery': {'mean': 0.20, 'vol': 0.20, 'transitions': {'Bull Market': 0.9, 'Correction': 0.1}}
         },
         "inflation_regimes": {
             'Normal': {'mean': 0.025, 'vol': 0.01, 'transitions': {'Normal': 0.98, 'High': 0.02}},
             'High': {'mean': 0.06, 'vol': 0.03, 'transitions': {'Normal': 0.9, 'High': 0.1}}
         },
-        "initial_market_regime": "Normal",
+        "initial_market_regime": "Bull Market",
         "initial_inflation_regime": "Normal"
     },
     "STAGFLAZIONE ANNI '70": {
-        "description": "Simula un periodo di alta inflazione persistente con una crescita di mercato debole o negativa, simile agli anni '70.",
+        "description": "Simula un periodo di alta inflazione persistente con crescita di mercato debole ma non catastrofica, simile agli anni '70.",
         "market_regimes": {
-            'Stagnation': {'mean': 0.01, 'vol': 0.20, 'transitions': {'Stagnation': 0.98, 'WeakRecovery': 0.02}},
-            'WeakRecovery': {'mean': 0.05, 'vol': 0.25, 'transitions': {'Stagnation': 1.0}}
+            'Stagnation': {'mean': 0.02, 'vol': 0.18, 'transitions': {'Stagnation': 0.98, 'WeakRecovery': 0.02}},
+            'WeakRecovery': {'mean': 0.08, 'vol': 0.22, 'transitions': {'Stagnation': 0.8, 'WeakRecovery': 0.2}}
         },
         "inflation_regimes": {
             'High': {'mean': 0.08, 'vol': 0.04, 'transitions': {'High': 0.99, 'VeryHigh': 0.01}},
@@ -55,8 +55,8 @@ ECONOMIC_MODELS = {
     "CRESCITA STABILE (POST-2009)": {
         "description": "Un'era di crescita costante, bassa inflazione e volatilità contenuta, con rare e brevi flessioni.",
         "market_regimes": {
-            'Growth': {'mean': 0.10, 'vol': 0.12, 'transitions': {'Growth': 0.995, 'Dip': 0.005}},
-            'Dip': {'mean': -0.10, 'vol': 0.25, 'transitions': {'Growth': 1.0}}
+            'Growth': {'mean': 0.12, 'vol': 0.10, 'transitions': {'Growth': 0.995, 'Dip': 0.005}},
+            'Dip': {'mean': -0.08, 'vol': 0.20, 'transitions': {'Growth': 1.0}}
         },
         "inflation_regimes": {
             'Low': {'mean': 0.02, 'vol': 0.005, 'transitions': {'Low': 1.0}}
@@ -67,7 +67,7 @@ ECONOMIC_MODELS = {
     "CRISI PROLUNGATA (GIAPPONE)": {
         "description": "Modella un 'decennio perduto' con mercati stagnanti per un lungo periodo e un rischio persistente di deflazione.",
         "market_regimes": {
-            'Stagnation': {'mean': -0.01, 'vol': 0.18, 'transitions': {'Stagnation': 1.0}}
+            'Stagnation': {'mean': 0.00, 'vol': 0.15, 'transitions': {'Stagnation': 1.0}}
         },
         "inflation_regimes": {
             'Deflation': {'mean': -0.01, 'vol': 0.01, 'transitions': {'Deflation': 0.99, 'Normal': 0.01}},
@@ -433,6 +433,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                 patrimonio_etf += investimento_etf
                 etf_cost_basis += investimento_etf
                 contributi_totali_accumulati += investimento_etf
+                # SOLO contributi: positivo
                 etf_cashflow_anno += investimento_etf
 
         # D. FASE DI PRELIEVO (prima dei rendimenti)
@@ -482,6 +483,7 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     tasse_implicite = (1 - cost_basis_ratio) * parametri['tassazione_capital_gain']
                     importo_lordo_da_vendere = fabbisogno_da_etf / (1 - tasse_implicite) if (1 - tasse_implicite) > 0 else float('inf')
                     importo_venduto = min(importo_lordo_da_vendere, patrimonio_etf)
+                    # SOLO prelievi netti: negativo
                     etf_cashflow_anno -= importo_venduto
                     if importo_venduto > 0:
                         costo_proporzionale = (importo_venduto / patrimonio_etf) * etf_cost_basis
@@ -618,17 +620,26 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             dati_annuali['indice_prezzi'][anno_corrente] = indice_prezzi
             dati_annuali['contributi_totali_versati'][anno_corrente] = contributi_totali_accumulati
             
-            # Calcolo rendimento puro degli investimenti con metodo Simple Dietz approssimato
+            # Calcolo rendimento puro degli investimenti (solo ETF)
+            # Usiamo un metodo più semplice: confrontiamo il valore finale con quello iniziale
+            # escludendo i flussi di cassa (contributi e prelievi)
             patrimonio_investimenti_inizio = dati_annuali['saldo_etf_nominale'][anno_corrente-1]
             patrimonio_investimenti_fine = patrimonio_etf
             
-            # Denominatore: capitale iniziale + metà dei flussi di cassa netti dell'anno
-            denominatore = patrimonio_investimenti_inizio + (etf_cashflow_anno / 2)
-            
-            if denominatore != 0:
-                # Numeratore: guadagno/perdita netta (variazione di valore - flussi di cassa)
-                guadagno_netto = patrimonio_investimenti_fine - patrimonio_investimenti_inizio - etf_cashflow_anno
-                dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = guadagno_netto / denominatore
+            # Calcola il rendimento solo se c'è un patrimonio iniziale
+            if patrimonio_investimenti_inizio > 0:
+                # Il rendimento è la variazione percentuale del patrimonio ETF
+                # escludendo i flussi di cassa (contributi e prelievi)
+                # Per semplicità, assumiamo che i flussi di cassa siano distribuiti uniformemente nell'anno
+                flussi_netti_anno = etf_cashflow_anno  # Positivo per contributi, negativo per prelievi
+                patrimonio_medio_anno = patrimonio_investimenti_inizio + (flussi_netti_anno / 2)
+                
+                if patrimonio_medio_anno > 0:
+                    # Rendimento = (Valore finale - Valore iniziale - Flussi netti) / Patrimonio medio
+                    rendimento_puro = (patrimonio_investimenti_fine - patrimonio_investimenti_inizio - flussi_netti_anno) / patrimonio_medio_anno
+                    dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = rendimento_puro
+                else:
+                    dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = 0.0
             else:
                 dati_annuali['rendimento_investimento_percentuale'][anno_corrente] = 0.0
             
