@@ -732,23 +732,18 @@ with st.sidebar.expander("1. Parametri di Base", expanded=True):
     else:
         inflazione_modello = 0.025  # Default 2.5% se non calcolabile
     
-    # Mostra l'inflazione del modello e permette piccoli aggiustamenti
-    st.markdown(f"**📊 Inflazione del Modello: {inflazione_modello:.1%}**")
-    
-    # Range di aggiustamento ±1% intorno all'inflazione del modello
-    min_adj = max(0, inflazione_modello - 0.01)
-    max_adj = min(0.10, inflazione_modello + 0.01)
-    default_adj = p.get('inflazione', inflazione_modello)
-    
-    # Assicurati che il valore di default sia nel range
-    if default_adj < min_adj or default_adj > max_adj:
-        default_adj = inflazione_modello
-    
+    def percent_it(val):
+        return f"{val*100:.2f}".replace('.', ',') + '%'
+
+    st.markdown(f"**📊 Inflazione del Modello: {percent_it(inflazione_modello)}**")
+    st.markdown(f"Range: {percent_it(min_adj)} – {percent_it(max_adj)}")
+
     inflazione = st.slider(
-        "Aggiustamento Inflazione (±1%)", 
+        "Aggiustamento Inflazione (±1%)",
         min_adj, max_adj, default_adj, 0.001,
-        help=f"Piccolo aggiustamento all'inflazione del modello ({inflazione_modello:.1%}). Range: {min_adj:.1%} - {max_adj:.1%}"
+        help=f"Piccolo aggiustamento all'inflazione del modello ({percent_it(inflazione_modello)}). Range: {percent_it(min_adj)} – {percent_it(max_adj)}"
     )
+    st.markdown(f"**Inflazione selezionata:** {percent_it(inflazione)}")
     # --- FINE NUOVO CONTROLLO ---
     
     anni_inizio_prelievo = st.number_input("Anni all'Inizio dei Prelievi", min_value=0, value=p.get('anni_inizio_prelievo', 35), help="Tra quanti anni prevedi di smettere di lavorare e iniziare a vivere del tuo patrimonio (e pensione). Questo segna il passaggio dalla fase di Accumulo a quella di Decumulo.")
