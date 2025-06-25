@@ -446,48 +446,35 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
             # Imposta/aggiorna il prelievo annuale SOLO UNA VOLTA ALL'ANNO
             if (mese - inizio_prelievo_mesi) % 12 == 0:
                 if parametri['strategia_prelievo'] == 'FISSO':
-                    prelievo_annuo_nominale_corrente = prelievo_annuo_da_usare * indice_prezzi
+                    prelievo_annuo_nominale_corrente = prelievo_annuo_da_usare * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
                 elif parametri['strategia_prelievo'] == 'REGOLA_4_PERCENTO':
-                    if mese == inizio_prelievo_mesi:
-                        patrimonio_a_prelievo = patrimonio_banca + patrimonio_etf
-                        prelievo_annuo_nominale_iniziale = patrimonio_a_prelievo * parametri['percentuale_regola_4']
-                        indice_prezzi_inizio_pensione = indice_prezzi
-                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale
-                    else:
-                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
+                    patrimonio_a_inizio_anno = patrimonio_banca + patrimonio_etf
+                    prelievo_annuo_nominale_corrente = patrimonio_a_inizio_anno * parametri['percentuale_regola_4'] * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
                 elif parametri['strategia_prelievo'] == 'GUARDRAIL':
+                    patrimonio_a_inizio_anno = patrimonio_banca + patrimonio_etf
+                    prelievo_annuo_nominale_iniziale = patrimonio_a_inizio_anno * parametri['percentuale_regola_4']
                     if mese == inizio_prelievo_mesi:
-                        patrimonio_a_prelievo = patrimonio_banca + patrimonio_etf
-                        prelievo_annuo_nominale_iniziale = patrimonio_a_prelievo * parametri['percentuale_regola_4']
                         indice_prezzi_inizio_pensione = indice_prezzi
-                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale
+                        prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
                     else:
-                        # Calcola trend di mercato (ultimi 3 anni)
                         anni_da_prelievo = (mese - inizio_prelievo_mesi) // 12
                         if anni_da_prelievo >= 3:
-                            # Calcola trend basato sul patrimonio attuale vs iniziale
                             patrimonio_attuale = patrimonio_banca + patrimonio_etf
-                            trend_mercato = patrimonio_attuale / (patrimonio_a_prelievo * (indice_prezzi / indice_prezzi_inizio_pensione))
-                            
+                            trend_mercato = patrimonio_attuale / (prelievo_annuo_nominale_iniziale / parametri['percentuale_regola_4'])
                             banda_guardrail = parametri.get('banda_guardrail', 0.10)
                             if trend_mercato > (1 + banda_guardrail):
-                                # Mercato in forte crescita: aumenta prelievo
-                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione) * (1 + banda_guardrail * 0.5)
+                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (1 + banda_guardrail * 0.5) * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
                             elif trend_mercato < (1 - banda_guardrail):
-                                # Mercato in calo: riduce prelievo
-                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione) * (1 - banda_guardrail * 0.5)
+                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (1 - banda_guardrail * 0.5) * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
                             else:
-                                # Mercato stabile: prelievo normale
-                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
+                                prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
                         else:
-                            # Primi anni: prelievo normale
-                            prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi / indice_prezzi_inizio_pensione)
-            
+                            prelievo_annuo_nominale_corrente = prelievo_annuo_nominale_iniziale * (indice_prezzi if parametri.get('indicizza_contributi_inflazione', True) else 1)
+
             prelievo_mensile_target = prelievo_annuo_nominale_corrente / 12 if prelievo_annuo_nominale_corrente > 0 else 0
             if prelievo_mensile_target > 0:
                 prelevato_da_banca = min(prelievo_mensile_target, patrimonio_banca)
                 patrimonio_banca -= prelevato_da_banca
-                
                 fabbisogno_da_etf = prelievo_mensile_target - prelevato_da_banca
                 prelevato_da_etf_netto = 0
                 if fabbisogno_da_etf > 0 and patrimonio_etf > 0:
@@ -495,24 +482,20 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
                     tasse_implicite = (1 - cost_basis_ratio) * parametri['tassazione_capital_gain']
                     importo_lordo_da_vendere = fabbisogno_da_etf / (1 - tasse_implicite) if (1 - tasse_implicite) > 0 else float('inf')
                     importo_venduto = min(importo_lordo_da_vendere, patrimonio_etf)
-                    etf_cashflow_anno -= importo_venduto # Traccia il flusso in uscita
-                    
+                    etf_cashflow_anno -= importo_venduto
                     if importo_venduto > 0:
                         costo_proporzionale = (importo_venduto / patrimonio_etf) * etf_cost_basis
                         plusvalenza = importo_venduto - costo_proporzionale
                         tasse = plusvalenza * parametri['tassazione_capital_gain']
                         prelevato_da_etf_netto = importo_venduto - tasse
-                        
                         patrimonio_etf -= importo_venduto
                         etf_cost_basis -= costo_proporzionale
-
                 prelievo_totale_mese = prelevato_da_banca + prelevato_da_etf_netto
                 dati_annuali['prelievi_target_nominali'][anno_corrente] += prelievo_mensile_target
                 dati_annuali['prelievi_effettivi_nominali'][anno_corrente] += prelievo_totale_mese
                 dati_annuali['prelievi_effettivi_reali'][anno_corrente] += prelievo_totale_mese / indice_prezzi
                 dati_annuali['prelievi_da_banca_nominali'][anno_corrente] += prelevato_da_banca
                 dati_annuali['prelievi_da_etf_nominali'][anno_corrente] += prelevato_da_etf_netto
-                
                 dati_annuali['reddito_totale_reale'][anno_corrente] += prelievo_totale_mese / indice_prezzi
 
         # E. RENDIMENTI, COSTI E AGGIORNAMENTO INFLAZIONE
