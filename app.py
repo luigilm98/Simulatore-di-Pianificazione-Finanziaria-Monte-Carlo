@@ -1516,3 +1516,77 @@ with tabs[2]: # Analisi dei Redditi
     st.markdown("---")
     # --- Riepilogo Entrate ---
     dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+
+# --- Storico Contributi Versati (Tabella Dettagliata) ---
+dati_mediana = st.session_state.risultati['dati_grafici_avanzati']['dati_mediana']
+anni_totali = st.session_state.parametri['anni_totali']
+eta_iniziale = st.session_state.parametri['eta_iniziale']
+contributo_mensile_banca = st.session_state.parametri['contributo_mensile_banca']
+contributo_mensile_etf = st.session_state.parametri['contributo_mensile_etf']
+contributo_annuo_fp = st.session_state.parametri.get('contributo_annuo_fp', 0)
+attiva_fp = st.session_state.parametri.get('attiva_fondo_pensione', False)
+indicizza = st.session_state.parametri.get('indicizza_contributi_inflazione', True)
+indici_prezzi = dati_mediana.get('indice_prezzi', np.ones(anni_totali + 1))[1:]
+
+anni = np.arange(1, anni_totali + 1)
+contributi_conto_nom = np.array([contributo_mensile_banca * 12 for _ in anni])
+contributi_etf_nom = np.array([contributo_mensile_etf * 12 for _ in anni])
+contributi_fp_nom = np.array([(contributo_annuo_fp / 12) * 12 if attiva_fp else 0 for _ in anni])
+
+if indicizza:
+    contributi_conto_nom = contributi_conto_nom * indici_prezzi
+    contributi_etf_nom = contributi_etf_nom * indici_prezzi
+    contributi_fp_nom = contributi_fp_nom * indici_prezzi
+
+contributi_conto_reale = contributi_conto_nom / indici_prezzi
+contributi_etf_reale = contributi_etf_nom / indici_prezzi
+contributi_fp_reale = contributi_fp_nom / indici_prezzi
+
+# Cumulativi
+cumul_conto_nom = np.cumsum(contributi_conto_nom)
+cumul_etf_nom = np.cumsum(contributi_etf_nom)
+cumul_fp_nom = np.cumsum(contributi_fp_nom)
+cumul_totale_nom = cumul_conto_nom + cumul_etf_nom + cumul_fp_nom
+
+cumul_conto_reale = np.cumsum(contributi_conto_reale)
+cumul_etf_reale = np.cumsum(contributi_etf_reale)
+cumul_fp_reale = np.cumsum(contributi_fp_reale)
+cumul_totale_reale = cumul_conto_reale + cumul_etf_reale + cumul_fp_reale
+
+import pandas as pd
+with st.expander('📊 Storico Contributi Versati (dettaglio anno per anno)', expanded=False):
+    st.markdown('Questa tabella mostra, anno per anno, i contributi versati suddivisi per categoria e sia in valori nominali che reali. Sono incluse anche le somme cumulative per ogni categoria e il totale.')
+    df_contributi = pd.DataFrame({
+        'Anno': anni,
+        'Età': eta_iniziale + anni,
+        'Contributi Conto (Nominale)': contributi_conto_nom,
+        'Cumul. Conto (Nominale)': cumul_conto_nom,
+        'Contributi ETF (Nominale)': contributi_etf_nom,
+        'Cumul. ETF (Nominale)': cumul_etf_nom,
+        'Contributi FP (Nominale)': contributi_fp_nom,
+        'Cumul. FP (Nominale)': cumul_fp_nom,
+        'Totale Cumul. (Nominale)': cumul_totale_nom,
+        'Contributi Conto (Reale)': contributi_conto_reale,
+        'Cumul. Conto (Reale)': cumul_conto_reale,
+        'Contributi ETF (Reale)': contributi_etf_reale,
+        'Cumul. ETF (Reale)': cumul_etf_reale,
+        'Contributi FP (Reale)': contributi_fp_reale,
+        'Cumul. FP (Reale)': cumul_fp_reale,
+        'Totale Cumul. (Reale)': cumul_totale_reale,
+    })
+    st.dataframe(df_contributi.style.format({
+        'Contributi Conto (Nominale)': '€ {:,.0f}',
+        'Cumul. Conto (Nominale)': '€ {:,.0f}',
+        'Contributi ETF (Nominale)': '€ {:,.0f}',
+        'Cumul. ETF (Nominale)': '€ {:,.0f}',
+        'Contributi FP (Nominale)': '€ {:,.0f}',
+        'Cumul. FP (Nominale)': '€ {:,.0f}',
+        'Totale Cumul. (Nominale)': '€ {:,.0f}',
+        'Contributi Conto (Reale)': '€ {:,.0f}',
+        'Cumul. Conto (Reale)': '€ {:,.0f}',
+        'Contributi ETF (Reale)': '€ {:,.0f}',
+        'Cumul. ETF (Reale)': '€ {:,.0f}',
+        'Contributi FP (Reale)': '€ {:,.0f}',
+        'Cumul. FP (Reale)': '€ {:,.0f}',
+        'Totale Cumul. (Reale)': '€ {:,.0f}',
+    }))
