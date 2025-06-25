@@ -652,82 +652,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
     }
 
 
-def _calcola_prelievo_sostenibile(parametri):
-    """
-    Trova il prelievo annuo reale massimo sostenibile con una ricerca binaria.
-    L'obiettivo è trovare il tasso di prelievo che porta il patrimonio reale
-    finale *mediano* il più vicino possibile a zero, senza diventare negativo.
-    Utilizza un numero ridotto di simulazioni per la velocità.
-    """
-    params_test = parametri.copy()
-    params_test['prelievo_annuo'] = 0
-    params_test['n_simulazioni'] = max(100, params_test['n_simulazioni'] // 4)
-    params_test['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
-
-    risultati_test = run_full_simulation(params_test)
-    patrimoni_reali_test = risultati_test['dati_grafici_principali']['reale']
-    
-    idx_inizio_prelievo = parametri['anni_inizio_prelievo']
-    capitale_reale_mediano_a_prelievo = np.median(patrimoni_reali_test[:, idx_inizio_prelievo])
-
-    anni_prelievo = parametri['anni_totali'] - parametri['anni_inizio_prelievo']
-    if anni_prelievo <= 0:
-        return 0
-    # Se il capitale mediano è basso ma non nullo, prova comunque a cercare un prelievo >0
-    if capitale_reale_mediano_a_prelievo <= 0:
-        return 0
-    
-    # Range più ampio per la ricerca binaria
-    limite_inferiore = 0
-    limite_superiore = max(1, capitale_reale_mediano_a_prelievo * 2 / max(1, anni_prelievo))
-    prelievo_ottimale = 0
-    soglia = 10000  # Patrimonio finale massimo accettato
-    max_fallimento = 0.10  # Probabilità di fallimento massima accettata
-    
-    def mediana_finale(prelievo):
-        params_run = parametri.copy()
-        params_run['prelievo_annuo'] = prelievo  # Assicura che venga usato il valore corretto
-        params_run['n_simulazioni'] = max(100, params_run['n_simulazioni'] // 4)
-        params_run['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
-        risultati_run = run_full_simulation(params_run, prelievo_annuo_da_usare=prelievo)
-        patrimonio_finale = np.median(risultati_run['dati_grafici_principali']['reale'][:, -1])
-        prob_fallimento = risultati_run['statistiche']['probabilita_fallimento']
-        return patrimonio_finale, prob_fallimento
-
-    for _ in range(50):
-        prelievo_corrente = (limite_inferiore + limite_superiore) / 2
-        if prelievo_corrente < 1:
-            break
-        patrimonio_risultante, prob_fallimento = mediana_finale(prelievo_corrente)
-        if abs(patrimonio_risultante) <= soglia and prob_fallimento <= max_fallimento:
-            prelievo_ottimale = prelievo_corrente
-            limite_inferiore = prelievo_corrente
-        else:
-            limite_superiore = prelievo_corrente
-                
-    return prelievo_ottimale
-
-
 def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
     valida_parametri(parametri)
     
-    # Gestione del calcolo del prelievo sostenibile
-    prelievo_sostenibile_calcolato = None
-    prelievo_effettivamente_usato = None
+    # Gestione del prelievo annuo
     if prelievo_annuo_da_usare is None:
-        if parametri['strategia_prelievo'] == 'FISSO' and parametri.get('calcola_prelievo_sostenibile', False) and not parametri.get('_in_routine_sostenibile', False):
-            prelievo_sostenibile_calcolato = _calcola_prelievo_sostenibile(parametri)
-            prelievo_annuo_da_usare = prelievo_sostenibile_calcolato
-            parametri['prelievo_annuo'] = prelievo_sostenibile_calcolato
-            parametri['_in_routine_sostenibile'] = True  # Evita ricorsione
-            prelievo_effettivamente_usato = prelievo_sostenibile_calcolato
-            # Debug: stampa il valore calcolato
-            print(f"[DEBUG] Prelievo sostenibile calcolato: {prelievo_sostenibile_calcolato}")
-        else:
-            prelievo_annuo_da_usare = parametri['prelievo_annuo']
-            prelievo_effettivamente_usato = prelievo_annuo_da_usare
-    else:
-        prelievo_effettivamente_usato = prelievo_annuo_da_usare
+        prelievo_annuo_da_usare = parametri['prelievo_annuo']
 
     # Inizializzazione contenitori per i risultati aggregati
     n_sim = parametri['n_simulazioni']
@@ -781,8 +711,8 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         'patrimoni_reali_finali': patrimoni_finali_reali,
         'guadagni_accumulo_mediano_nominale': np.median(tutti_i_guadagni),
         'contributi_totali_versati_mediano_nominale': np.median(tutti_i_contributi),
-        'prelievo_sostenibile_calcolato': prelievo_sostenibile_calcolato,
-        'prelievo_effettivamente_usato': prelievo_effettivamente_usato
+        'prelievo_sostenibile_calcolato': None,
+        'prelievo_effettivamente_usato': prelievo_annuo_da_usare
     }
 
     reddito_reale_annuo_tutte_le_run = np.array([run['reddito_totale_reale'] for run in tutti_i_dati_annuali])
@@ -790,7 +720,7 @@ def run_full_simulation(parametri, prelievo_annuo_da_usare=None):
         'totale_reale_medio_annuo': np.mean(reddito_reale_annuo_tutte_le_run) if reddito_reale_annuo_tutte_le_run.size > 0 else 0.0
     }
     # Debug: stampa il valore effettivamente usato
-    print(f"[DEBUG] Prelievo effettivamente usato nella simulazione principale: {prelievo_effettivamente_usato}")
+    print(f"[DEBUG] Prelievo effettivamente usato nella simulazione principale: {prelievo_annuo_da_usare}")
 
     return {
         "statistiche": statistiche,

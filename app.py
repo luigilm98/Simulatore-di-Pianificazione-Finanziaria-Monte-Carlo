@@ -844,26 +844,13 @@ with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
         help="Scegli come verranno calcolati i prelievi dal tuo patrimonio una volta in pensione. 'FISSO' è un importo costante. 'REGOLA_4_PERCENTO' ricalcola ogni anno il 4% del capitale residuo. 'GUARDRAIL' adatta i prelievi ai trend di mercato per proteggere il capitale."
     )
     
-    # Nuovo controllo per distinguere tra prelievo fisso e calcolo automatico
+    # Controllo per l'importo di prelievo fisso
     if strategia_prelievo == 'FISSO':
-        tipo_prelievo_fisso = st.radio(
-            "Tipo di Prelievo Fisso",
-            options=['Importo Specifico', 'Calcolo Automatico Sostenibile'],
-            index=0 if p.get('tipo_prelievo_fisso', 'Importo Specifico') == 'Importo Specifico' else 1,
-            help="Scegli se impostare un importo specifico o far calcolare automaticamente il prelievo massimo sostenibile dal tuo patrimonio."
+        prelievo_annuo = st.number_input(
+            "Importo Prelievo Fisso Annuo (€)",
+            min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
+            help="L'importo fisso che preleverai ogni anno dal tuo patrimonio durante la pensione."
         )
-        
-        if tipo_prelievo_fisso == 'Importo Specifico':
-            prelievo_annuo = st.number_input(
-                "Importo Prelievo Fisso Annuo (€)",
-                min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
-                help="L'importo fisso che preleverai ogni anno dal tuo patrimonio durante la pensione."
-            )
-            calcola_prelievo_sostenibile = False
-        else:  # Calcolo Automatico Sostenibile
-            prelievo_annuo = 0  # Placeholder, verrà calcolato dal motore
-            calcola_prelievo_sostenibile = True
-            st.info("🔍 Il simulatore calcolerà automaticamente il prelievo massimo sostenibile dal tuo patrimonio.")
     else:
         # Per le altre strategie, usa sempre il valore specificato
         prelievo_annuo = st.number_input(
@@ -871,8 +858,6 @@ with st.sidebar.expander("3. Strategie di Prelievo", expanded=True):
             min_value=0, step=500, value=p.get('prelievo_annuo', 12000),
             help="Usato SOLO con la strategia 'FISSO'. Per le altre strategie, questo valore viene ignorato."
         )
-        calcola_prelievo_sostenibile = False
-        tipo_prelievo_fisso = 'Importo Specifico'
     
     percentuale_regola_4 = st.slider(
         "Percentuale Regola 4% / Prelievo Iniziale (%)", 0.0, 10.0, p.get('percentuale_regola_4', 0.04) * 100, 0.1,
@@ -962,7 +947,6 @@ if st.sidebar.button("🚀 Esegui Simulazione", type="primary"):
             'inflazione': inflazione, 'anni_inizio_prelievo': anni_inizio_prelievo,
             'prelievo_annuo': prelievo_annuo, 'n_simulazioni': n_simulazioni, 'anni_totali': anni_totali_input,
             'strategia_prelievo': strategia_prelievo, 'percentuale_regola_4': percentuale_regola_4, 'banda_guardrail': banda_guardrail,
-            'calcola_prelievo_sostenibile': calcola_prelievo_sostenibile, 'tipo_prelievo_fisso': tipo_prelievo_fisso,
             'indicizza_contributi_inflazione': indicizza_contributi_inflazione,
             
             'strategia_ribilanciamento': strategia_ribilanciamento, 
@@ -1137,19 +1121,7 @@ with col2:
 
 
 # --- Messaggi Informativi Contestuali ---
-prelievo_sostenibile_calcolato = st.session_state.risultati['statistiche'].get('prelievo_sostenibile_calcolato')
-prelievo_effettivamente_usato = st.session_state.risultati['statistiche'].get('prelievo_effettivamente_usato')
-if prelievo_sostenibile_calcolato is not None and prelievo_sostenibile_calcolato > 0:
-    st.info(f"""
-    **Hai richiesto il calcolo del prelievo massimo sostenibile.**
-    \nAbbiamo calcolato che potresti prelevare circa **€ {prelievo_sostenibile_calcolato:,.0f} reali all'anno**.\n
-    **DEBUG:** Il prelievo effettivamente usato nella simulazione principale è: **€ {prelievo_effettivamente_usato:,.0f}**.
-    """)
-
-# --- Forza la visualizzazione del prelievo effettivamente usato se >0 ---
-if prelievo_effettivamente_usato is not None and prelievo_effettivamente_usato > 0:
-    prelievo_medio_reale = prelievo_effettivamente_usato
-    prelievo_medio_nominale = prelievo_effettivamente_usato
+# Rimuovo il messaggio sul calcolo automatico sostenibile
 
 # --- Warning se i prelievi effettivi sono nulli o trascurabili ---
 if prelievo_medio_reale < 1:
