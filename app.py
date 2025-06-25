@@ -41,7 +41,6 @@ with st.form("profilo_utente"):
         st.error("La somma delle percentuali deve essere 100%.")
     submitted = st.form_submit_button("Salva profilo")
     if submitted and pct_azioni + pct_obblig + pct_liquidita == 100:
-        st.success("Profilo utente salvato! Ora puoi scegliere gli scenari di stress.")
         st.session_state['profilo_utente'] = {
             'eta': eta,
             'orizzonte': orizzonte,
@@ -53,6 +52,7 @@ with st.form("profilo_utente"):
             'pct_obblig': pct_obblig,
             'pct_liquidita': pct_liquidita
         }
+        st.success("Profilo utente salvato! Ora puoi scegliere gli scenari di stress.")
 
 # --- 2. Scelta scenari di stress ---
 st.header("2. Scegli scenari di stress")
@@ -78,7 +78,6 @@ with st.form("scenari_stress"):
 
     submitted_stress = st.form_submit_button("Salva scenari di stress")
     if submitted_stress:
-        st.success("Scenari di stress salvati! Ora puoi eseguire la simulazione.")
         st.session_state['scenari_stress'] = {
             'crash': crash,
             'crash_severity': crash_severity,
@@ -92,6 +91,7 @@ with st.form("scenari_stress"):
             'spesa_importo': spesa_importo,
             'spesa_anno': spesa_anno
         }
+        st.success("Scenari di stress salvati! Ora puoi eseguire la simulazione.")
 
 # --- 3. Esecuzione simulazione e visualizzazione risultati ---
 st.header("3. Esegui simulazione e visualizza risultati")
@@ -140,7 +140,7 @@ else:
         anni_sopravvivenza = len(patrimonio_arr) - 1
         rischio_longevita = fine < st.session_state['profilo_utente']['obiettivo_prelievo'] * 10  # Arbitrario: meno di 10 anni di prelievo
 
-        # Salva risultati per confronto scenari
+        # Salva risultati per confronto scenari PRIMA di qualsiasi output
         st.session_state['last_simulation'] = {
             'profilo_utente': st.session_state['profilo_utente'],
             'scenari_stress': st.session_state['scenari_stress'],
@@ -231,14 +231,6 @@ st.header("5. Gestione e confronto scenari")
 SCENARIO_DIR = "simulation_history"
 os.makedirs(SCENARIO_DIR, exist_ok=True)
 
-# Salvataggio scenario dopo la simulazione
-if 'profilo_utente' in st.session_state and 'scenari_stress' in st.session_state and 'last_simulation' not in st.session_state:
-    st.session_state['last_simulation'] = {
-        'profilo_utente': st.session_state['profilo_utente'],
-        'scenari_stress': st.session_state['scenari_stress'],
-        # Puoi aggiungere qui altri risultati della simulazione se vuoi salvarli
-    }
-
 if 'last_simulation' in st.session_state:
     with st.form("save_scenario_form"):
         scenario_name = st.text_input("Nome scenario da salvare", "Scenario " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"))
@@ -250,7 +242,6 @@ if 'last_simulation' in st.session_state:
             st.success(f"Scenario '{scenario_name}' salvato!")
             del st.session_state['last_simulation']
 
-# Lista scenari salvati
 scenari_files = [f for f in os.listdir(SCENARIO_DIR) if f.endswith('.json')]
 if scenari_files:
     st.markdown("**Scenari salvati:**")
