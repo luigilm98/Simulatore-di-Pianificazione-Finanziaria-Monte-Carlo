@@ -417,9 +417,12 @@ def _esegui_una_simulazione(parametri, prelievo_annuo_da_usare):
 
         # C. FASE DI ACCUMULO (prima dei rendimenti)
         if mese < inizio_prelievo_mesi:
-            # Rivaluta i contributi per l'inflazione corrente
-            contributo_mensile_banca_nominale = parametri['contributo_mensile_banca'] * indice_prezzi
-            contributo_mensile_etf_nominale = parametri['contributo_mensile_etf'] * indice_prezzi
+            if parametri.get('indicizza_contributi_inflazione', True):
+                contributo_mensile_banca_nominale = parametri['contributo_mensile_banca'] * indice_prezzi
+                contributo_mensile_etf_nominale = parametri['contributo_mensile_etf'] * indice_prezzi
+            else:
+                contributo_mensile_banca_nominale = parametri['contributo_mensile_banca']
+                contributo_mensile_etf_nominale = parametri['contributo_mensile_etf']
 
             patrimonio_banca += contributo_mensile_banca_nominale
             contributi_totali_accumulati += contributo_mensile_banca_nominale
