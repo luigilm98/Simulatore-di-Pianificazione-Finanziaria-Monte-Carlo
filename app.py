@@ -1022,8 +1022,29 @@ stats_aggregate = st.session_state.risultati['statistiche']
 
 # 1. Calcolo Componenti del Patrimonio
 patrimonio_iniziale_totale = st.session_state.parametri['capitale_iniziale'] + st.session_state.parametri['etf_iniziale']
-# Usiamo i valori mediani calcolati dal motore, che sono più robusti
-contributi_versati = stats_aggregate['contributi_totali_versati_mediano_nominale']
+
+# Calcolo contributi versati usando la stessa logica della tabella
+anni_totali = st.session_state.parametri['anni_totali']
+anni_inizio_prelievo = st.session_state.parametri['anni_inizio_prelievo']
+eta_iniziale = st.session_state.parametri['eta_iniziale']
+eta_ritiro_fp = st.session_state.parametri.get('eta_ritiro_fp', 67)
+attiva_fp = st.session_state.parametri.get('attiva_fondo_pensione', False)
+
+# Contributi conto e ETF (solo durante la fase di accumulo)
+contributi_conto_totali = st.session_state.parametri['contributo_mensile_banca'] * 12 * anni_inizio_prelievo
+contributi_etf_totali = st.session_state.parametri['contributo_mensile_etf'] * 12 * anni_inizio_prelievo
+
+# Contributi FP (solo fino all'età di ritiro)
+if attiva_fp:
+    anni_contributo_fp = min(eta_ritiro_fp - eta_iniziale, anni_totali)
+    contributi_fp_totali = st.session_state.parametri.get('contributo_annuo_fp', 0) * anni_contributo_fp
+else:
+    contributi_fp_totali = 0
+
+# Contributi totali (NON includendo il capitale iniziale)
+contributi_versati = contributi_conto_totali + contributi_etf_totali + contributi_fp_totali
+
+# Guadagni da investimento (dalla simulazione)
 guadagni_da_investimento = stats_aggregate['guadagni_accumulo_mediano_nominale']
 
 # Calcolo percentili patrimonio all'inizio prelievi
@@ -1080,7 +1101,11 @@ col1.metric(
 )
 col2.metric(
     "Contributi Totali Versati", f"€ {contributi_versati:,.0f}",
-    help="La stima di tutto il denaro che verserai di tasca tua durante la fase di accumulo. Include: accantonamenti sul conto corrente, investimenti in ETF, e contributi al fondo pensione (se attivato). Questo è il tuo sacrificio finanziario totale."
+    help="La stima di tutto il denaro che verserai di tasca tua durante la fase di accumulo. Include: accantonamenti sul conto corrente ({} anni), investimenti in ETF ({} anni), e contributi al fondo pensione ({} anni se attivo). Questo è il tuo sacrificio finanziario totale, escludendo il capitale iniziale.".format(
+        anni_inizio_prelievo, 
+        anni_inizio_prelievo, 
+        min(eta_ritiro_fp - eta_iniziale, anni_totali) if attiva_fp else 0
+    )
 )
 col3.metric(
     "Guadagni da Investimento", f"€ {guadagni_da_investimento:,.0f}",
@@ -1500,21 +1525,36 @@ attiva_fp = st.session_state.parametri.get('attiva_fondo_pensione', False)
 indicizza = st.session_state.parametri.get('indicizza_contributi_inflazione', True)
 indici_prezzi = dati_mediana.get('indice_prezzi', np.ones(anni_totali + 1))[1:]
 
-anni = np.arange(1, anni_totali + 1)
-contributi_conto_nom = np.array([contributo_mensile_banca * 12 for _ in anni])
-contributi_etf_nom = np.array([contributo_mensile_etf * 12 for _ in anni])
-contributi_fp_nom = np.array([(contributo_annuo_fp / 12) * 12 if attiva_fp else 0 for _ in anni])
+# Parametri temporali per i contributi
+anni_inizio_prelievo = st.session_state.parametri['anni_inizio_prelievo']
+eta_ritiro_fp = st.session_state.parametri.get('eta_ritiro_fp', 67)
+inizio_pensione_anni = st.session_state.parametri.get('inizio_pensione_anni', 40)
 
+anni = np.arange(1, anni_totali + 1)
+
+# Contributi conto corrente e ETF: si fermano all'inizio dei prelievi
+contributi_conto_nom = np.where(anni <= anni_inizio_prelievo, contributo_mensile_banca * 12, 0)
+contributi_etf_nom = np.where(anni <= anni_inizio_prelievo, contributo_mensile_etf * 12, 0)
+
+# Contributi fondo pensione: si fermano all'età di ritiro FP (se attivo)
+if attiva_fp:
+    anni_contributo_fp = eta_ritiro_fp - eta_iniziale
+    contributi_fp_nom = np.where(anni <= anni_contributo_fp, contributo_annuo_fp, 0)
+else:
+    contributi_fp_nom = np.zeros_like(anni)
+
+# Applica indicizzazione all'inflazione se richiesta
 if indicizza:
     contributi_conto_nom = contributi_conto_nom * indici_prezzi
     contributi_etf_nom = contributi_etf_nom * indici_prezzi
     contributi_fp_nom = contributi_fp_nom * indici_prezzi
 
+# Converti in valori reali
 contributi_conto_reale = contributi_conto_nom / indici_prezzi
 contributi_etf_reale = contributi_etf_nom / indici_prezzi
 contributi_fp_reale = contributi_fp_nom / indici_prezzi
 
-# Cumulativi
+# Calcola cumulativi (NON includendo il capitale iniziale)
 cumul_conto_nom = np.cumsum(contributi_conto_nom)
 cumul_etf_nom = np.cumsum(contributi_etf_nom)
 cumul_fp_nom = np.cumsum(contributi_fp_nom)
@@ -1527,7 +1567,16 @@ cumul_totale_reale = cumul_conto_reale + cumul_etf_reale + cumul_fp_reale
 
 import pandas as pd
 with st.expander('📊 Storico Contributi Versati (dettaglio anno per anno)', expanded=False):
-    st.markdown('Questa tabella mostra, anno per anno, i contributi versati suddivisi per categoria e sia in valori nominali che reali. Sono incluse anche le somme cumulative per ogni categoria e il totale.')
+    st.markdown('''
+    Questa tabella mostra, anno per anno, i contributi versati suddivisi per categoria e sia in valori nominali che reali. 
+    
+    **Note importanti:**
+    - I contributi conto corrente e ETF si fermano all'inizio della fase di prelievo (anno {})
+    - I contributi fondo pensione si fermano all'età di ritiro FP (anno {})
+    - Il capitale iniziale (€{:,.0f}) NON è incluso in questa tabella - è già presente nel patrimonio iniziale
+    - I valori reali rappresentano il potere d'acquisto di oggi
+    '''.format(anni_inizio_prelievo, eta_ritiro_fp - eta_iniziale, st.session_state.parametri['capitale_iniziale'] + st.session_state.parametri['etf_iniziale']))
+    
     df_contributi = pd.DataFrame({
         'Anno': anni,
         'Età': eta_iniziale + anni,
