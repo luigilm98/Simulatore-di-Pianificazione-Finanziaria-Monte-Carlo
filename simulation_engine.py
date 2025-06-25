@@ -694,20 +694,25 @@ def _calcola_prelievo_sostenibile(parametri):
         
     limite_inferiore, limite_superiore = 0, capitale_reale_mediano_a_prelievo / anni_prelievo
     prelievo_ottimale = 0
+    soglia = 10000  # Patrimonio finale massimo accettato
+    max_fallimento = 0.10  # Probabilità di fallimento massima accettata
     
     def mediana_finale(prelievo):
         params_run = parametri.copy()
         params_run['n_simulazioni'] = max(100, params_run['n_simulazioni'] // 4)
         params_run['_in_routine_sostenibile'] = True  # Flag per evitare ricorsione
         risultati_run = run_full_simulation(params_run, prelievo_annuo_da_usare=prelievo)
-        return np.median(risultati_run['statistiche']['patrimonio_finale_mediano_reale'])
+        patrimonio_finale = np.median(risultati_run['statistiche']['patrimonio_finale_mediano_reale'])
+        prob_fallimento = risultati_run['statistiche']['probabilita_fallimento']
+        return patrimonio_finale, prob_fallimento
 
-    for _ in range(15):
+    for _ in range(50):
         prelievo_corrente = (limite_inferiore + limite_superiore) / 2
         if prelievo_corrente < 1: break
-        patrimonio_risultante = mediana_finale(prelievo_corrente)
-        if patrimonio_risultante > 0:
-            prelievo_ottimale, limite_inferiore = prelievo_corrente, prelievo_corrente
+        patrimonio_risultante, prob_fallimento = mediana_finale(prelievo_corrente)
+        if abs(patrimonio_risultante) <= soglia and prob_fallimento <= max_fallimento:
+            prelievo_ottimale = prelievo_corrente
+            limite_inferiore = prelievo_corrente
         else:
             limite_superiore = prelievo_corrente
             
